@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package channeld;
+
+//import "google/protobuf/any.proto";
+
+option go_package = "/proto";
+
+enum ChannelType {
+    UNKNOWN = 0;
+    GLOBAL = 1;   // Default channel. Any message without ChannelId specified will be sent to this channel. All connections join this channel.
+    PRIVATE = 2;  // Per-connection channel. Useful to store the user data and subscribe the client to the data update.
+    SUBWORLD = 3; // A game "room" in a session-based game, or a level in an MMORPG. Subworlds are spatially divided thus the interests are isolated.
+    SPATIAL = 4;  // Spatial channels are spatailly connected. Using this channel to implement a seamless open world.
+}
+
+enum MessageType {
+    INVALID = 0;
+    AUTH = 1;
+    AUTH_RESULT = 2;
+    CREATE_CHANNEL = 3;
+    REMOVE_CHANNEL = 4;
+    SUB_TO_CHANNEL = 5;
+    UNSUB_TO_CHANNEL = 6;
+    CHANNEL_DATA_GLOBAL = 11;
+    CHANNEL_DATA_SPATIAL = 14;
+}
+
+message AuthMessage {
+    string playerIdentifierToken = 1;
+    string loginToken = 2;
+}
+
+message CreateChannelMessage {
+    ChannelType channelType = 1;
+}
+
+message RemoveChannelMessage {
+    
+}
+
+message SubscribedToChannelsMessage {
+    uint32 connId = 1;
+    repeated uint32 channelIds = 2;
+}
+
+message UnsubscribedToChannelsMessage {
+    uint32 connId = 1;
+    repeated uint32 channelIds = 2;
+}
+
+/*
+message ChannelDataMessage {
+    uint32 channelId = 1;
+    google.protobuf.Any data = 2;
+}
+*/
+
+message GlobalChannelDataMessage {
+    string title = 1;
+    uint32 clientConnNum = 2;
+}
+
+message Location {
+    double x = 1;
+    double y = 2;
+    double z = 3;
+}
+
+message SpatialChannelDataMessage {
+    map<uint32, Location> entities = 1;
+}

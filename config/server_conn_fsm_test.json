@@ -1,0 +1,36 @@
+{
+    "States": [
+        {
+            "Name": "INIT",
+            "MsgTypeWhitelist": "1",
+            "MsgTypeBlacklist": ""
+        },
+        {
+            "Name": "OPEN",
+            "MsgTypeWhitelist": "2-10, 20",
+            "MsgTypeBlacklist": "9"
+        },
+        {
+            "Name": "HANDOVER",
+            "MsgTypeWhitelist": "21,22",
+            "MsgTypeBlacklist": ""
+        }
+    ],
+    "Transitions": [
+        {
+            "FromState": "INIT",
+            "ToState": "OPEN",
+            "MsgType": 1
+        },
+        {
+            "FromState": "OPEN",
+            "ToState": "HANDOVER",
+            "MsgType": 20
+        },
+        {
+            "FromState": "HANDOVER",
+            "ToState": "OPEN",
+            "MsgType": 22
+        }
+    ]
+}
