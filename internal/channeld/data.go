@@ -11,7 +11,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
-type ChannelDataMessage = protoreflect.Message
+type ChannelDataMessage = Message //protoreflect.Message
 
 type ChannelData struct {
 	msgType proto.MessageType
@@ -32,12 +32,13 @@ func NewChannelData(channelType proto.ChannelType) *ChannelData {
 	}
 	return &ChannelData{
 		msgType: proto.MessageType(msgType),
-		msg:     dataType.New(),
+		msg:     dataType.New().Interface(),
 	}
 }
 
 func (d *ChannelData) Update(updateMsg Message, cs *ChannelSubscription) {
-	protobuf.Merge(d.msg.Interface(), updateMsg)
+	protobuf.Merge(d.msg, updateMsg)
+
 	if cs.fanOutDataMsg == nil {
 		cs.fanOutDataMsg = updateMsg
 	} else {
@@ -45,10 +46,15 @@ func (d *ChannelData) Update(updateMsg Message, cs *ChannelSubscription) {
 	}
 }
 
-func (ch *Channel) tickData(dt time.Duration) {
+func (ch *Channel) tickData() {
 	for connId, cs := range ch.subscribedConnections {
+		if cs.fanOutDataMsg == nil {
+			continue
+		}
 		if cs.options.Frequency <= 0 || time.Now().After(cs.lastFanOutTime.Add(time.Second/time.Duration(cs.options.Frequency))) {
-			GetConnection(connId).SendWithChannel(ch.id, ch.Data().msgType, cs.fanOutDataMsg)
+			c := GetConnection(connId)
+			c.SendWithChannel(ch.id, ch.Data().msgType, cs.fanOutDataMsg)
+			c.Flush()
 			cs.lastFanOutTime = time.Now()
 		}
 	}

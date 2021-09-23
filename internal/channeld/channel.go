@@ -43,10 +43,13 @@ type Channel struct {
 	subscribedConnections map[ConnectionId]*ChannelSubscription
 	data                  *ChannelData
 	inMsgQueue            chan ChannelMessage
+	tickInterval          time.Duration
+	removing              chan bool
 }
 
 const (
-	GlobalChannelId ChannelId = 0
+	GlobalChannelId     ChannelId     = 0
+	defaultTickInterval time.Duration = time.Millisecond * 50
 )
 
 var nextChannelId ChannelId = GlobalChannelId
@@ -75,6 +78,8 @@ func CreateChannel(t proto.ChannelType, owner *Connection) *Channel {
 		subscribedConnections: make(map[ConnectionId]*ChannelSubscription),
 		data:                  NewChannelData(t),
 		inMsgQueue:            make(chan ChannelMessage, 1024),
+		tickInterval:          defaultTickInterval,
+		removing:              make(chan bool),
 	}
 	if owner == nil {
 		ch.state = INIT
@@ -83,10 +88,13 @@ func CreateChannel(t proto.ChannelType, owner *Connection) *Channel {
 	}
 	allChannels[nextChannelId] = ch
 	nextChannelId += 1
+	go ch.Tick()
 	return ch
 }
 
 func RemoveChannel(ch *Channel) {
+	close(ch.inMsgQueue)
+	ch.removing <- true
 	delete(allChannels, ch.id)
 }
 
@@ -102,10 +110,24 @@ func (ch *Channel) PutMessage(msg Message, handler MessageHandlerFunc, conn *Con
 	ch.inMsgQueue <- ChannelMessage{msg, handler, conn}
 }
 
-func (ch *Channel) ProcessMessages() {
+func (ch *Channel) Tick() {
 	for {
-		cm := <-ch.inMsgQueue
-		cm.handler(cm.msg, cm.conn, ch)
+		if <-ch.removing {
+			return
+		}
+
+		tickStart := time.Now()
+		for len(ch.inMsgQueue) > 0 {
+			cm := <-ch.inMsgQueue
+			cm.handler(cm.msg, cm.conn, ch)
+			if ch.tickInterval > 0 && time.Since(tickStart) >= ch.tickInterval {
+				log.Printf("%s spent %dms handling messages, will delay the left ones(%d) to the next tick.", ch, time.Millisecond*time.Since(tickStart), len(ch.inMsgQueue))
+				break
+			}
+		}
+		ch.tickData()
+
+		time.Sleep(ch.tickInterval - time.Since(tickStart))
 	}
 }
 
@@ -115,8 +137,4 @@ func (ch *Channel) Broadcast(msgType proto.MessageType, msg Message) {
 
 func (ch *Channel) BroadcastSub(connId ConnectionId) {
 
-}
-
-func (ch *Channel) Tick(dt time.Duration) {
-	ch.tickData(dt)
 }

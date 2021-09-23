@@ -29,9 +29,11 @@ type Connection struct {
 	id             ConnectionId
 	connectionType ConnectionType
 	conn           net.Conn
-	reader         io.Reader
-	writer         io.Writer
+	reader         *bufio.Reader
+	writer         *bufio.Writer
 	fsm            *fsm.FiniteStateMachine
+	// Don't put the removing into the FSM as 1) the FSM's states are user-defined. 2) the FSM doesn't have the race condition.
+	removing chan bool
 }
 
 var allConnections map[ConnectionId]*Connection
@@ -90,6 +92,7 @@ func AddConnection(c net.Conn, t ConnectionType) *Connection {
 		conn:           c,
 		reader:         bufio.NewReader(c),
 		writer:         bufio.NewWriter(c),
+		removing:       make(chan bool),
 	}
 	var fsm fsm.FiniteStateMachine
 	switch t {
@@ -103,7 +106,19 @@ func AddConnection(c net.Conn, t ConnectionType) *Connection {
 
 	allConnections[connection.id] = connection
 
+	go func() {
+		for !<-connection.removing {
+			connection.Receive()
+		}
+	}()
+
 	return connection
+}
+
+func RemoveConnection(c *Connection) {
+	c.removing <- true
+	c.conn.Close()
+	delete(allConnections, c.id)
 }
 
 func readBytes(c *Connection, len uint) ([]byte, error) {
@@ -199,10 +214,16 @@ func (c *Connection) Receive() {
 		log.Panicln(err)
 	}
 
+	c.fsm.OnReceived(msgType)
+
 	channel.PutMessage(msg, entry.handler, c)
 }
 
 func (c *Connection) SendWithChannel(channelId ChannelId, msgType proto.MessageType, msg Message) {
+	if <-c.removing {
+		return
+	}
+
 	bytes, err := protobuf.Marshal(msg)
 	if err != nil {
 		log.Panicf("Failed to marshal message %d: %s\n", msgType, msg)
@@ -220,7 +241,15 @@ func (c *Connection) SendWithChannel(channelId ChannelId, msgType proto.MessageT
 }
 
 func (c *Connection) Send(msgType proto.MessageType, msg Message) {
+	if <-c.removing {
+		return
+	}
+
 	c.SendWithChannel(0, msgType, msg)
+}
+
+func (c *Connection) Flush() {
+	c.writer.Flush()
 }
 
 func (c *Connection) String() string {

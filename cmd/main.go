@@ -35,8 +35,8 @@ func main() {
 	channeld.InitConnections(*cs, *sfsm, *cfsm)
 	channeld.InitChannels()
 
-	channeld.StartListening(channeld.SERVER, *sn, *sa)
+	go channeld.StartListening(channeld.SERVER, *sn, *sa)
 	///* After all the server connections established, the client connection will be listened.*/
-	channeld.StartListening(channeld.CLIENT, *cn, *ca)
+	go channeld.StartListening(channeld.CLIENT, *cn, *ca)
 
 }

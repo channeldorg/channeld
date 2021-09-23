@@ -26,7 +26,11 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options ChannelSubscription
 		log.Printf("%s already subscribed to %s, the subsctiption options will be update.\n", c, ch)
 		cs.options = options
 	} else {
-		cs = &ChannelSubscription{options: options}
+		cs = &ChannelSubscription{
+			options: options,
+			// Send the whole data to the connection when subscribed
+			fanOutDataMsg: ch.Data().msg,
+		}
 		ch.subscribedConnections[c.id] = cs
 	}
 	return nil

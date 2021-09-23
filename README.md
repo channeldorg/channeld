@@ -9,15 +9,27 @@ and other backend applications that require real-time, subscription-based user i
 * Area of interest management based on channel and data subscriptions
 
 ## Binary protocol:
-[-----------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------
 CHNL(4B) | ChannelID(4B) | StubID(4B) | MessageType(4B) | BodySize(4B) | MessageBody
-------------------------------------------------------------------------------------]
+------------------------------------------------------------------------------------
 1. The first 4 bytes is the indentifier of a valid channeld packet ("CHNL" short for channel).
 2. The second 4 bytes is an uint32 indicates which channel the message is sent to. 0 means the message should be handled in the global channel (e.g. a CreateChannel message).
 3. The third 4 bytes is an uint32 indentifier as the RPC stub. 0 means the packet is not a RPC message.
 4. Followed by the 4 bytes as an uint32 indicates the [message type](proto/message_types.proto).
 5. Followed by the 4 bytes as the uint32 size of the remaining message body.
 6. The remaining bytes is the message body, which is the marshalled data of a protobuf message.
+
+
+## Goroutines
+### IO
+Client listner.Accept()
+Server listner.Accept()
+### Connection
+(Per connection) Connection.Receive()
+### Channel
+(Per channel) Channel.Tick()
+
+
 
 ## Performance
 

@@ -69,7 +69,9 @@ func handleRemoveChannel(m Message, c *Connection, ch *Channel) {
 	}
 
 	for connId := range ch.subscribedConnections {
-		GetConnection(connId).sendUnsubscribed(ch.id)
+		sc := GetConnection(connId)
+		sc.sendUnsubscribed(ch.id)
+		sc.Flush()
 	}
 	RemoveChannel(ch)
 }
@@ -108,6 +110,7 @@ func handleSubToChannels(m Message, c *Connection, ch *Channel) {
 
 	for conn, channelIds := range connChannelIds {
 		conn.sendConnSubscribed(ConnectionId(msg.ConnId), channelIds...)
+		conn.Flush()
 	}
 }
 
@@ -144,6 +147,7 @@ func handleUnsubToChannels(m Message, c *Connection, ch *Channel) {
 
 		for conn, channelIds := range connChannelIds {
 			conn.sendConnUnsubscribed(ConnectionId(msg.ConnId), channelIds...)
+			conn.Flush()
 		}
 	}
 }

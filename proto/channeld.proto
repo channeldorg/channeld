@@ -17,7 +17,7 @@ enum ChannelType {
 enum MessageType {
     INVALID = 0;
     AUTH = 1;
-    AUTH_RESULT = 2;
+    //AUTH_RESULT = 2;
     CREATE_CHANNEL = 3;
     REMOVE_CHANNEL = 4;
     SUB_TO_CHANNEL = 5;
@@ -29,6 +29,15 @@ enum MessageType {
 message AuthMessage {
     string playerIdentifierToken = 1;
     string loginToken = 2;
+}
+
+message AuthResultMessage {
+    enum AuthResult {
+        SUCCESSFUL = 0;
+        INVALID_PIT = 1;
+        INVALID_L = 2;
+    }
+    AuthResult result = 1;
 }
 
 message CreateChannelMessage {
