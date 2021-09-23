@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package channeld;
+
+option go_package = "/proto";
+
+message TestMapMessage {
+    map<uint32, string> kv = 1;
+}
