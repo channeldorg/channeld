@@ -1,6 +1,7 @@
 package channeld
 
 import (
+	"container/list"
 	"fmt"
 	"log"
 	"time"
@@ -43,6 +44,7 @@ type Channel struct {
 	subscribedConnections map[ConnectionId]*ChannelSubscription
 	data                  *ChannelData
 	inMsgQueue            chan ChannelMessage
+	fanOutQueue           *list.List
 	tickInterval          time.Duration
 	removing              chan bool
 }
@@ -78,6 +80,7 @@ func CreateChannel(t proto.ChannelType, owner *Connection) *Channel {
 		subscribedConnections: make(map[ConnectionId]*ChannelSubscription),
 		data:                  NewChannelData(t),
 		inMsgQueue:            make(chan ChannelMessage, 1024),
+		fanOutQueue:           list.New(),
 		tickInterval:          defaultTickInterval,
 		removing:              make(chan bool),
 	}

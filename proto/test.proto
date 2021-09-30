@@ -7,3 +7,15 @@ option go_package = "/proto";
 message TestMapMessage {
     map<uint32, string> kv = 1;
 }
+
+message TestFieldMaskMessage {
+    message NestedMessage {
+        int64 p1 = 1;
+        uint32 p2 = 2;
+    }
+
+    string name = 1;
+    NestedMessage msg = 2;
+    repeated NestedMessage list = 3;
+    map<int64, NestedMessage> kv = 4;
+}

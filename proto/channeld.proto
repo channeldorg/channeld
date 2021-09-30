@@ -76,6 +76,10 @@ message Location {
     double z = 3;
 }
 
+message SpatialEntityInfo {
+    Location loc = 1;
+}
+
 message SpatialChannelDataMessage {
-    map<uint32, Location> entities = 1;
+    map<uint32, SpatialEntityInfo> entities = 1;
 }

@@ -67,6 +67,132 @@ func (x *TestMapMessage) GetKv() map[uint32]string {
 	return nil
 }
 
+type TestFieldMaskMessage struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Name string                                        `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Msg  *TestFieldMaskMessage_NestedMessage           `protobuf:"bytes,2,opt,name=msg,proto3" json:"msg,omitempty"`
+	List []*TestFieldMaskMessage_NestedMessage         `protobuf:"bytes,3,rep,name=list,proto3" json:"list,omitempty"`
+	Kv   map[int64]*TestFieldMaskMessage_NestedMessage `protobuf:"bytes,4,rep,name=kv,proto3" json:"kv,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+}
+
+func (x *TestFieldMaskMessage) Reset() {
+	*x = TestFieldMaskMessage{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_test_proto_msgTypes[1]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *TestFieldMaskMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TestFieldMaskMessage) ProtoMessage() {}
+
+func (x *TestFieldMaskMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_test_proto_msgTypes[1]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TestFieldMaskMessage.ProtoReflect.Descriptor instead.
+func (*TestFieldMaskMessage) Descriptor() ([]byte, []int) {
+	return file_test_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *TestFieldMaskMessage) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *TestFieldMaskMessage) GetMsg() *TestFieldMaskMessage_NestedMessage {
+	if x != nil {
+		return x.Msg
+	}
+	return nil
+}
+
+func (x *TestFieldMaskMessage) GetList() []*TestFieldMaskMessage_NestedMessage {
+	if x != nil {
+		return x.List
+	}
+	return nil
+}
+
+func (x *TestFieldMaskMessage) GetKv() map[int64]*TestFieldMaskMessage_NestedMessage {
+	if x != nil {
+		return x.Kv
+	}
+	return nil
+}
+
+type TestFieldMaskMessage_NestedMessage struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	P1 int64  `protobuf:"varint,1,opt,name=p1,proto3" json:"p1,omitempty"`
+	P2 uint32 `protobuf:"varint,2,opt,name=p2,proto3" json:"p2,omitempty"`
+}
+
+func (x *TestFieldMaskMessage_NestedMessage) Reset() {
+	*x = TestFieldMaskMessage_NestedMessage{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_test_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *TestFieldMaskMessage_NestedMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TestFieldMaskMessage_NestedMessage) ProtoMessage() {}
+
+func (x *TestFieldMaskMessage_NestedMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_test_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TestFieldMaskMessage_NestedMessage.ProtoReflect.Descriptor instead.
+func (*TestFieldMaskMessage_NestedMessage) Descriptor() ([]byte, []int) {
+	return file_test_proto_rawDescGZIP(), []int{1, 0}
+}
+
+func (x *TestFieldMaskMessage_NestedMessage) GetP1() int64 {
+	if x != nil {
+		return x.P1
+	}
+	return 0
+}
+
+func (x *TestFieldMaskMessage_NestedMessage) GetP2() uint32 {
+	if x != nil {
+		return x.P2
+	}
+	return 0
+}
+
 var File_test_proto protoreflect.FileDescriptor
 
 var file_test_proto_rawDesc = []byte{
@@ -79,8 +205,31 @@ var file_test_proto_rawDesc = []byte{
 	0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01,
 	0x28, 0x0d, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65,
 	0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38,
-	0x01, 0x42, 0x08, 0x5a, 0x06, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x06, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x33,
+	0x01, 0x22, 0xfa, 0x02, 0x0a, 0x14, 0x54, 0x65, 0x73, 0x74, 0x46, 0x69, 0x65, 0x6c, 0x64, 0x4d,
+	0x61, 0x73, 0x6b, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61,
+	0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x12, 0x3e,
+	0x0a, 0x03, 0x6d, 0x73, 0x67, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x2c, 0x2e, 0x63, 0x68,
+	0x61, 0x6e, 0x6e, 0x65, 0x6c, 0x64, 0x2e, 0x54, 0x65, 0x73, 0x74, 0x46, 0x69, 0x65, 0x6c, 0x64,
+	0x4d, 0x61, 0x73, 0x6b, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x2e, 0x4e, 0x65, 0x73, 0x74,
+	0x65, 0x64, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x52, 0x03, 0x6d, 0x73, 0x67, 0x12, 0x40,
+	0x0a, 0x04, 0x6c, 0x69, 0x73, 0x74, 0x18, 0x03, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x2c, 0x2e, 0x63,
+	0x68, 0x61, 0x6e, 0x6e, 0x65, 0x6c, 0x64, 0x2e, 0x54, 0x65, 0x73, 0x74, 0x46, 0x69, 0x65, 0x6c,
+	0x64, 0x4d, 0x61, 0x73, 0x6b, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x2e, 0x4e, 0x65, 0x73,
+	0x74, 0x65, 0x64, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x52, 0x04, 0x6c, 0x69, 0x73, 0x74,
+	0x12, 0x36, 0x0a, 0x02, 0x6b, 0x76, 0x18, 0x04, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x26, 0x2e, 0x63,
+	0x68, 0x61, 0x6e, 0x6e, 0x65, 0x6c, 0x64, 0x2e, 0x54, 0x65, 0x73, 0x74, 0x46, 0x69, 0x65, 0x6c,
+	0x64, 0x4d, 0x61, 0x73, 0x6b, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x2e, 0x4b, 0x76, 0x45,
+	0x6e, 0x74, 0x72, 0x79, 0x52, 0x02, 0x6b, 0x76, 0x1a, 0x2f, 0x0a, 0x0d, 0x4e, 0x65, 0x73, 0x74,
+	0x65, 0x64, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x0e, 0x0a, 0x02, 0x70, 0x31, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x02, 0x70, 0x31, 0x12, 0x0e, 0x0a, 0x02, 0x70, 0x32, 0x18,
+	0x02, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x02, 0x70, 0x32, 0x1a, 0x63, 0x0a, 0x07, 0x4b, 0x76, 0x45,
+	0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x03, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x42, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18,
+	0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x2c, 0x2e, 0x63, 0x68, 0x61, 0x6e, 0x6e, 0x65, 0x6c, 0x64,
+	0x2e, 0x54, 0x65, 0x73, 0x74, 0x46, 0x69, 0x65, 0x6c, 0x64, 0x4d, 0x61, 0x73, 0x6b, 0x4d, 0x65,
+	0x73, 0x73, 0x61, 0x67, 0x65, 0x2e, 0x4e, 0x65, 0x73, 0x74, 0x65, 0x64, 0x4d, 0x65, 0x73, 0x73,
+	0x61, 0x67, 0x65, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x42, 0x08,
+	0x5a, 0x06, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -95,18 +244,25 @@ func file_test_proto_rawDescGZIP() []byte {
 	return file_test_proto_rawDescData
 }
 
-var file_test_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_test_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_test_proto_goTypes = []interface{}{
-	(*TestMapMessage)(nil), // 0: channeld.TestMapMessage
-	nil,                    // 1: channeld.TestMapMessage.KvEntry
+	(*TestMapMessage)(nil),       // 0: channeld.TestMapMessage
+	(*TestFieldMaskMessage)(nil), // 1: channeld.TestFieldMaskMessage
+	nil,                          // 2: channeld.TestMapMessage.KvEntry
+	(*TestFieldMaskMessage_NestedMessage)(nil), // 3: channeld.TestFieldMaskMessage.NestedMessage
+	nil, // 4: channeld.TestFieldMaskMessage.KvEntry
 }
 var file_test_proto_depIdxs = []int32{
-	1, // 0: channeld.TestMapMessage.kv:type_name -> channeld.TestMapMessage.KvEntry
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	2, // 0: channeld.TestMapMessage.kv:type_name -> channeld.TestMapMessage.KvEntry
+	3, // 1: channeld.TestFieldMaskMessage.msg:type_name -> channeld.TestFieldMaskMessage.NestedMessage
+	3, // 2: channeld.TestFieldMaskMessage.list:type_name -> channeld.TestFieldMaskMessage.NestedMessage
+	4, // 3: channeld.TestFieldMaskMessage.kv:type_name -> channeld.TestFieldMaskMessage.KvEntry
+	3, // 4: channeld.TestFieldMaskMessage.KvEntry.value:type_name -> channeld.TestFieldMaskMessage.NestedMessage
+	5, // [5:5] is the sub-list for method output_type
+	5, // [5:5] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_test_proto_init() }
@@ -127,6 +283,30 @@ func file_test_proto_init() {
 				return nil
 			}
 		}
+		file_test_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*TestFieldMaskMessage); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_test_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*TestFieldMaskMessage_NestedMessage); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -134,7 +314,7 @@ func file_test_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_test_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

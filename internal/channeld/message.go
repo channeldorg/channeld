@@ -76,6 +76,7 @@ func handleRemoveChannel(m Message, c *Connection, ch *Channel) {
 	RemoveChannel(ch)
 }
 
+// FIXME: the channel joining should be handled in corresponding channels, otherwise we need to make chan the Channel.subscribedConnections.
 func handleSubToChannels(m Message, c *Connection, ch *Channel) {
 	msg, ok := m.(*proto.SubscribedToChannelsMessage)
 	if !ok {
@@ -161,5 +162,5 @@ func handleChannelDataUpdate(m Message, c *Connection, ch *Channel) {
 		}
 	}
 
-	ch.Data().Update(m, ch.subscribedConnections[c.id])
+	ch.Data().OnUpdate(m)
 }

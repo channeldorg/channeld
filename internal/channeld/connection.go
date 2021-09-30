@@ -62,7 +62,12 @@ func InitConnections(connSize int, serverFsmPath string, clientFsmPath string) {
 }
 
 func GetConnection(id ConnectionId) *Connection {
-	return allConnections[id]
+	c := allConnections[id]
+	if c != nil && !<-c.removing {
+		return c
+	} else {
+		return nil
+	}
 }
 
 func StartListening(t ConnectionType, network string, address string) {
