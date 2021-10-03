@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"time"
 
 	"clewcat.com/channeld/proto"
 	"github.com/iancoleman/strcase"
-	"github.com/mennanov/fmutils"
+	"github.com/indiest/fmutils"
 	protobuf "google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
@@ -17,28 +16,38 @@ import (
 
 type ChannelDataMessage = Message //protoreflect.Message
 
+type DataMergeOptions struct {
+	// By default, Protobuf appends the src list to the dst list. Setting this option to true will replace the dst list with the src list.
+	ShouldReplaceRepeated bool
+	// By default, Protobuf ignores the nil value when merging the map. Setting this option to true will delete the key-value pair when merging.
+	ShouldDeleteNilMapValue bool
+	// If the value is greater than 0, truncate the top elements of the list when oversized.
+	ListSizeLimit int
+}
+
 type ChannelData struct {
-	msgType         proto.MessageType
-	msg             ChannelDataMessage
-	updateMsg       ChannelDataMessage
+	mergeOptions *DataMergeOptions
+	msgType      proto.MessageType
+	msg          ChannelDataMessage
+	//updateMsg       ChannelDataMessage
 	updateMsgBuffer *list.List
 }
 
-type FanOutConnection struct {
+type fanOutConnection struct {
 	connId         ConnectionId
-	lastFanOutTime time.Time
+	lastFanOutTime ChannelTime
 }
 
-type UpdateMsgBufferElement struct {
+type updateMsgBufferElement struct {
 	updateMsg  ChannelDataMessage
-	updateTime time.Time
+	updateTime ChannelTime
 }
 
 const (
 	MaxUpdateMsgBufferSize = 512
 )
 
-func NewChannelData(channelType proto.ChannelType) *ChannelData {
+func NewChannelData(channelType proto.ChannelType, mergeOptions *DataMergeOptions) *ChannelData {
 	channelTypeName := channelType.String()
 	dataTypeName := fmt.Sprintf("channeld.%sChannelDataMessage",
 		strcase.ToCamel(strings.ToLower(channelTypeName)))
@@ -58,24 +67,26 @@ func NewChannelData(channelType proto.ChannelType) *ChannelData {
 	}
 }
 
-func (d *ChannelData) OnUpdate(updateMsg Message) {
-	protobuf.Merge(d.msg, updateMsg)
-	if d.updateMsg == nil {
-		d.updateMsg = updateMsg
-	} else {
-		protobuf.Merge(d.updateMsg, updateMsg)
-	}
+func (d *ChannelData) OnUpdate(updateMsg Message, t ChannelTime) {
+	mergeWithOptions(d.msg, updateMsg, d.mergeOptions)
+	/*
+		if d.updateMsg == nil {
+			d.updateMsg = updateMsg
+		} else {
+			mergeWithOptions(d.updateMsg, updateMsg, d.mergeOptions)
+		}
+	*/
 
-	d.updateMsgBuffer.PushBack(&UpdateMsgBufferElement{
+	d.updateMsgBuffer.PushBack(&updateMsgBufferElement{
 		updateMsg:  updateMsg,
-		updateTime: time.Now(),
+		updateTime: t,
 	})
 	if d.updateMsgBuffer.Len() > MaxUpdateMsgBufferSize {
 		d.updateMsgBuffer.Remove(d.updateMsgBuffer.Front())
 	}
 }
 
-func (ch *Channel) tickData() {
+func (ch *Channel) tickData(t ChannelTime) {
 	if ch.Data().msg == nil {
 		return
 	}
@@ -92,62 +103,99 @@ func (ch *Channel) tickData() {
 	*/
 	bufp := ch.Data().updateMsgBuffer.Front()
 	var accumulatedUpdateMsg ChannelDataMessage = nil
-	var lastUpdateTime time.Time
+	var lastUpdateTime ChannelTime
+	fe := ch.fanOutQueue.Front()
 
-	for fe := ch.fanOutQueue.Front(); fe != nil; fe = fe.Next() {
-		foc := fe.Value.(*FanOutConnection)
+	for i := 0; i < ch.fanOutQueue.Len(); i++ {
+		foc := fe.Value.(*fanOutConnection)
 		c := GetConnection(foc.connId)
 		if c == nil {
+			fe = fe.Next()
 			continue
 		}
 		cs := ch.subscribedConnections[foc.connId]
 		if cs == nil {
+			fe = fe.Next()
 			continue
 		}
 
-		nextFanOutTime := foc.lastFanOutTime.Add(cs.options.FanOutInterval)
-		if time.Now().After(nextFanOutTime) {
-			if foc.lastFanOutTime.IsZero() {
+		nextFanOutTime := foc.lastFanOutTime.AddMs(cs.options.FanOutIntervalMs)
+		if t >= nextFanOutTime {
+			if foc.lastFanOutTime == 0 {
 				// Send the whole data for the first time
-				ch.FanOutDataUpdate(c, cs, ch.Data().msg)
+				ch.fanOutDataUpdate(c, cs, ch.Data().msg)
 			} else if bufp != nil {
-				if foc.lastFanOutTime.After(lastUpdateTime) {
+				if foc.lastFanOutTime >= lastUpdateTime {
 					lastUpdateTime = foc.lastFanOutTime
 				}
 
-				for be := bufp.Value.(*UpdateMsgBufferElement); be.updateTime.After(lastUpdateTime) && be.updateTime.Before(nextFanOutTime); bufp = bufp.Next() {
+				for be := bufp.Value.(*updateMsgBufferElement); bufp != nil && be.updateTime >= lastUpdateTime && be.updateTime <= nextFanOutTime; bufp = bufp.Next() {
 					if accumulatedUpdateMsg == nil {
 						accumulatedUpdateMsg = protobuf.Clone(be.updateMsg)
 					} else {
-						protobuf.Merge(accumulatedUpdateMsg, be.updateMsg)
+						mergeWithOptions(accumulatedUpdateMsg, be.updateMsg, ch.data.mergeOptions)
 					}
 					lastUpdateTime = be.updateTime
 				}
 
 				if accumulatedUpdateMsg != nil {
-					ch.FanOutDataUpdate(c, cs, accumulatedUpdateMsg)
+					ch.fanOutDataUpdate(c, cs, accumulatedUpdateMsg)
 				}
 			}
 
-			foc.lastFanOutTime = time.Now()
+			foc.lastFanOutTime = t
 
-			temp := fe
-			fe = fe.Next()
+			temp := fe.Next()
 			// Move the fanned-out connection to the back of the queue
 			for be := ch.fanOutQueue.Back(); be != nil; be = be.Prev() {
-				if be.Value.(*FanOutConnection).lastFanOutTime.Before(foc.lastFanOutTime) {
-					ch.fanOutQueue.MoveAfter(temp, be)
+				if be.Value.(*fanOutConnection).lastFanOutTime <= foc.lastFanOutTime {
+					ch.fanOutQueue.MoveAfter(fe, be)
+					fe = temp
+					break
 				}
 			}
-			fe = fe.Prev()
+		} else {
+			fe = fe.Next()
 		}
 	}
 }
 
-func (ch *Channel) FanOutDataUpdate(c *Connection, cs *ChannelSubscription, updateMsg ChannelDataMessage) {
+func (ch *Channel) fanOutDataUpdate(c *Connection, cs *ChannelSubscription, updateMsg ChannelDataMessage) {
 	fmutils.Filter(updateMsg, cs.options.DataFieldMasks)
 	c.SendWithChannel(ch.id, ch.Data().msgType, updateMsg)
-	c.Flush()
 	// cs.lastFanOutTime = time.Now()
 	// cs.fanOutDataMsg = nil
+}
+
+func mergeWithOptions(dst Message, src Message, options *DataMergeOptions) {
+	protobuf.Merge(dst, src)
+	if options != nil {
+		dst.ProtoReflect().Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
+			if fd.IsList() {
+				if options.ShouldReplaceRepeated {
+					dst.ProtoReflect().Set(fd, src.ProtoReflect().Get(fd))
+				}
+				list := v.List()
+				offset := list.Len() - options.ListSizeLimit
+				if options.ListSizeLimit > 0 && offset > 0 {
+					for i := 0; i < options.ListSizeLimit; i++ {
+						list.Set(i, list.Get(i+offset))
+					}
+					list.Truncate(options.ListSizeLimit)
+				}
+			} else if fd.IsMap() {
+				if options.ShouldDeleteNilMapValue {
+					dstMap := v.Map()
+					srcMap := src.ProtoReflect().Get(fd).Map()
+					srcMap.Range(func(k protoreflect.MapKey, v protoreflect.Value) bool {
+						if !v.Message().IsValid() {
+							dstMap.Clear(k)
+						}
+						return true
+					})
+				}
+			}
+			return true
+		})
+	}
 }

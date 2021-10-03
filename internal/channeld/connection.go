@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"sync/atomic"
+	"time"
 
 	"clewcat.com/channeld/internal/fsm"
 	"clewcat.com/channeld/proto"
@@ -21,9 +22,16 @@ type ConnectionId uint32
 type ConnectionType uint8
 
 const (
-	SERVER ConnectionType = 1
-	CLIENT ConnectionType = 2
+	SERVER        ConnectionType = 1
+	CLIENT        ConnectionType = 2
+	FlushInterval time.Duration  = time.Millisecond * 10
 )
+
+type sendQueueMessage struct {
+	channelId ChannelId
+	msgType   proto.MessageType
+	msg       Message
+}
 
 type Connection struct {
 	id             ConnectionId
@@ -31,9 +39,9 @@ type Connection struct {
 	conn           net.Conn
 	reader         *bufio.Reader
 	writer         *bufio.Writer
+	sendQueue      chan sendQueueMessage
 	fsm            *fsm.FiniteStateMachine
-	// Don't put the removing into the FSM as 1) the FSM's states are user-defined. 2) the FSM doesn't have the race condition.
-	removing chan bool
+	removing       int32 // Don't put the removing into the FSM as 1) the FSM's states are user-defined. 2) the FSM doesn't have the race condition.
 }
 
 var allConnections map[ConnectionId]*Connection
@@ -59,11 +67,25 @@ func InitConnections(connSize int, serverFsmPath string, clientFsmPath string) {
 	if err != nil {
 		log.Println("Failed to read client FSM", err)
 	}
+
+	/* Split each Connection.Flush into a goroutine (see AddConnection)
+	go func() {
+		for {
+			t := time.Now()
+			for _, c := range allConnections {
+				if !<-c.removing {
+					c.Flush()
+				}
+			}
+			time.Sleep(FlushInterval - time.Since(t))
+		}
+	}()
+	*/
 }
 
 func GetConnection(id ConnectionId) *Connection {
 	c := allConnections[id]
-	if c != nil && !<-c.removing {
+	if c != nil && !c.IsRemoving() {
 		return c
 	} else {
 		return nil
@@ -84,7 +106,20 @@ func StartListening(t ConnectionType, network string, address string) {
 		if err != nil {
 			log.Println(err)
 		} else {
-			AddConnection(conn, t)
+			connection := AddConnection(conn, t)
+
+			go func() {
+				for !connection.IsRemoving() {
+					connection.Receive()
+				}
+			}()
+
+			go func() {
+				for !connection.IsRemoving() {
+					connection.Flush()
+					time.Sleep(time.Millisecond)
+				}
+			}()
 		}
 	}
 }
@@ -97,7 +132,8 @@ func AddConnection(c net.Conn, t ConnectionType) *Connection {
 		conn:           c,
 		reader:         bufio.NewReader(c),
 		writer:         bufio.NewWriter(c),
-		removing:       make(chan bool),
+		sendQueue:      make(chan sendQueueMessage, 128),
+		removing:       0,
 	}
 	var fsm fsm.FiniteStateMachine
 	switch t {
@@ -111,19 +147,17 @@ func AddConnection(c net.Conn, t ConnectionType) *Connection {
 
 	allConnections[connection.id] = connection
 
-	go func() {
-		for !<-connection.removing {
-			connection.Receive()
-		}
-	}()
-
 	return connection
 }
 
 func RemoveConnection(c *Connection) {
-	c.removing <- true
+	atomic.AddInt32(&c.removing, 1)
 	c.conn.Close()
 	delete(allConnections, c.id)
+}
+
+func (c *Connection) IsRemoving() bool {
+	return c.removing > 0
 }
 
 func readBytes(c *Connection, len uint) ([]byte, error) {
@@ -131,13 +165,13 @@ func readBytes(c *Connection, len uint) ([]byte, error) {
 	if _, err := io.ReadFull(c.reader, bytes); err != nil {
 		switch err.(type) {
 		case *net.OpError:
-			log.Printf("Client disconnected: %s\n", c.conn.RemoteAddr().String())
-			c.conn.Close()
+			log.Printf("%s disconnected: %s\n", c.String(), c.conn.RemoteAddr().String())
+			RemoveConnection(c)
 		}
 
 		if err == io.EOF {
-			log.Printf("Client disconnected: %s\n", c.conn.RemoteAddr().String())
-			c.conn.Close()
+			log.Printf("%s disconnected: %s\n", c.String(), c.conn.RemoteAddr().String())
+			RemoveConnection(c)
 		}
 		return nil, err
 	}
@@ -156,6 +190,7 @@ func readUint32(c *Connection) (uint32, error) {
 // CHNL in ASCII
 const TAG_ID uint32 = 67<<24 | 72<<16 | 78<<8 | 76
 
+// TODO: read the packet using protobuf
 func (c *Connection) Receive() {
 	if tag, err := readUint32(c); tag != TAG_ID {
 		log.Println("Invalid tag:", tag, ", the packet will be dropped.", err)
@@ -225,28 +260,19 @@ func (c *Connection) Receive() {
 }
 
 func (c *Connection) SendWithChannel(channelId ChannelId, msgType proto.MessageType, msg Message) {
-	if <-c.removing {
+	if c.IsRemoving() {
 		return
 	}
 
-	bytes, err := protobuf.Marshal(msg)
-	if err != nil {
-		log.Panicf("Failed to marshal message %d: %s\n", msgType, msg)
+	c.sendQueue <- sendQueueMessage{
+		channelId: channelId,
+		msgType:   msgType,
+		msg:       msg,
 	}
-	if len(bytes) >= (1 << 32) {
-		log.Panicf("Message body is too large, size: %d\n", len(bytes))
-	}
-
-	binary.Write(c.writer, binary.LittleEndian, TAG_ID)
-	binary.Write(c.writer, binary.LittleEndian, uint32(channelId))
-	binary.Write(c.writer, binary.LittleEndian, uint32(0))
-	binary.Write(c.writer, binary.LittleEndian, uint32(msgType))
-	binary.Write(c.writer, binary.LittleEndian, uint32(len(bytes)))
-	binary.Write(c.writer, binary.LittleEndian, bytes)
 }
 
 func (c *Connection) Send(msgType proto.MessageType, msg Message) {
-	if <-c.removing {
+	if c.IsRemoving() {
 		return
 	}
 
@@ -254,6 +280,26 @@ func (c *Connection) Send(msgType proto.MessageType, msg Message) {
 }
 
 func (c *Connection) Flush() {
+	for len(c.sendQueue) > 0 {
+		e := <-c.sendQueue
+		bytes, err := protobuf.Marshal(e.msg)
+		if err != nil {
+			log.Printf("Failed to marshal message %d: %s\n", e.msgType, e.msg)
+			continue
+		}
+		if len(bytes) >= (1 << 32) {
+			log.Printf("Message body is too large, size: %d\n", len(bytes))
+			continue
+		}
+
+		binary.Write(c.writer, binary.LittleEndian, TAG_ID)
+		binary.Write(c.writer, binary.LittleEndian, uint32(e.channelId))
+		binary.Write(c.writer, binary.LittleEndian, uint32(0))
+		binary.Write(c.writer, binary.LittleEndian, uint32(e.msgType))
+		binary.Write(c.writer, binary.LittleEndian, uint32(len(bytes)))
+		binary.Write(c.writer, binary.LittleEndian, bytes)
+	}
+
 	c.writer.Flush()
 }
 

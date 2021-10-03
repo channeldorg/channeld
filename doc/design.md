@@ -12,25 +12,29 @@
 
 ## Goroutines
 ### IO
-Client listner.Accept()
-Server listner.Accept()
+- Client listner.Accept()
+- Server listner.Accept()
 ### Connection
-(Per connection) Connection.Receive()
+- (Per connection) Connection.Receive()
+- (Per connection) Connection.Flush()
 ### Channel
-(Per channel) Channel.Tick()
+- (Per channel) Channel.Tick()
 
 
 
-## How channel data updates are fanned out
+## How channel data updates are fanned out{#fan-out}
 U = sends channel data update message to channeld
 F = channeld sends accumulated update message to a subscribed connection
 
-Server Connection:  ------U1----U2--------U3---------
-Client Connection1: ----F1---F2---F3---F4---F5---F6--
-Client Connection2:   --F7--------F8--------F9-------
+Server Connection: (C0) ------U1----U2--------U3---------
+Client Connection1:(C1) ----F1---F2---F3---F4---F5---F6--
+Client Connection2:(C2)   --F7--------F8--------F9-------
+
+Fan out interval of C1 = 50ms, C2 = 100ms
+Time of U1 = 60ms, U2 = 120ms, U3 = 240ms, F1/F7 = 50ms, F2 = 100ms, F3/F8 = 150ms...
 
 F1 = nil(no send), F2 = U1, F3 = U2, F4 = nil, F5 = U3, F6 = nil
-F7 = whole data (as the client connection2 just subscribed), F8 = U1+U2, F9 = U3
+F7 = the whole data (as the client connection2 just subscribed), F8 = U1+U2, F9 = U3
 
 Assuming there are n connections, and each U has m properties in average. There are several ways to implement the fan-out:
 A. Each connection contains its own fan-out message

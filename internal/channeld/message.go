@@ -52,7 +52,7 @@ func handleCreateChannel(m Message, c *Connection, ch *Channel) {
 		newChannel = CreateChannel(msg.ChannelType, c)
 	}
 	// Subscribe to channel after creation
-	c.SubscribeToChannel(newChannel, ChannelSubscriptionOptions{})
+	c.SubscribeToChannel(newChannel, msg.SubOptions)
 	// Also send the Sub message to the creator (no need to broadcast as there's only 1 subscriptor)
 	c.sendSubscribed(newChannel.id)
 }
@@ -71,7 +71,7 @@ func handleRemoveChannel(m Message, c *Connection, ch *Channel) {
 	for connId := range ch.subscribedConnections {
 		sc := GetConnection(connId)
 		sc.sendUnsubscribed(ch.id)
-		sc.Flush()
+		//sc.Flush()
 	}
 	RemoveChannel(ch)
 }
@@ -92,7 +92,7 @@ func handleSubToChannels(m Message, c *Connection, ch *Channel) {
 			log.Printf("Failed to subscribe to channel %d as it doesn't exist\n", id)
 			continue
 		}
-		err := connToSub.SubscribeToChannel(ch, ChannelSubscriptionOptions{})
+		err := connToSub.SubscribeToChannel(ch, msg.SubOptions)
 		if err != nil {
 			log.Printf("Failed to subscribe to channel %d, err: %s\n", id, err)
 			continue
@@ -111,7 +111,7 @@ func handleSubToChannels(m Message, c *Connection, ch *Channel) {
 
 	for conn, channelIds := range connChannelIds {
 		conn.sendConnSubscribed(ConnectionId(msg.ConnId), channelIds...)
-		conn.Flush()
+		// conn.Flush()
 	}
 }
 
@@ -148,7 +148,7 @@ func handleUnsubToChannels(m Message, c *Connection, ch *Channel) {
 
 		for conn, channelIds := range connChannelIds {
 			conn.sendConnUnsubscribed(ConnectionId(msg.ConnId), channelIds...)
-			conn.Flush()
+			// conn.Flush()
 		}
 	}
 }
@@ -162,5 +162,5 @@ func handleChannelDataUpdate(m Message, c *Connection, ch *Channel) {
 		}
 	}
 
-	ch.Data().OnUpdate(m)
+	ch.Data().OnUpdate(m, ch.GetTime())
 }

@@ -4,40 +4,57 @@ import (
 	"container/list"
 	"fmt"
 	"log"
-	"time"
 
 	"clewcat.com/channeld/proto"
+	protobuf "google.golang.org/protobuf/proto"
 )
 
 const (
-	defaultFanOutInterval time.Duration = time.Millisecond * 50
+	DefaultFanOutIntervalMs uint32 = 20
 )
 
+/* TODO: delete this code block - the definition has been moved to protobuf
 type ChannelSubscriptionOptions struct {
 	CanUpdateData  bool
 	DataFieldMasks []string
 	FanOutInterval time.Duration
 }
+*/
 
 type ChannelSubscription struct {
-	options ChannelSubscriptionOptions
+	options proto.ChannelSubscriptionOptions
 	//fanOutDataMsg  Message
 	//lastFanOutTime time.Time
 	fanOutElement *list.Element
 }
 
-func (c *Connection) SubscribeToChannel(ch *Channel, options ChannelSubscriptionOptions) error {
+func (c *Connection) SubscribeToChannel(ch *Channel, options *proto.ChannelSubscriptionOptions) error {
 	cs, exists := ch.subscribedConnections[c.id]
 	if exists {
-		log.Printf("%s already subscribed to %s, the subsctiption options will be update.\n", c, ch)
-		cs.options = options
+		log.Printf("%s already subscribed to %s, the subscription options will be merged.\n", c, ch)
+		if options != nil {
+			protobuf.Merge(&cs.options, options)
+		}
 	} else {
+
 		cs = &ChannelSubscription{
-			options: options,
 			// Send the whole data to the connection when subscribed
 			//fanOutDataMsg: ch.Data().msg,
 		}
-		cs.fanOutElement = ch.fanOutQueue.PushFront(&FanOutConnection{connId: c.id})
+		if options != nil {
+			cs.options = proto.ChannelSubscriptionOptions{
+				CanUpdateData:    options.CanUpdateData,
+				DataFieldMasks:   options.DataFieldMasks,
+				FanOutIntervalMs: options.FanOutIntervalMs,
+			}
+		} else {
+			cs.options = proto.ChannelSubscriptionOptions{
+				CanUpdateData:    true,
+				DataFieldMasks:   make([]string, 0),
+				FanOutIntervalMs: DefaultFanOutIntervalMs,
+			}
+		}
+		cs.fanOutElement = ch.fanOutQueue.PushFront(&fanOutConnection{connId: c.id})
 		ch.subscribedConnections[c.id] = cs
 	}
 	return nil

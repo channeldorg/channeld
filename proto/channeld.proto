@@ -40,8 +40,15 @@ message AuthResultMessage {
     AuthResult result = 1;
 }
 
+message ChannelSubscriptionOptions {
+	bool CanUpdateData = 1;
+	repeated string DataFieldMasks = 2;
+	uint32 FanOutIntervalMs = 3;
+}
+
 message CreateChannelMessage {
     ChannelType channelType = 1;
+    ChannelSubscriptionOptions subOptions = 2;
 }
 
 message RemoveChannelMessage {
@@ -51,6 +58,7 @@ message RemoveChannelMessage {
 message SubscribedToChannelsMessage {
     uint32 connId = 1;
     repeated uint32 channelIds = 2;
+    ChannelSubscriptionOptions subOptions = 3;
 }
 
 message UnsubscribedToChannelsMessage {

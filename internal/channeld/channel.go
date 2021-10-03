@@ -30,7 +30,14 @@ const (
 
 type ChannelId uint32
 
-type ChannelMessage struct {
+// ChannelTime is the relative time since the channel created.
+type ChannelTime int64 // time.Duration
+
+func (t ChannelTime) AddMs(ms uint32) ChannelTime {
+	return t + ChannelTime(uint32(time.Millisecond)*ms)
+}
+
+type channelMessage struct {
 	msg     Message
 	handler MessageHandlerFunc
 	conn    *Connection
@@ -43,15 +50,17 @@ type Channel struct {
 	ownerConnection       *Connection
 	subscribedConnections map[ConnectionId]*ChannelSubscription
 	data                  *ChannelData
-	inMsgQueue            chan ChannelMessage
+	inMsgQueue            chan channelMessage
 	fanOutQueue           *list.List
+	startTime             time.Time // Time since channel created
 	tickInterval          time.Duration
+	tickFrames            int
 	removing              chan bool
 }
 
 const (
 	GlobalChannelId     ChannelId     = 0
-	defaultTickInterval time.Duration = time.Millisecond * 50
+	DefaultTickInterval time.Duration = time.Millisecond * 50
 )
 
 var nextChannelId ChannelId = GlobalChannelId
@@ -78,10 +87,12 @@ func CreateChannel(t proto.ChannelType, owner *Connection) *Channel {
 		channelType:           t,
 		ownerConnection:       owner,
 		subscribedConnections: make(map[ConnectionId]*ChannelSubscription),
-		data:                  NewChannelData(t),
-		inMsgQueue:            make(chan ChannelMessage, 1024),
+		data:                  NewChannelData(t, nil),
+		inMsgQueue:            make(chan channelMessage, 1024),
 		fanOutQueue:           list.New(),
-		tickInterval:          defaultTickInterval,
+		startTime:             time.Now(),
+		tickInterval:          DefaultTickInterval,
+		tickFrames:            0,
 		removing:              make(chan bool),
 	}
 	if owner == nil {
@@ -110,7 +121,11 @@ func (ch *Channel) Data() *ChannelData {
 }
 
 func (ch *Channel) PutMessage(msg Message, handler MessageHandlerFunc, conn *Connection) {
-	ch.inMsgQueue <- ChannelMessage{msg, handler, conn}
+	ch.inMsgQueue <- channelMessage{msg, handler, conn}
+}
+
+func (ch *Channel) GetTime() ChannelTime {
+	return ChannelTime(time.Since(ch.startTime))
 }
 
 func (ch *Channel) Tick() {
@@ -120,6 +135,8 @@ func (ch *Channel) Tick() {
 		}
 
 		tickStart := time.Now()
+		ch.tickFrames++
+
 		for len(ch.inMsgQueue) > 0 {
 			cm := <-ch.inMsgQueue
 			cm.handler(cm.msg, cm.conn, ch)
@@ -128,7 +145,7 @@ func (ch *Channel) Tick() {
 				break
 			}
 		}
-		ch.tickData()
+		ch.tickData(ch.GetTime())
 
 		time.Sleep(ch.tickInterval - time.Since(tickStart))
 	}

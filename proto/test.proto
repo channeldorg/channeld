@@ -4,8 +4,22 @@ package channeld;
 
 option go_package = "/proto";
 
+message TestMergeMessage {
+    repeated string list = 1;
+
+    message StringWrapper {
+        string content = 1;
+    }
+   map<int64, StringWrapper> kv = 2;
+}
+
 message TestMapMessage {
     map<uint32, string> kv = 1;
+
+    message StringWrapper {
+        string content = 1;
+    }
+    map<uint32, StringWrapper> kv2 = 2;
 }
 
 message TestFieldMaskMessage {
@@ -17,5 +31,6 @@ message TestFieldMaskMessage {
     string name = 1;
     NestedMessage msg = 2;
     repeated NestedMessage list = 3;
-    map<int64, NestedMessage> kv = 4;
+    map<int64, NestedMessage> kv1 = 4;
+    map<int64, string> kv2 = 5;
 }
