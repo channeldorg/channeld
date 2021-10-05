@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package channeld;
 
-//import "google/protobuf/any.proto";
+import "google/protobuf/any.proto";
 
 option go_package = "/proto";
 
@@ -12,6 +12,11 @@ enum ChannelType {
     PRIVATE = 2;  // Per-connection channel. Useful to store the user data and subscribe the client to the data update.
     SUBWORLD = 3; // A game "room" in a session-based game, or a level in an MMORPG. Subworlds are spatially divided thus the interests are isolated.
     SPATIAL = 4;  // Spatial channels are spatailly connected. Using this channel to implement a seamless open world.
+    TEST = 100;   // The following are for tests.
+    TEST1 = 101;
+    TEST2 = 102;
+    TEST3 = 103;
+    TEST4 = 104;
 }
 
 enum MessageType {
@@ -22,8 +27,9 @@ enum MessageType {
     REMOVE_CHANNEL = 4;
     SUB_TO_CHANNEL = 5;
     UNSUB_TO_CHANNEL = 6;
-    CHANNEL_DATA_GLOBAL = 11;
-    CHANNEL_DATA_SPATIAL = 14;
+    CHANNEL_DATA_UPDATE = 7;
+    //CHANNEL_DATA_GLOBAL = 11;
+    //CHANNEL_DATA_SPATIAL = 14;
 }
 
 message AuthMessage {
@@ -49,6 +55,7 @@ message ChannelSubscriptionOptions {
 message CreateChannelMessage {
     ChannelType channelType = 1;
     ChannelSubscriptionOptions subOptions = 2;
+    google.protobuf.Any data = 3;
 }
 
 message RemoveChannelMessage {
@@ -66,17 +73,17 @@ message UnsubscribedToChannelsMessage {
     repeated uint32 channelIds = 2;
 }
 
-/*
-message ChannelDataMessage {
-    uint32 channelId = 1;
-    google.protobuf.Any data = 2;
+message ChannelDataUpdateMessage {
+    google.protobuf.Any data = 1;
 }
-*/
 
+/*
 message GlobalChannelDataMessage {
     string title = 1;
     uint32 clientConnNum = 2;
 }
+*/
+
 
 message Location {
     double x = 1;

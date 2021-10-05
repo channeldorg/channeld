@@ -1,6 +1,7 @@
 package channeld
 
 import (
+	"container/list"
 	"log"
 
 	"clewcat.com/channeld/proto"
@@ -21,7 +22,7 @@ var MessageMap = map[proto.MessageType]*MessageMapEntry{
 	proto.MessageType_REMOVE_CHANNEL:      {&proto.RemoveChannelMessage{}, handleRemoveChannel},
 	proto.MessageType_SUB_TO_CHANNEL:      {&proto.SubscribedToChannelsMessage{}, handleSubToChannels},
 	proto.MessageType_UNSUB_TO_CHANNEL:    {&proto.UnsubscribedToChannelsMessage{}, handleUnsubToChannels},
-	proto.MessageType_CHANNEL_DATA_GLOBAL: {&proto.GlobalChannelDataMessage{}, handleChannelDataUpdate},
+	proto.MessageType_CHANNEL_DATA_UPDATE: {&proto.ChannelDataUpdateMessage{}, handleChannelDataUpdate},
 }
 
 func handleAuth(m Message, c *Connection, ch *Channel) {
@@ -40,17 +41,25 @@ func handleCreateChannel(m Message, c *Connection, ch *Channel) {
 	}
 
 	var newChannel *Channel
-	// World channel is initially created by the system.
+	// Global channel is initially created by the system. Creating the channel will attempt to own it.
 	if msg.ChannelType == proto.ChannelType_GLOBAL {
 		newChannel = globalChannel
 		if globalChannel.ownerConnection == nil {
 			globalChannel.ownerConnection = c
 		} else {
-			log.Panicln("Illegal attempt to create the WOLRD channel, connection: ", c)
+			log.Panicln("Illegal attempt to create the GLOBAL channel, connection: ", c)
 		}
 	} else {
 		newChannel = CreateChannel(msg.ChannelType, c)
 	}
+
+	newChannel.data = &ChannelData{
+		updateMsgBuffer: list.New(),
+	}
+	if msg.Data != nil {
+		newChannel.data.msg, _ = msg.Data.UnmarshalNew()
+	}
+
 	// Subscribe to channel after creation
 	c.SubscribeToChannel(newChannel, msg.SubOptions)
 	// Also send the Sub message to the creator (no need to broadcast as there's only 1 subscriptor)
@@ -162,5 +171,13 @@ func handleChannelDataUpdate(m Message, c *Connection, ch *Channel) {
 		}
 	}
 
-	ch.Data().OnUpdate(m, ch.GetTime())
+	msg, ok := m.(*proto.ChannelDataUpdateMessage)
+	if !ok {
+		log.Panicln("Message is not a ChannelDataUpdateMessage, will not be handled.")
+	}
+	updateMsg, err := msg.Data.UnmarshalNew()
+	if err != nil {
+		log.Panicln(err)
+	}
+	ch.Data().OnUpdate(updateMsg, ch.GetTime())
 }

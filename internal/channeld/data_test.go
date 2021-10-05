@@ -2,6 +2,7 @@ package channeld
 
 import (
 	"container/list"
+	"log"
 	"net"
 	"testing"
 	"time"
@@ -10,48 +11,97 @@ import (
 	"github.com/indiest/fmutils"
 	"github.com/stretchr/testify/assert"
 	protobuf "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
+type TestUpdateMessageSender struct {
+	queue []*proto.TestChannelDataMessage
+}
+
+func (s *TestUpdateMessageSender) Send(c *Connection, channelId ChannelId, msgType proto.MessageType, msg Message) {
+	// Extract the payload from the ChannelDataUpdatMessage
+	payload := msg.(*proto.ChannelDataUpdateMessage).Data
+	updateMsg, err := payload.UnmarshalNew()
+	payload.ProtoReflect()
+	if err != nil {
+		log.Panicln(err)
+	}
+	s.queue = append(s.queue, updateMsg.(*proto.TestChannelDataMessage))
+}
+
+func addTestConnection(t ConnectionType) *Connection {
+	conn1, _ := net.Pipe()
+	c := AddConnection(conn1, t)
+	c.sender = &TestUpdateMessageSender{queue: make([]*proto.TestChannelDataMessage, 0)}
+	return c
+}
+
+func (c *Connection) testQueue() []*proto.TestChannelDataMessage {
+	return c.sender.(*TestUpdateMessageSender).queue
+}
+
+// See the test case in [the design doc](doc/design.md#fan-out)
 func TestFanOutChannelData(t *testing.T) {
-	// See the test case in [the design doc](doc/design.md#fan-out)
-	serverConn, clientConn := net.Pipe()
 	InitConnections(3, "../../config/server_conn_fsm.json", "../../config/client_conn_fsm.json")
 	InitChannels()
-	// We need to manually tick. Set the interval to a very large value.
-	globalChannel.tickInterval = time.Hour
-	dataMsg := globalChannel.Data().msg.(*proto.GlobalChannelDataMessage)
-	dataMsg.Title = "a"
 
-	sc := AddConnection(serverConn, SERVER)
-	cc1 := AddConnection(clientConn, CLIENT)
-	cc2 := AddConnection(clientConn, CLIENT)
-	//ch := CreateChannel(proto.ChannelType_GLOBAL, sc)
-	sc.SubscribeToChannel(globalChannel, nil)
-	cc1.SubscribeToChannel(globalChannel, &proto.ChannelSubscriptionOptions{
+	c0 := addTestConnection(SERVER)
+	c1 := addTestConnection(CLIENT)
+	c2 := addTestConnection(CLIENT)
+
+	testChannel := CreateChannel(proto.ChannelType_TEST, c0)
+	dataMsg := &proto.TestChannelDataMessage{
+		Text: "a",
+		Num:  1,
+	}
+	testChannel.data = &ChannelData{
+		msg:             dataMsg,
+		updateMsgBuffer: list.New(),
+	}
+	// We need to manually tick the channel. Set the interval to a very large value.
+	testChannel.tickInterval = time.Hour
+
+	c0.SubscribeToChannel(testChannel, nil)
+	c1.SubscribeToChannel(testChannel, &proto.ChannelSubscriptionOptions{
 		FanOutIntervalMs: 50,
 	})
 
 	channelStartTime := ChannelTime(100 * int64(time.Millisecond))
 	// F0 = the whole data
-	globalChannel.tickData(channelStartTime)
-	assert.Equal(t, 1, len(cc1.sendQueue))
-	assert.Equal(t, 0, len(cc2.sendQueue))
+	testChannel.tickData(channelStartTime)
+	assert.Equal(t, 1, len(c1.testQueue()))
+	assert.Equal(t, 0, len(c2.testQueue()))
+	assert.EqualValues(t, dataMsg.Num, c1.testQueue()[0].Num)
 
-	cc2.SubscribeToChannel(globalChannel, &proto.ChannelSubscriptionOptions{
+	c2.SubscribeToChannel(testChannel, &proto.ChannelSubscriptionOptions{
 		FanOutIntervalMs: 100,
 	})
 	// F1 = no data, F7 = the whole data
-	globalChannel.tickData(channelStartTime.AddMs(50))
-	assert.Equal(t, 1, len(cc1.sendQueue))
-	assert.Equal(t, 1, len(cc2.sendQueue))
+	testChannel.tickData(channelStartTime.AddMs(50))
+	assert.Equal(t, 1, len(c1.testQueue()))
+	assert.Equal(t, 1, len(c2.testQueue()))
+	assert.EqualValues(t, dataMsg.Num, c2.testQueue()[0].Num)
 
 	// U1 arrives
-	u1 := &proto.GlobalChannelDataMessage{Title: "b"}
-	globalChannel.Data().OnUpdate(u1, channelStartTime.AddMs(60))
+	u1 := &proto.TestChannelDataMessage{Text: "b"}
+	testChannel.Data().OnUpdate(u1, channelStartTime.AddMs(60))
 
 	// F2 = U1
-	globalChannel.tickData(channelStartTime.AddMs(100))
-	assert.Equal(t, 2, len(cc1.sendQueue))
+	testChannel.tickData(channelStartTime.AddMs(100))
+	assert.Equal(t, 2, len(c1.testQueue()))
+	assert.Equal(t, 1, len(c2.testQueue()))
+	// U1 doesn't have "ClientConnNum" property
+	assert.NotEqualValues(t, dataMsg.Num, c1.testQueue()[1].Num)
+
+	// U2 arrives
+	u2 := &proto.TestChannelDataMessage{Text: "c"}
+	testChannel.Data().OnUpdate(u2, channelStartTime.AddMs(120))
+
+	// F3/F8 = U2
+	testChannel.tickData(channelStartTime.AddMs(150))
+	assert.Equal(t, 3, len(c1.testQueue()))
+	assert.Equal(t, 2, len(c2.testQueue()))
+
 }
 
 func TestListMoveElement(t *testing.T) {
@@ -112,11 +162,10 @@ func TestDataMergeOptions(t *testing.T) {
 	assert.Equal(t, "bbb", mergedMsg3.Kv[2].Content)
 }
 
-func TestNewChannelData(t *testing.T) {
-	globalData := NewChannelData(proto.ChannelType_GLOBAL, nil)
+func TestReflectChannelData(t *testing.T) {
+	globalData := ReflectChannelData(proto.ChannelType_TEST, nil)
 	assert.NotNil(t, globalData)
-	assert.Equal(t, proto.MessageType_CHANNEL_DATA_GLOBAL, globalData.msgType)
-	assert.IsType(t, &proto.GlobalChannelDataMessage{}, globalData.msg)
+	assert.IsType(t, &proto.TestChannelDataMessage{}, globalData.msg)
 }
 
 func TestDataFieldMasks(t *testing.T) {
@@ -157,6 +206,30 @@ func TestDataFieldMasks(t *testing.T) {
 	filteredMsg5 := protobuf.Clone(testMsg)
 	fmutils.Filter(filteredMsg5, []string{"kv2.a"})
 	t.Log(filteredMsg5.(*proto.TestFieldMaskMessage).String())
+}
+
+func TestProtobufAny(t *testing.T) {
+	any1, err := anypb.New(&proto.TestAnyMessage_Type1{Value: "a"})
+	assert.NoError(t, err)
+
+	any2, err := anypb.New(&proto.TestAnyMessage_Type2{Value: 1})
+	assert.NoError(t, err)
+
+	msg1 := &proto.TestAnyMessage{Msg: any1}
+	msg2 := &proto.TestAnyMessage{Msg: any2}
+	// Can merge the any property from different type
+	protobuf.Merge(msg1, msg2)
+	assert.EqualValues(t, any2, msg1.Msg)
+	// Can be converted to a message of a unknown type
+	um, err := msg1.Msg.UnmarshalNew()
+	assert.NoError(t, err)
+	assert.EqualValues(t, 1, um.(*proto.TestAnyMessage_Type2).Value)
+
+	msg1.List = append(msg1.List, any1)
+	msg2.List = append(msg2.List, any2)
+	// Can merge the any list of different types
+	protobuf.Merge(msg1, msg2)
+	assert.Equal(t, 2, len(msg1.List))
 }
 
 func TestProtobufMapMerge(t *testing.T) {

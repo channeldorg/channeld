@@ -33,12 +33,28 @@ type sendQueueMessage struct {
 	msg       Message
 }
 
+// Add an interface before the underlying network layer for the test code.
+type MessageSender interface {
+	Send(c *Connection, channelId ChannelId, msgType proto.MessageType, msg Message)
+}
+
+type QueuedMessageSender struct{}
+
+func (s *QueuedMessageSender) Send(c *Connection, channelId ChannelId, msgType proto.MessageType, msg Message) {
+	c.sendQueue <- sendQueueMessage{
+		channelId: channelId,
+		msgType:   msgType,
+		msg:       msg,
+	}
+}
+
 type Connection struct {
 	id             ConnectionId
 	connectionType ConnectionType
 	conn           net.Conn
 	reader         *bufio.Reader
 	writer         *bufio.Writer
+	sender         MessageSender
 	sendQueue      chan sendQueueMessage
 	fsm            *fsm.FiniteStateMachine
 	removing       int32 // Don't put the removing into the FSM as 1) the FSM's states are user-defined. 2) the FSM doesn't have the race condition.
@@ -132,6 +148,7 @@ func AddConnection(c net.Conn, t ConnectionType) *Connection {
 		conn:           c,
 		reader:         bufio.NewReader(c),
 		writer:         bufio.NewWriter(c),
+		sender:         &QueuedMessageSender{},
 		sendQueue:      make(chan sendQueueMessage, 128),
 		removing:       0,
 	}
@@ -259,24 +276,20 @@ func (c *Connection) Receive() {
 	channel.PutMessage(msg, entry.handler, c)
 }
 
-func (c *Connection) SendWithChannel(channelId ChannelId, msgType proto.MessageType, msg Message) {
+func (c *Connection) Send(channelId ChannelId, msgType proto.MessageType, msg Message) {
 	if c.IsRemoving() {
 		return
 	}
 
-	c.sendQueue <- sendQueueMessage{
-		channelId: channelId,
-		msgType:   msgType,
-		msg:       msg,
-	}
+	c.sender.Send(c, channelId, msgType, msg)
 }
 
-func (c *Connection) Send(msgType proto.MessageType, msg Message) {
+func (c *Connection) SendWithGlobalChannel(msgType proto.MessageType, msg Message) {
 	if c.IsRemoving() {
 		return
 	}
 
-	c.SendWithChannel(0, msgType, msg)
+	c.Send(0, msgType, msg)
 }
 
 func (c *Connection) Flush() {

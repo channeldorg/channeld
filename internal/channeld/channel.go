@@ -87,13 +87,15 @@ func CreateChannel(t proto.ChannelType, owner *Connection) *Channel {
 		channelType:           t,
 		ownerConnection:       owner,
 		subscribedConnections: make(map[ConnectionId]*ChannelSubscription),
-		data:                  NewChannelData(t, nil),
-		inMsgQueue:            make(chan channelMessage, 1024),
-		fanOutQueue:           list.New(),
-		startTime:             time.Now(),
-		tickInterval:          DefaultTickInterval,
-		tickFrames:            0,
-		removing:              make(chan bool),
+		/* Channel data is not created by default. See handleCreateChannel().
+		data:                  ReflectChannelData(t, nil),
+		*/
+		inMsgQueue:   make(chan channelMessage, 1024),
+		fanOutQueue:  list.New(),
+		startTime:    time.Now(),
+		tickInterval: DefaultTickInterval,
+		tickFrames:   0,
+		removing:     make(chan bool),
 	}
 	if owner == nil {
 		ch.state = INIT

@@ -12,6 +12,7 @@ import (
 	protobuf "google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type ChannelDataMessage = Message //protoreflect.Message
@@ -27,7 +28,6 @@ type DataMergeOptions struct {
 
 type ChannelData struct {
 	mergeOptions *DataMergeOptions
-	msgType      proto.MessageType
 	msg          ChannelDataMessage
 	//updateMsg       ChannelDataMessage
 	updateMsgBuffer *list.List
@@ -47,7 +47,7 @@ const (
 	MaxUpdateMsgBufferSize = 512
 )
 
-func NewChannelData(channelType proto.ChannelType, mergeOptions *DataMergeOptions) *ChannelData {
+func ReflectChannelData(channelType proto.ChannelType, mergeOptions *DataMergeOptions) *ChannelData {
 	channelTypeName := channelType.String()
 	dataTypeName := fmt.Sprintf("channeld.%sChannelDataMessage",
 		strcase.ToCamel(strings.ToLower(channelTypeName)))
@@ -55,14 +55,17 @@ func NewChannelData(channelType proto.ChannelType, mergeOptions *DataMergeOption
 	if err != nil {
 		log.Panicln("Failed to create data for channel type", channelTypeName)
 	}
-	msgTypeName := "CHANNEL_DATA_" + strings.ToUpper(channelTypeName)
-	msgType, exists := proto.MessageType_value[msgTypeName]
-	if !exists {
-		log.Panicln("Can't find data update message type by name", msgTypeName)
-	}
+	/*
+		msgTypeName := "CHANNEL_DATA_" + strings.ToUpper(channelTypeName)
+		msgType, exists := proto.MessageType_value[msgTypeName]
+		if !exists {
+			log.Panicln("Can't find data update message type by name", msgTypeName)
+		}
+	*/
 	return &ChannelData{
-		msgType:         proto.MessageType(msgType),
+		//msgType:         proto.MessageType(msgType),
 		msg:             dataType.New().Interface(),
+		mergeOptions:    mergeOptions,
 		updateMsgBuffer: list.New(),
 	}
 }
@@ -87,7 +90,7 @@ func (d *ChannelData) OnUpdate(updateMsg Message, t ChannelTime) {
 }
 
 func (ch *Channel) tickData(t ChannelTime) {
-	if ch.Data().msg == nil {
+	if ch.data == nil || ch.data.msg == nil {
 		return
 	}
 	/*
@@ -101,7 +104,7 @@ func (ch *Channel) tickData(t ChannelTime) {
 			}
 		}
 	*/
-	bufp := ch.Data().updateMsgBuffer.Front()
+	bufp := ch.data.updateMsgBuffer.Front()
 	var accumulatedUpdateMsg ChannelDataMessage = nil
 	var lastUpdateTime ChannelTime
 	fe := ch.fanOutQueue.Front()
@@ -123,7 +126,7 @@ func (ch *Channel) tickData(t ChannelTime) {
 		if t >= nextFanOutTime {
 			if foc.lastFanOutTime == 0 {
 				// Send the whole data for the first time
-				ch.fanOutDataUpdate(c, cs, ch.Data().msg)
+				ch.fanOutDataUpdate(c, cs, ch.data.msg)
 			} else if bufp != nil {
 				if foc.lastFanOutTime >= lastUpdateTime {
 					lastUpdateTime = foc.lastFanOutTime
@@ -162,7 +165,13 @@ func (ch *Channel) tickData(t ChannelTime) {
 
 func (ch *Channel) fanOutDataUpdate(c *Connection, cs *ChannelSubscription, updateMsg ChannelDataMessage) {
 	fmutils.Filter(updateMsg, cs.options.DataFieldMasks)
-	c.SendWithChannel(ch.id, ch.Data().msgType, updateMsg)
+	any, err := anypb.New(updateMsg)
+	if err != nil {
+		log.Panicln(err)
+	}
+	c.Send(ch.id, proto.MessageType_CHANNEL_DATA_UPDATE, &proto.ChannelDataUpdateMessage{
+		Data: any,
+	})
 	// cs.lastFanOutTime = time.Now()
 	// cs.fanOutDataMsg = nil
 }

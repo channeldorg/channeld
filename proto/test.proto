@@ -2,7 +2,25 @@ syntax = "proto3";
 
 package channeld;
 
+import "google/protobuf/any.proto";
+
 option go_package = "/proto";
+
+message TestChannelDataMessage {
+    string text = 1;
+    uint32 num = 2;
+}
+
+message TestAnyMessage {
+    message Type1 {
+        string value = 1;
+    }
+    message Type2 {
+        int64 value = 1;
+    }
+    google.protobuf.Any msg = 1;
+    repeated google.protobuf.Any list = 2;
+}
 
 message TestMergeMessage {
     repeated string list = 1;
