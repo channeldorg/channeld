@@ -55,6 +55,10 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *proto.ChannelSubsc
 			}
 		}
 		cs.fanOutElement = ch.fanOutQueue.PushFront(&fanOutConnection{connId: c.id})
+		// Records the maximum fan-out interval for checking if the oldest update message is removable when the buffer is overflowed.
+		if ch.data != nil && ch.data.maxFanOutIntervalMs < cs.options.FanOutIntervalMs {
+			ch.data.maxFanOutIntervalMs = cs.options.FanOutIntervalMs
+		}
 		ch.subscribedConnections[c.id] = cs
 	}
 	return nil

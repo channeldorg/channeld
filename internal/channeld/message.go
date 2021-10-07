@@ -30,9 +30,9 @@ func handleAuth(m Message, c *Connection, ch *Channel) {
 }
 
 func handleCreateChannel(m Message, c *Connection, ch *Channel) {
-	// Only the WORLD channel can handle channel creation/deletion
+	// Only the GLOBAL channel can handle channel creation/deletion
 	if ch != globalChannel {
-		log.Panicln("Illegal attemp to create channel outside the WOLRD channel, connection: ", c)
+		log.Panicln("Illegal attemp to create channel outside the GLOBAL channel, connection: ", c)
 	}
 
 	msg, ok := m.(*proto.CreateChannelMessage)

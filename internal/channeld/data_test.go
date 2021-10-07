@@ -40,6 +40,15 @@ func (c *Connection) testQueue() []*proto.TestChannelDataMessage {
 	return c.sender.(*TestUpdateMessageSender).queue
 }
 
+func (c *Connection) latestMsg() *proto.TestChannelDataMessage {
+	queue := c.testQueue()
+	if len(queue) > 0 {
+		return queue[len(queue)-1]
+	} else {
+		return nil
+	}
+}
+
 // See the test case in [the design doc](doc/design.md#fan-out)
 func TestFanOutChannelData(t *testing.T) {
 	InitConnections(3, "../../config/server_conn_fsm.json", "../../config/client_conn_fsm.json")
@@ -71,7 +80,7 @@ func TestFanOutChannelData(t *testing.T) {
 	testChannel.tickData(channelStartTime)
 	assert.Equal(t, 1, len(c1.testQueue()))
 	assert.Equal(t, 0, len(c2.testQueue()))
-	assert.EqualValues(t, dataMsg.Num, c1.testQueue()[0].Num)
+	assert.EqualValues(t, dataMsg.Num, c1.latestMsg().Num)
 
 	c2.SubscribeToChannel(testChannel, &proto.ChannelSubscriptionOptions{
 		FanOutIntervalMs: 100,
@@ -80,7 +89,7 @@ func TestFanOutChannelData(t *testing.T) {
 	testChannel.tickData(channelStartTime.AddMs(50))
 	assert.Equal(t, 1, len(c1.testQueue()))
 	assert.Equal(t, 1, len(c2.testQueue()))
-	assert.EqualValues(t, dataMsg.Num, c2.testQueue()[0].Num)
+	assert.EqualValues(t, dataMsg.Num, c2.latestMsg().Num)
 
 	// U1 arrives
 	u1 := &proto.TestChannelDataMessage{Text: "b"}
@@ -91,17 +100,20 @@ func TestFanOutChannelData(t *testing.T) {
 	assert.Equal(t, 2, len(c1.testQueue()))
 	assert.Equal(t, 1, len(c2.testQueue()))
 	// U1 doesn't have "ClientConnNum" property
-	assert.NotEqualValues(t, dataMsg.Num, c1.testQueue()[1].Num)
+	assert.NotEqualValues(t, dataMsg.Num, c1.latestMsg().Num)
+	assert.EqualValues(t, "b", c1.latestMsg().Text)
+	assert.EqualValues(t, "a", c2.latestMsg().Text)
 
 	// U2 arrives
 	u2 := &proto.TestChannelDataMessage{Text: "c"}
 	testChannel.Data().OnUpdate(u2, channelStartTime.AddMs(120))
 
-	// F3/F8 = U2
+	// F8=U1+U2; F3 = U2
 	testChannel.tickData(channelStartTime.AddMs(150))
 	assert.Equal(t, 3, len(c1.testQueue()))
 	assert.Equal(t, 2, len(c2.testQueue()))
-
+	assert.EqualValues(t, "c", c1.latestMsg().Text)
+	assert.EqualValues(t, "c", c2.latestMsg().Text)
 }
 
 func TestListMoveElement(t *testing.T) {
@@ -123,8 +135,8 @@ func TestDataMergeOptions(t *testing.T) {
 	dstMsg := &proto.TestMergeMessage{
 		List: []string{"a", "b", "c"},
 		Kv: map[int64]*proto.TestMergeMessage_StringWrapper{
-			1: &proto.TestMergeMessage_StringWrapper{Content: "aa"},
-			2: &proto.TestMergeMessage_StringWrapper{Content: "bb"},
+			1: {Content: "aa"},
+			2: {Content: "bb"},
 		},
 	}
 
@@ -132,7 +144,7 @@ func TestDataMergeOptions(t *testing.T) {
 		List: []string{"d", "e"},
 		Kv: map[int64]*proto.TestMergeMessage_StringWrapper{
 			1: nil,
-			2: &proto.TestMergeMessage_StringWrapper{Content: "bbb"},
+			2: {Content: "bbb"},
 		},
 	}
 

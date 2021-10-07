@@ -41,6 +41,6 @@ A. Each connection contains its own fan-out message
 Space complexity: O(n)*O(m)
 Time complexity: O(n)*O(m)
 
-B. Store all the U in the last 10 seconds (presumably the largest fan-out interval allowed). Sort the connections by the nextFanOutTime, and then send the accumulated update message to each connection.
+B. Store all the U in the channel. Sort the connections by the lastFanOutTime, and then send the accumulated update message to each connection.
 Space complexity: O(1)*O(m)
 Time complexity: O(nlog(n)) + O(n)*O(m)

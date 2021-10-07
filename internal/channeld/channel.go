@@ -60,7 +60,7 @@ type Channel struct {
 
 const (
 	GlobalChannelId     ChannelId     = 0
-	DefaultTickInterval time.Duration = time.Millisecond * 50
+	DefaultTickInterval time.Duration = time.Millisecond * 10
 )
 
 var nextChannelId ChannelId = GlobalChannelId

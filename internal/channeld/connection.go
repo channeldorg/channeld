@@ -204,7 +204,7 @@ func readUint32(c *Connection) (uint32, error) {
 	}
 }
 
-// CHNL in ASCII
+// 'CHNL' in ASCII
 const TAG_ID uint32 = 67<<24 | 72<<16 | 78<<8 | 76
 
 // TODO: read the packet using protobuf

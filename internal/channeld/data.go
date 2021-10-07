@@ -30,7 +30,8 @@ type ChannelData struct {
 	mergeOptions *DataMergeOptions
 	msg          ChannelDataMessage
 	//updateMsg       ChannelDataMessage
-	updateMsgBuffer *list.List
+	updateMsgBuffer     *list.List
+	maxFanOutIntervalMs uint32
 }
 
 type fanOutConnection struct {
@@ -39,8 +40,8 @@ type fanOutConnection struct {
 }
 
 type updateMsgBufferElement struct {
-	updateMsg  ChannelDataMessage
-	updateTime ChannelTime
+	updateMsg   ChannelDataMessage
+	arrivalTime ChannelTime
 }
 
 const (
@@ -81,11 +82,15 @@ func (d *ChannelData) OnUpdate(updateMsg Message, t ChannelTime) {
 	*/
 
 	d.updateMsgBuffer.PushBack(&updateMsgBufferElement{
-		updateMsg:  updateMsg,
-		updateTime: t,
+		updateMsg:   updateMsg,
+		arrivalTime: t,
 	})
 	if d.updateMsgBuffer.Len() > MaxUpdateMsgBufferSize {
-		d.updateMsgBuffer.Remove(d.updateMsgBuffer.Front())
+		oldest := d.updateMsgBuffer.Front()
+		// Remove the oldest update message if it should has been fanned-out
+		if oldest.Value.(*updateMsgBufferElement).arrivalTime.AddMs(d.maxFanOutIntervalMs) < t {
+			d.updateMsgBuffer.Remove(oldest)
+		}
 	}
 }
 
@@ -104,26 +109,28 @@ func (ch *Channel) tickData(t ChannelTime) {
 			}
 		}
 	*/
-	bufp := ch.data.updateMsgBuffer.Front()
-	var accumulatedUpdateMsg ChannelDataMessage = nil
-	var lastUpdateTime ChannelTime
-	fe := ch.fanOutQueue.Front()
+	focp := ch.fanOutQueue.Front()
 
-	for i := 0; i < ch.fanOutQueue.Len(); i++ {
-		foc := fe.Value.(*fanOutConnection)
+	for foci := 0; foci < ch.fanOutQueue.Len(); foci++ {
+		foc := focp.Value.(*fanOutConnection)
 		c := GetConnection(foc.connId)
 		if c == nil {
-			fe = fe.Next()
+			focp = focp.Next()
 			continue
 		}
 		cs := ch.subscribedConnections[foc.connId]
 		if cs == nil {
-			fe = fe.Next()
+			focp = focp.Next()
 			continue
 		}
 
 		nextFanOutTime := foc.lastFanOutTime.AddMs(cs.options.FanOutIntervalMs)
 		if t >= nextFanOutTime {
+
+			var lastUpdateTime ChannelTime
+			bufp := ch.data.updateMsgBuffer.Front()
+			var accumulatedUpdateMsg ChannelDataMessage = nil
+
 			if foc.lastFanOutTime == 0 {
 				// Send the whole data for the first time
 				ch.fanOutDataUpdate(c, cs, ch.data.msg)
@@ -132,13 +139,18 @@ func (ch *Channel) tickData(t ChannelTime) {
 					lastUpdateTime = foc.lastFanOutTime
 				}
 
-				for be := bufp.Value.(*updateMsgBufferElement); bufp != nil && be.updateTime >= lastUpdateTime && be.updateTime <= nextFanOutTime; bufp = bufp.Next() {
-					if accumulatedUpdateMsg == nil {
-						accumulatedUpdateMsg = protobuf.Clone(be.updateMsg)
-					} else {
-						mergeWithOptions(accumulatedUpdateMsg, be.updateMsg, ch.data.mergeOptions)
+				//for be := bufp.Value.(*updateMsgBufferElement); bufp != nil && be.arrivalTime >= lastUpdateTime && be.arrivalTime <= nextFanOutTime; bufp = bufp.Next() {
+				for bufi := 0; bufi < ch.data.updateMsgBuffer.Len(); bufi++ {
+					be := bufp.Value.(*updateMsgBufferElement)
+					if be.arrivalTime >= lastUpdateTime && be.arrivalTime <= nextFanOutTime {
+						if accumulatedUpdateMsg == nil {
+							accumulatedUpdateMsg = protobuf.Clone(be.updateMsg)
+						} else {
+							mergeWithOptions(accumulatedUpdateMsg, be.updateMsg, ch.data.mergeOptions)
+						}
+						lastUpdateTime = be.arrivalTime
 					}
-					lastUpdateTime = be.updateTime
+					bufp = bufp.Next()
 				}
 
 				if accumulatedUpdateMsg != nil {
@@ -148,17 +160,17 @@ func (ch *Channel) tickData(t ChannelTime) {
 
 			foc.lastFanOutTime = t
 
-			temp := fe.Next()
+			temp := focp.Next()
 			// Move the fanned-out connection to the back of the queue
 			for be := ch.fanOutQueue.Back(); be != nil; be = be.Prev() {
 				if be.Value.(*fanOutConnection).lastFanOutTime <= foc.lastFanOutTime {
-					ch.fanOutQueue.MoveAfter(fe, be)
-					fe = temp
+					ch.fanOutQueue.MoveAfter(focp, be)
+					focp = temp
 					break
 				}
 			}
 		} else {
-			fe = fe.Next()
+			focp = focp.Next()
 		}
 	}
 }
