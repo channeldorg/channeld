@@ -6,7 +6,7 @@ import (
 	"log"
 	"strings"
 
-	"clewcat.com/channeld/proto"
+	"channeld.clewcat.com/channeld/proto"
 	"github.com/iancoleman/strcase"
 	"github.com/indiest/fmutils"
 	protobuf "google.golang.org/protobuf/proto"

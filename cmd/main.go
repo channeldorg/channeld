@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 
-	"clewcat.com/channeld/internal/channeld"
+	"channeld.clewcat.com/channeld/pkg/channeld"
 	"rsc.io/getopt"
 )
 

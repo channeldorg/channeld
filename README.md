@@ -2,7 +2,7 @@ channeld is a light-weight and efficient **messaging gateway** server designed f
 and other backend applications that require real-time, subscription-based user interaction with high concurrency (e.g. an instance messenger).
 
 ## Features:
-* Supports binary protocol via TCP/UDP and gRPC via HTTPS2
+* Protobuf-based binary protocol over TCP, KCP or WebSocket
 * Load-balancing backend servers with auto-scaling
 * FSM-based message filtering
 * Channel-based data subscription and storage of any type defined with Protocol Buffer
@@ -21,9 +21,13 @@ CHNL(4B) | ChannelID(4B) | StubID(4B) | MessageType(4B) | BodySize(4B) | Message
 
 
 ## Performance
+channeld is aimmed to support 10Ks connections 1Ms packets per second on a single node, and 100Ms in a distributed system.
 
 ## Examples:
-* Chat room
+* Chat rooms
+HTML + JavaScript, WebSocket
 * Relay server
+Unity, TCP
 * Seamless world travelling
+Unreal, KCP
 * Dynamic region load-balancing

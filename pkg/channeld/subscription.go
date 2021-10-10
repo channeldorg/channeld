@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"clewcat.com/channeld/proto"
+	"channeld.clewcat.com/channeld/proto"
 	protobuf "google.golang.org/protobuf/proto"
 )
 

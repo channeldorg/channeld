@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"clewcat.com/channeld/proto"
+	"channeld.clewcat.com/channeld/proto"
 )
 
 /* Use the definitions in channeld.proto instead
@@ -49,6 +49,7 @@ type Channel struct {
 	state                 ChannelState
 	ownerConnection       *Connection
 	subscribedConnections map[ConnectionId]*ChannelSubscription
+	metadata              string // Read-only property, e.g. name
 	data                  *ChannelData
 	inMsgQueue            chan channelMessage
 	fanOutQueue           *list.List

@@ -3,8 +3,9 @@ package channeld
 import (
 	"container/list"
 	"log"
+	"strings"
 
-	"clewcat.com/channeld/proto"
+	"channeld.clewcat.com/channeld/proto"
 	protobuf "google.golang.org/protobuf/proto"
 )
 
@@ -20,6 +21,7 @@ var MessageMap = map[proto.MessageType]*MessageMapEntry{
 	proto.MessageType_AUTH:                {&proto.AuthMessage{}, handleAuth},
 	proto.MessageType_CREATE_CHANNEL:      {&proto.CreateChannelMessage{}, handleCreateChannel},
 	proto.MessageType_REMOVE_CHANNEL:      {&proto.RemoveChannelMessage{}, handleRemoveChannel},
+	proto.MessageType_LIST_CHANNEL:        {&proto.ListChannelMessage{}, handleListChannel},
 	proto.MessageType_SUB_TO_CHANNEL:      {&proto.SubscribedToChannelsMessage{}, handleSubToChannels},
 	proto.MessageType_UNSUB_TO_CHANNEL:    {&proto.UnsubscribedToChannelsMessage{}, handleUnsubToChannels},
 	proto.MessageType_CHANNEL_DATA_UPDATE: {&proto.ChannelDataUpdateMessage{}, handleChannelDataUpdate},
@@ -30,7 +32,7 @@ func handleAuth(m Message, c *Connection, ch *Channel) {
 }
 
 func handleCreateChannel(m Message, c *Connection, ch *Channel) {
-	// Only the GLOBAL channel can handle channel creation/deletion
+	// Only the GLOBAL channel can handle channel creation/deletion/listing
 	if ch != globalChannel {
 		log.Panicln("Illegal attemp to create channel outside the GLOBAL channel, connection: ", c)
 	}
@@ -53,6 +55,7 @@ func handleCreateChannel(m Message, c *Connection, ch *Channel) {
 		newChannel = CreateChannel(msg.ChannelType, c)
 	}
 
+	newChannel.metadata = msg.Metadata
 	newChannel.data = &ChannelData{
 		updateMsgBuffer: list.New(),
 	}
@@ -67,6 +70,10 @@ func handleCreateChannel(m Message, c *Connection, ch *Channel) {
 }
 
 func handleRemoveChannel(m Message, c *Connection, ch *Channel) {
+	if ch != globalChannel {
+		log.Panicln("Illegal attemp to remove channel outside the GLOBAL channel, connection: ", c)
+	}
+
 	_, ok := m.(*proto.RemoveChannelMessage)
 	if !ok {
 		log.Panicln("Message is not a RemoveChannelMessage, will not be handled.")
@@ -83,6 +90,42 @@ func handleRemoveChannel(m Message, c *Connection, ch *Channel) {
 		//sc.Flush()
 	}
 	RemoveChannel(ch)
+}
+
+func handleListChannel(m Message, c *Connection, ch *Channel) {
+	if ch != globalChannel {
+		log.Panicln("Illegal attemp to list channel outside the GLOBAL channel, connection: ", c)
+	}
+
+	msg, ok := m.(*proto.ListChannelMessage)
+	if !ok {
+		log.Panicln("Message is not a ListChannelMessage, will not be handled.")
+	}
+
+	result := make([]*proto.ListChannelResultMessage_ChannelInfo, 0)
+	for _, channel := range allChannels {
+		if msg.TypeFilter != proto.ChannelType_UNKNOWN && msg.TypeFilter != channel.channelType {
+			continue
+		}
+		matched := len(msg.MetadataFilters) == 0
+		for _, keyword := range msg.MetadataFilters {
+			if strings.Contains(channel.metadata, keyword) {
+				matched = true
+				break
+			}
+		}
+		if matched {
+			result = append(result, &proto.ListChannelResultMessage_ChannelInfo{
+				ChannelId:   uint32(channel.id),
+				ChannelType: channel.channelType,
+				Metadata:    channel.metadata,
+			})
+		}
+	}
+
+	c.SendWithGlobalChannel(proto.MessageType_LIST_CHANNEL, &proto.ListChannelResultMessage{
+		Channels: result,
+	})
 }
 
 // FIXME: the channel joining should be handled in corresponding channels, otherwise we need to make chan the Channel.subscribedConnections.

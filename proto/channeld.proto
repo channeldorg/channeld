@@ -6,6 +6,14 @@ import "google/protobuf/any.proto";
 
 option go_package = "/proto";
 
+message Packet {
+    uint32 channelId = 1;
+    uint32 stubId = 2;
+    uint32 msgType = 3;
+    uint32 bodySize = 4;
+    bytes msgBody = 5;
+}
+
 enum ChannelType {
     UNKNOWN = 0;
     GLOBAL = 1;   // Default channel. Any message without ChannelId specified will be sent to this channel. All connections join this channel.
@@ -25,11 +33,10 @@ enum MessageType {
     //AUTH_RESULT = 2;
     CREATE_CHANNEL = 3;
     REMOVE_CHANNEL = 4;
-    SUB_TO_CHANNEL = 5;
-    UNSUB_TO_CHANNEL = 6;
-    CHANNEL_DATA_UPDATE = 7;
-    //CHANNEL_DATA_GLOBAL = 11;
-    //CHANNEL_DATA_SPATIAL = 14;
+    LIST_CHANNEL = 5;
+    SUB_TO_CHANNEL = 6;
+    UNSUB_TO_CHANNEL = 7;
+    CHANNEL_DATA_UPDATE = 8;
 }
 
 message AuthMessage {
@@ -41,7 +48,7 @@ message AuthResultMessage {
     enum AuthResult {
         SUCCESSFUL = 0;
         INVALID_PIT = 1;
-        INVALID_L = 2;
+        INVALID_LT = 2;
     }
     AuthResult result = 1;
 }
@@ -54,12 +61,27 @@ message ChannelSubscriptionOptions {
 
 message CreateChannelMessage {
     ChannelType channelType = 1;
-    ChannelSubscriptionOptions subOptions = 2;
-    google.protobuf.Any data = 3;
+    string metadata = 2;
+    ChannelSubscriptionOptions subOptions = 3;
+    google.protobuf.Any data = 4;
 }
 
 message RemoveChannelMessage {
     
+}
+
+message ListChannelMessage {
+    ChannelType typeFilter = 1;
+    repeated string metadataFilters = 2;
+}
+
+message ListChannelResultMessage {
+    message ChannelInfo {
+        uint32 channelId = 1;
+        ChannelType channelType = 2;
+        string metadata = 3;
+    }
+    repeated ChannelInfo channels = 1;
 }
 
 message SubscribedToChannelsMessage {

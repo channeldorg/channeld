@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"clewcat.com/channeld/proto"
+	"channeld.clewcat.com/channeld/proto"
 	"github.com/indiest/fmutils"
 	"github.com/stretchr/testify/assert"
 	protobuf "google.golang.org/protobuf/proto"
@@ -50,6 +50,7 @@ func (c *Connection) latestMsg() *proto.TestChannelDataMessage {
 }
 
 // See the test case in [the design doc](doc/design.md#fan-out)
+// TODO: add test cases with FieldMasks (no fan-out if no property is updated)
 func TestFanOutChannelData(t *testing.T) {
 	InitConnections(3, "../../config/server_conn_fsm.json", "../../config/client_conn_fsm.json")
 	InitChannels()
@@ -255,7 +256,7 @@ func TestProtobufMapMerge(t *testing.T) {
 	testMsg.Kv[4] = "d"
 
 	testMsg.Kv2[1] = &proto.TestMapMessage_StringWrapper{Content: "a"}
-	testMsg.Kv2[2] = &proto.TestMapMessage_StringWrapper{Content: "b"}
+	testMsg.Kv2[2] = &proto.TestMapMessage_StringWrapper{Content: "b", Num: 2}
 
 	updateMsg := &proto.TestMapMessage{
 		Kv:  make(map[uint32]string),
@@ -279,5 +280,6 @@ func TestProtobufMapMerge(t *testing.T) {
 	*/
 	assert.NotEqual(t, nil, testMsg.Kv2[1])
 	assert.Equal(t, "b", testMsg.Kv2[2].Content)
-
+	// The other properties should remain the same
+	assert.Equal(t, int64(2), testMsg.Kv2[2].Num)
 }

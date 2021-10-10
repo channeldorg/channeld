@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"clewcat.com/channeld/internal/fsm"
-	"clewcat.com/channeld/proto"
+	"channeld.clewcat.com/channeld/pkg/fsm"
+	"channeld.clewcat.com/channeld/proto"
 	protobuf "google.golang.org/protobuf/proto"
 )
 
@@ -108,34 +108,43 @@ func GetConnection(id ConnectionId) *Connection {
 	}
 }
 
+func startGoroutines(connection *Connection) {
+	go func() {
+		for !connection.IsRemoving() {
+			connection.Receive()
+		}
+	}()
+
+	go func() {
+		for !connection.IsRemoving() {
+			connection.Flush()
+			time.Sleep(time.Millisecond)
+		}
+	}()
+}
+
 func StartListening(t ConnectionType, network string, address string) {
-	listener, err := net.Listen(network, address)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
+	// TODO: add "kcp" network types
+	if network == "ws" || network == "websocket" {
+		startWebSocketServer(t, address)
+	} else {
 
-	defer listener.Close()
-
-	for {
-		conn, err := listener.Accept()
+		listener, err := net.Listen(network, address)
 		if err != nil {
-			log.Println(err)
-		} else {
-			connection := AddConnection(conn, t)
+			log.Fatal(err)
+			return
+		}
 
-			go func() {
-				for !connection.IsRemoving() {
-					connection.Receive()
-				}
-			}()
+		defer listener.Close()
 
-			go func() {
-				for !connection.IsRemoving() {
-					connection.Flush()
-					time.Sleep(time.Millisecond)
-				}
-			}()
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				log.Println(err)
+			} else {
+				connection := AddConnection(conn, t)
+				startGoroutines(connection)
+			}
 		}
 	}
 }

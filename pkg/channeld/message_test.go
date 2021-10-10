@@ -3,7 +3,7 @@ package channeld
 import (
 	"testing"
 
-	"clewcat.com/channeld/proto"
+	"channeld.clewcat.com/channeld/proto"
 	"github.com/stretchr/testify/assert"
 	protobuf "google.golang.org/protobuf/proto"
 )

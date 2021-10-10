@@ -36,6 +36,7 @@ message TestMapMessage {
 
     message StringWrapper {
         string content = 1;
+        int64 num = 2;
     }
     map<uint32, StringWrapper> kv2 = 2;
 }
