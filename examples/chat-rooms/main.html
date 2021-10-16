@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="//cdn.rawgit.com/dcodeIO/protobuf.js/6.X.X/dist/protobuf.min.js"></script>
+<script>  
+window.addEventListener("load", function(evt) {
+
+    var output = document.getElementById("output");
+    var input = document.getElementById("input");
+    var connId = 0
+    var joinedChannels = {}
+    var curChannelId = 0
+
+    var appendMessage = function(message) {
+        var d = document.createElement("div");
+        d.textContent = message;
+        output.appendChild(d);
+        output.scroll(0, output.scrollHeight);
+    };
+
+    var appendLog = function(message, level) {
+        var d = document.createElement("div");
+        switch (level) {
+        case "ERROR":
+            d.style.color = "red";
+            break;
+        case "WARN":
+            d.style.color = "yellow";
+            break;
+        default:
+            d.style.color = "#cccccc";
+            break;
+        }
+        
+        d.textContent = message;
+        output.appendChild(d);
+        output.scroll(0, output.scrollHeight);       
+    };
+
+    var getByteArray = function(uint32Num) {
+        return [uint32Num >> 24, uint32Num >> 16, uint32Num >> 8, uint32Num & 0xff];
+    };
+
+    var getUint32 = function(uint8Arr, index) {
+        return uint8Arr[index] << 24 | uint8Arr[index+1] << 16 | uint8Arr[index+2] << 8 | uint8Arr[index+3]
+    };
+
+    // protobufjs is missing the support of google.protobuf.Any type, we need to do it manually
+    var marshalAny = function(msg) {
+        var bytes = msg.$type.encode(msg).finish()
+        return proto.Any.create({
+            type_url: "type.googleapis.com/" + msg.$type.typeName,
+            value: bytes
+        });
+    };
+
+    var unmarshalAny = function(anyMsg) {
+        var typeFullName = anyMsg.type_url.replace("type.googleapis.com/", "");
+        for (var typeName in proto) {
+            if (proto[typeName].typeName == typeFullName) {
+                return proto[typeName].decode(anyMsg.value);
+            }
+        }
+        return null;
+    };
+
+    var sendPacket = function(channelId, msgType, msgClass, jo) {
+        var msg = msgClass.create(jo)
+        var msgBody = msgClass.encode(msg).finish()
+        var packet = new Uint8Array(new ArrayBuffer(msgBody.length + 20))
+        // 'CHNL' in ASCII
+        packet.set([67,72,78,76], 0)
+        packet.set(getByteArray(channelId), 4)
+        packet.set([0,0,0,0], 8)
+        packet.set(getByteArray(msgType), 12)
+        packet.set(getByteArray(msgBody.length), 16)
+        packet.set(msgBody, 20)
+        ws.send(packet)
+    };
+
+    var handleAuthResult = function(msg, channelId) {
+        connId = msg.connId;
+        appendLog("Auth result: " + msg.result + ", connId: " + connId)
+
+        sendPacket(0, proto.MessageType.values.SUB_TO_CHANNEL, proto.SubscribedToChannelMessage, {
+            connId: connId
+        });
+    };
+
+    var handleSubToChannel = function(msg, channelId) {
+        if (msg.connId == connId) {
+            joinedChannels[channelId] = {connIds: [connId]}
+        } else {
+            joinedChannels[channelId].connIds.push(msg.connId)
+        }
+        appendLog("User" + msg.connId + " joined channel " + channelId)
+    };
+
+    var handleChannelDataUpdate = function(msg, channelId) {
+        var chatChannelData = unmarshalAny(msg.data)
+        for (const textMsg of chatChannelData.chatMessages) {
+            appendMessage("[" + new Date(textMsg.sendTime).toLocaleTimeString() + "]" + textMsg.sender + ": " + textMsg.content)
+        }
+    };
+
+
+    var protobufRoot;
+    var proto = {};
+    var messageHandlers = {};
+    
+    protobuf.load("/proto", function(err, root) {
+        if (err) {
+            appendLog(err, "ERROR");
+            return;
+        }
+        proto.ChannelType = root.lookupEnum("channeld.ChannelType")
+        proto.MessageType = root.lookupEnum("channeld.MessageType")
+        proto.AuthMessage = root.lookupType("channeld.AuthMessage")
+        proto.AuthResultMessage = root.lookupType("channeld.AuthResultMessage")
+        proto.ChannelSubscriptionOptions = root.lookupType("channeld.ChannelSubscriptionOptions")
+        proto.CreateChannelMessage = root.lookupType("channeld.CreateChannelMessage")
+        proto.RemoveChannelMessage = root.lookupType("channeld.RemoveChannelMessage")
+        proto.ListChannelResultMessage = root.lookupType("channeld.ListChannelResultMessage")
+        proto.ChannelInfo = root.lookupType("channeld.ListChannelResultMessage.ChannelInfo")
+        proto.SubscribedToChannelMessage = root.lookupType("channeld.SubscribedToChannelMessage")
+        proto.UnsubscribedToChannelMessage = root.lookupType("channeld.UnsubscribedToChannelMessage")
+        proto.ChannelDataUpdateMessage = root.lookupType("channeld.ChannelDataUpdateMessage")
+        // Use reflection to create the Any type.
+        proto.Any = new protobuf.Type("Any").add(new protobuf.Field("type_url", 1, "string")).add(new protobuf.Field("value", 2, "bytes"));
+        root.define("google.protobuf.Any").add(proto.Any);
+
+        protobuf.load("/proto/chat", function(err, root) {
+            if (err) {
+                appendLog(err, "ERROR");
+                return;
+            }
+            proto.ChatMessage = root.lookupType("chat.ChatMessage")
+            proto.ChatChannelData = root.lookupType("chat.ChatChannelData")
+
+            for (const key in proto) {
+                var value = proto[key]
+                if (!value) {
+                    appendLog("Missing proto type: " + key, "ERROR")
+                } else {
+                    // The full name has a leading dot. Save one without the dot for future comparison.
+                    value.typeName = value.fullName.substring(1)
+                }
+            }
+
+            messageHandlers[proto.MessageType.values.AUTH] = {class: proto.AuthResultMessage, handler: handleAuthResult};
+            messageHandlers[proto.MessageType.values.SUB_TO_CHANNEL] = {class: proto.SubscribedToChannelMessage, handler: handleSubToChannel};
+            messageHandlers[proto.MessageType.values.CHANNEL_DATA_UPDATE] = {class: proto.ChannelDataUpdateMessage, handler: handleChannelDataUpdate};
+        })
+    })
+
+    var ws = new WebSocket("ws://{{.}}");
+    ws.binaryType = "arraybuffer";
+    ws.onopen = function(evt) {
+        appendLog("Server connected.");
+
+        sendPacket(0, proto.MessageType.values.AUTH, proto.AuthMessage, {
+            playerIdentifierToken: "test",
+            loginToken: "test"
+        });
+    };
+    ws.onclose = function(evt) {
+        appendLog("Server disconnected.");
+        ws = null;
+    };
+    ws.onmessage = function(evt) {
+        //appendLog("Received raw data: " + evt.data);
+        var bytes = new Uint8Array(evt.data);
+        var channelId = getUint32(bytes, 4);
+        var msgType = getUint32(bytes, 12);
+        var h = messageHandlers[msgType];
+        if (!h) {
+            appendLog("Invalid message type: " + msgType, "ERROR");
+            return;
+        }
+        var bodySize = getUint32(bytes, 16)
+        var msg = h.class.decode(bytes.subarray(20, 20 + bodySize))
+        h.handler(msg, channelId)
+    };
+    ws.onerror = function(evt) {
+        appendLog(evt.data, "ERROR");
+    };
+
+    document.getElementById("send").onclick = function(evt) {
+        if (!ws || connId == 0) {
+            return false;
+        }
+        sendPacket(curChannelId, proto.MessageType.values.CHANNEL_DATA_UPDATE, proto.ChannelDataUpdateMessage, {
+            data: marshalAny(proto.ChatChannelData.create({
+                chatMessages: [
+                    {sendTime: new Date().getTime(), sender: "User" + connId, content: input.value}
+                ]
+            }))
+        });
+        return false;
+    };
+
+    window.onbeforeunload = function(evt) {
+        if (!ws) {
+            return true;
+        }
+        ws.close();
+        return true;
+    };
+
+});
+</script>
+</head>
+<body>
+<table width="100%">
+<tr><td valign="top" width="100%">
+<div id="output" style="height: 50vh;overflow-y: scroll;background-color: white; border-color: black; border-style: solid;"></div>
+<form>
+<p><input id="input" type="text" value="Hello world!">
+<button id="send">Send</button>
+</form>
+</td></tr></table>
+</body>
+</html>
