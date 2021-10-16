@@ -51,6 +51,7 @@ message AuthResultMessage {
         INVALID_LT = 2;
     }
     AuthResult result = 1;
+    uint32 connId = 2;
 }
 
 message ChannelSubscriptionOptions {

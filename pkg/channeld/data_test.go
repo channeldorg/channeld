@@ -64,10 +64,7 @@ func TestFanOutChannelData(t *testing.T) {
 		Text: "a",
 		Num:  1,
 	}
-	testChannel.data = &ChannelData{
-		msg:             dataMsg,
-		updateMsgBuffer: list.New(),
-	}
+	testChannel.InitData(dataMsg, nil)
 	// We need to manually tick the channel. Set the interval to a very large value.
 	testChannel.tickInterval = time.Hour
 

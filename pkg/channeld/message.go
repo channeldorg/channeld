@@ -1,7 +1,6 @@
 package channeld
 
 import (
-	"container/list"
 	"log"
 	"strings"
 
@@ -28,7 +27,18 @@ var MessageMap = map[proto.MessageType]*MessageMapEntry{
 }
 
 func handleAuth(m Message, c *Connection, ch *Channel) {
+	msg, ok := m.(*proto.AuthMessage)
+	if !ok {
+		log.Panicln("Message is not a AuthMessage, will not be handled.")
+	}
+	log.Printf("Auth PIT: %s, LT: %s\n", msg.PlayerIdentifierToken, msg.LoginToken)
 
+	// TODO: Authentication
+
+	c.SendWithGlobalChannel(proto.MessageType_AUTH, &proto.AuthResultMessage{
+		Result: proto.AuthResultMessage_SUCCESSFUL,
+		ConnId: uint32(c.id),
+	})
 }
 
 func handleCreateChannel(m Message, c *Connection, ch *Channel) {
@@ -56,11 +66,13 @@ func handleCreateChannel(m Message, c *Connection, ch *Channel) {
 	}
 
 	newChannel.metadata = msg.Metadata
-	newChannel.data = &ChannelData{
-		updateMsgBuffer: list.New(),
-	}
 	if msg.Data != nil {
-		newChannel.data.msg, _ = msg.Data.UnmarshalNew()
+		dataMsg, err := msg.Data.UnmarshalNew()
+		if err != nil {
+			log.Printf("Failed to unmarshal data message when creating %s, error: %s\n", newChannel, err)
+		} else {
+			newChannel.InitData(dataMsg, nil)
+		}
 	}
 
 	// Subscribe to channel after creation
@@ -137,7 +149,8 @@ func handleSubToChannels(m Message, c *Connection, ch *Channel) {
 
 	// The connection that subscribes. Could be different to c which sends the message.
 	connToSub := GetConnection(ConnectionId(msg.ConnId))
-	connChannelIds := make(map[*Connection][]ChannelId)
+	ownerConnectionChannelIds := make(map[*Connection][]ChannelId)
+	subChannelIds := make([]ChannelId, 0)
 	for id := range msg.ChannelIds {
 		ch := GetChannel(ChannelId(id))
 		if ch == nil {
@@ -150,21 +163,27 @@ func handleSubToChannels(m Message, c *Connection, ch *Channel) {
 			continue
 		}
 
-		// Optimize to send all channelIds to each connection once
+		// Optimize to send all channelIds to each owner connection once
 		if ch.ownerConnection != nil {
-			channelIds := connChannelIds[ch.ownerConnection]
+			channelIds := ownerConnectionChannelIds[ch.ownerConnection]
 			if channelIds == nil {
 				channelIds = make([]ChannelId, 1)
 			}
 			channelIds = append(channelIds, ch.id)
-			connChannelIds[ch.ownerConnection] = channelIds
+			ownerConnectionChannelIds[ch.ownerConnection] = channelIds
 		}
+
+		subChannelIds = append(subChannelIds, ch.id)
 	}
 
-	for conn, channelIds := range connChannelIds {
+	// Send to channel owners
+	for conn, channelIds := range ownerConnectionChannelIds {
 		conn.sendConnSubscribed(ConnectionId(msg.ConnId), channelIds...)
 		// conn.Flush()
 	}
+
+	// Send back to requester
+	c.sendConnSubscribed(c.id, subChannelIds...)
 }
 
 func handleUnsubToChannels(m Message, c *Connection, ch *Channel) {
@@ -174,7 +193,8 @@ func handleUnsubToChannels(m Message, c *Connection, ch *Channel) {
 	}
 
 	connToUnsub := GetConnection(ConnectionId(msg.ConnId))
-	connChannelIds := make(map[*Connection][]ChannelId)
+	ownerConnectionChannelIds := make(map[*Connection][]ChannelId)
+	unsubChannelIds := make([]ChannelId, 0)
 	for id := range msg.ChannelIds {
 		ch := GetChannel(ChannelId(id))
 		if ch == nil {
@@ -190,19 +210,25 @@ func handleUnsubToChannels(m Message, c *Connection, ch *Channel) {
 
 		// Optimize to send all channelIds to each connection once
 		if ch.ownerConnection != nil {
-			channelIds := connChannelIds[ch.ownerConnection]
+			channelIds := ownerConnectionChannelIds[ch.ownerConnection]
 			if channelIds == nil {
 				channelIds = make([]ChannelId, 1)
 			}
 			channelIds = append(channelIds, ch.id)
-			connChannelIds[ch.ownerConnection] = channelIds
+			ownerConnectionChannelIds[ch.ownerConnection] = channelIds
 		}
 
-		for conn, channelIds := range connChannelIds {
-			conn.sendConnUnsubscribed(ConnectionId(msg.ConnId), channelIds...)
-			// conn.Flush()
-		}
+		unsubChannelIds = append(unsubChannelIds, ch.id)
 	}
+
+	// Send to channel owners
+	for conn, channelIds := range ownerConnectionChannelIds {
+		conn.sendConnUnsubscribed(ConnectionId(msg.ConnId), channelIds...)
+		// conn.Flush()
+	}
+
+	// Send back to requester
+	c.sendConnUnsubscribed(c.id, unsubChannelIds...)
 }
 
 func handleChannelDataUpdate(m Message, c *Connection, ch *Channel) {

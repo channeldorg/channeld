@@ -4,7 +4,7 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -47,19 +47,37 @@ func (c *WSConn) SetWriteDeadline(t time.Time) error {
 	return c.conn.SetWriteDeadline(t)
 }
 
-var upgrader websocket.Upgrader = websocket.Upgrader{}
+var trustedOrigins []string
+
+func SetWebSocketTrustedOrigins(addrs []string) {
+	trustedOrigins = addrs
+}
+
+var upgrader websocket.Upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		if trustedOrigins == nil {
+			return true
+		} else {
+			for _, addr := range trustedOrigins {
+				if addr == r.RemoteAddr {
+					return true
+				}
+			}
+			return false
+		}
+	},
+}
 
 func startWebSocketServer(t ConnectionType, address string) {
-	u, err := url.Parse(address)
-	if err != nil {
-		log.Panic("Invalid address: ", err)
+	pattern := "/"
+	pathIndex := strings.Index(address, "/")
+	if pathIndex >= 0 {
+		pattern = address[pathIndex:]
+		address = address[:pathIndex-1]
 	}
 
-	pattern := u.Path
-	if len(pattern) == 0 {
-		pattern = "/"
-	}
-	http.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Panic(err)
@@ -67,5 +85,13 @@ func startWebSocketServer(t ConnectionType, address string) {
 		c := AddConnection(&WSConn{conn}, t)
 		startGoroutines(c)
 	})
-	http.ListenAndServe(address, nil)
+
+	server := http.Server{
+		Addr:    address,
+		Handler: mux,
+	}
+
+	defer server.Close()
+
+	log.Println(server.ListenAndServe())
 }

@@ -71,6 +71,18 @@ func ReflectChannelData(channelType proto.ChannelType, mergeOptions *DataMergeOp
 	}
 }
 
+func (ch *Channel) InitData(dataMsg Message, mergeOptions *DataMergeOptions) {
+	ch.data = &ChannelData{
+		msg:             dataMsg,
+		updateMsgBuffer: list.New(),
+		mergeOptions:    mergeOptions,
+	}
+}
+
+func (ch *Channel) Data() *ChannelData {
+	return ch.data
+}
+
 func (d *ChannelData) OnUpdate(updateMsg Message, t ChannelTime) {
 	mergeWithOptions(d.msg, updateMsg, d.mergeOptions)
 	/*

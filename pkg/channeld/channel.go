@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"fmt"
 	"log"
+	"sync/atomic"
 	"time"
 
 	"channeld.clewcat.com/channeld/proto"
@@ -56,7 +57,7 @@ type Channel struct {
 	startTime             time.Time // Time since channel created
 	tickInterval          time.Duration
 	tickFrames            int
-	removing              chan bool
+	removing              int32
 }
 
 const (
@@ -96,7 +97,7 @@ func CreateChannel(t proto.ChannelType, owner *Connection) *Channel {
 		startTime:    time.Now(),
 		tickInterval: DefaultTickInterval,
 		tickFrames:   0,
-		removing:     make(chan bool),
+		removing:     0,
 	}
 	if owner == nil {
 		ch.state = INIT
@@ -110,17 +111,17 @@ func CreateChannel(t proto.ChannelType, owner *Connection) *Channel {
 }
 
 func RemoveChannel(ch *Channel) {
+	atomic.AddInt32(&ch.removing, 1)
 	close(ch.inMsgQueue)
-	ch.removing <- true
 	delete(allChannels, ch.id)
 }
 
-func (ch *Channel) String() string {
-	return fmt.Sprintf("Channel(%s %d)", ch.channelType.Descriptor().Name(), ch.id)
+func (ch *Channel) IsRemoving() bool {
+	return ch.removing > 0
 }
 
-func (ch *Channel) Data() *ChannelData {
-	return ch.data
+func (ch *Channel) String() string {
+	return fmt.Sprintf("Channel(%s %d)", ch.channelType.String(), ch.id)
 }
 
 func (ch *Channel) PutMessage(msg Message, handler MessageHandlerFunc, conn *Connection) {
@@ -133,7 +134,7 @@ func (ch *Channel) GetTime() ChannelTime {
 
 func (ch *Channel) Tick() {
 	for {
-		if <-ch.removing {
+		if ch.IsRemoving() {
 			return
 		}
 
@@ -144,7 +145,7 @@ func (ch *Channel) Tick() {
 			cm := <-ch.inMsgQueue
 			cm.handler(cm.msg, cm.conn, ch)
 			if ch.tickInterval > 0 && time.Since(tickStart) >= ch.tickInterval {
-				log.Printf("%s spent %dms handling messages, will delay the left ones(%d) to the next tick.", ch, time.Millisecond*time.Since(tickStart), len(ch.inMsgQueue))
+				log.Printf("%s spent %dms handling messages, will delay the left ones(%d) to the next tick.", ch, time.Since(tickStart)/time.Millisecond, len(ch.inMsgQueue))
 				break
 			}
 		}

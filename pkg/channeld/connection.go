@@ -14,6 +14,7 @@ import (
 
 	"channeld.clewcat.com/channeld/pkg/fsm"
 	"channeld.clewcat.com/channeld/proto"
+	"github.com/gorilla/websocket"
 	protobuf "google.golang.org/protobuf/proto"
 )
 
@@ -22,9 +23,8 @@ type ConnectionId uint32
 type ConnectionType uint8
 
 const (
-	SERVER        ConnectionType = 1
-	CLIENT        ConnectionType = 2
-	FlushInterval time.Duration  = time.Millisecond * 10
+	SERVER ConnectionType = 1
+	CLIENT ConnectionType = 2
 )
 
 type sendQueueMessage struct {
@@ -186,18 +186,29 @@ func (c *Connection) IsRemoving() bool {
 	return c.removing > 0
 }
 
+type closeError struct {
+	source error
+}
+
+func (e *closeError) Error() string {
+	return e.source.Error()
+}
+
 func readBytes(c *Connection, len uint) ([]byte, error) {
 	bytes := make([]byte, len)
 	if _, err := io.ReadFull(c.reader, bytes); err != nil {
 		switch err.(type) {
 		case *net.OpError:
+		case *websocket.CloseError:
 			log.Printf("%s disconnected: %s\n", c.String(), c.conn.RemoteAddr().String())
 			RemoveConnection(c)
+			return nil, &closeError{err}
 		}
 
 		if err == io.EOF {
 			log.Printf("%s disconnected: %s\n", c.String(), c.conn.RemoteAddr().String())
 			RemoveConnection(c)
+			return nil, &closeError{err}
 		}
 		return nil, err
 	}
@@ -209,7 +220,7 @@ func readUint32(c *Connection) (uint32, error) {
 	if err != nil {
 		return 0, err
 	} else {
-		return binary.LittleEndian.Uint32(bytes), nil
+		return binary.BigEndian.Uint32(bytes), nil
 	}
 }
 
@@ -220,8 +231,11 @@ const TAG_ID uint32 = 67<<24 | 72<<16 | 78<<8 | 76
 func (c *Connection) Receive() {
 	if tag, err := readUint32(c); tag != TAG_ID {
 		log.Println("Invalid tag:", tag, ", the packet will be dropped.", err)
-		// Drop the packet
-		ioutil.ReadAll(c.reader)
+		_, isClosed := err.(*closeError)
+		if !isClosed {
+			// Drop the packet
+			ioutil.ReadAll(c.reader)
+		}
 		return
 	}
 
@@ -314,12 +328,12 @@ func (c *Connection) Flush() {
 			continue
 		}
 
-		binary.Write(c.writer, binary.LittleEndian, TAG_ID)
-		binary.Write(c.writer, binary.LittleEndian, uint32(e.channelId))
-		binary.Write(c.writer, binary.LittleEndian, uint32(0))
-		binary.Write(c.writer, binary.LittleEndian, uint32(e.msgType))
-		binary.Write(c.writer, binary.LittleEndian, uint32(len(bytes)))
-		binary.Write(c.writer, binary.LittleEndian, bytes)
+		binary.Write(c.writer, binary.BigEndian, TAG_ID)
+		binary.Write(c.writer, binary.BigEndian, uint32(e.channelId))
+		binary.Write(c.writer, binary.BigEndian, uint32(0))
+		binary.Write(c.writer, binary.BigEndian, uint32(e.msgType))
+		binary.Write(c.writer, binary.BigEndian, uint32(len(bytes)))
+		binary.Write(c.writer, binary.BigEndian, bytes)
 	}
 
 	c.writer.Flush()
