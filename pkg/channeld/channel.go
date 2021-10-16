@@ -138,6 +138,12 @@ func (ch *Channel) Tick() {
 			return
 		}
 
+		if ch.ownerConnection != nil {
+			if ch.ownerConnection.IsRemoving() {
+				ch.ownerConnection = nil
+			}
+		}
+
 		tickStart := time.Now()
 		ch.tickFrames++
 

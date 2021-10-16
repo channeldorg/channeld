@@ -21,8 +21,8 @@ var MessageMap = map[proto.MessageType]*MessageMapEntry{
 	proto.MessageType_CREATE_CHANNEL:      {&proto.CreateChannelMessage{}, handleCreateChannel},
 	proto.MessageType_REMOVE_CHANNEL:      {&proto.RemoveChannelMessage{}, handleRemoveChannel},
 	proto.MessageType_LIST_CHANNEL:        {&proto.ListChannelMessage{}, handleListChannel},
-	proto.MessageType_SUB_TO_CHANNEL:      {&proto.SubscribedToChannelsMessage{}, handleSubToChannels},
-	proto.MessageType_UNSUB_TO_CHANNEL:    {&proto.UnsubscribedToChannelsMessage{}, handleUnsubToChannels},
+	proto.MessageType_SUB_TO_CHANNEL:      {&proto.SubscribedToChannelMessage{}, handleSubToChannel},
+	proto.MessageType_UNSUB_TO_CHANNEL:    {&proto.UnsubscribedToChannelMessage{}, handleUnsubToChannel},
 	proto.MessageType_CHANNEL_DATA_UPDATE: {&proto.ChannelDataUpdateMessage{}, handleChannelDataUpdate},
 }
 
@@ -78,7 +78,7 @@ func handleCreateChannel(m Message, c *Connection, ch *Channel) {
 	// Subscribe to channel after creation
 	c.SubscribeToChannel(newChannel, msg.SubOptions)
 	// Also send the Sub message to the creator (no need to broadcast as there's only 1 subscriptor)
-	c.sendSubscribed(newChannel.id)
+	c.sendSubscribed(newChannel)
 }
 
 func handleRemoveChannel(m Message, c *Connection, ch *Channel) {
@@ -98,7 +98,7 @@ func handleRemoveChannel(m Message, c *Connection, ch *Channel) {
 
 	for connId := range ch.subscribedConnections {
 		sc := GetConnection(connId)
-		sc.sendUnsubscribed(ch.id)
+		sc.sendUnsubscribed(ch)
 		//sc.Flush()
 	}
 	RemoveChannel(ch)
@@ -140,6 +140,7 @@ func handleListChannel(m Message, c *Connection, ch *Channel) {
 	})
 }
 
+/*
 // FIXME: the channel joining should be handled in corresponding channels, otherwise we need to make chan the Channel.subscribedConnections.
 func handleSubToChannels(m Message, c *Connection, ch *Channel) {
 	msg, ok := m.(*proto.SubscribedToChannelsMessage)
@@ -229,6 +230,56 @@ func handleUnsubToChannels(m Message, c *Connection, ch *Channel) {
 
 	// Send back to requester
 	c.sendConnUnsubscribed(c.id, unsubChannelIds...)
+}
+*/
+
+func handleSubToChannel(m Message, c *Connection, ch *Channel) {
+	msg, ok := m.(*proto.SubscribedToChannelMessage)
+	if !ok {
+		log.Panicln("Message is not a SubscribedToChannelMessage, will not be handled.")
+	}
+
+	// The connection that subscribes. Could be different to c which sends the message.
+	connToSub := GetConnection(ConnectionId(msg.ConnId))
+	if connToSub == nil {
+		log.Panicln("Invalid ConnectionId:", msg.ConnId)
+	}
+	err := connToSub.SubscribeToChannel(ch, msg.SubOptions)
+	if err != nil {
+		log.Panicf("%s failed to subscribe to %s, error: %s\n", connToSub, ch, err)
+	}
+
+	connToSub.sendSubscribed(ch)
+	if ch.ownerConnection != nil {
+		ch.ownerConnection.sendSubscribed(ch)
+	}
+}
+
+func handleUnsubToChannel(m Message, c *Connection, ch *Channel) {
+	msg, ok := m.(*proto.UnsubscribedToChannelMessage)
+	if !ok {
+		log.Panicln("Message is not a UnsubscribedToChannelMessage, will not be handled.")
+	}
+
+	// The connection that unsubscribes. Could be different to c which sends the message.
+	connToUnsub := GetConnection(ConnectionId(msg.ConnId))
+	if connToUnsub == nil {
+		log.Panicln("Invalid ConnectionId:", msg.ConnId)
+	}
+	err := connToUnsub.UnsubscribeToChannel(ch)
+	if err != nil {
+		log.Panicf("%s failed to unsubscribe to %s, error: %s\n", connToUnsub, ch, err)
+	}
+
+	connToUnsub.sendUnsubscribed(ch)
+	if ch.ownerConnection != nil {
+		if ch.ownerConnection == connToUnsub {
+			// Reset the owner if it unsubscribed
+			ch.ownerConnection = nil
+		} else {
+			ch.ownerConnection.sendUnsubscribed(ch)
+		}
+	}
 }
 
 func handleChannelDataUpdate(m Message, c *Connection, ch *Channel) {

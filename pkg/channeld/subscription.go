@@ -75,6 +75,7 @@ func (c *Connection) UnsubscribeToChannel(ch *Channel) error {
 	return nil
 }
 
+/*
 func (c *Connection) sendConnSubscribed(connId ConnectionId, ids ...ChannelId) {
 	channelIds := make([]uint32, len(ids))
 	for i, id := range ids {
@@ -82,10 +83,6 @@ func (c *Connection) sendConnSubscribed(connId ConnectionId, ids ...ChannelId) {
 	}
 	subMsg := &proto.SubscribedToChannelsMessage{ConnId: uint32(connId), ChannelIds: channelIds}
 	c.SendWithGlobalChannel(proto.MessageType_SUB_TO_CHANNEL, subMsg)
-}
-
-func (c *Connection) sendSubscribed(ids ...ChannelId) {
-	c.sendConnSubscribed(c.id, ids...)
 }
 
 func (c *Connection) sendConnUnsubscribed(connId ConnectionId, ids ...ChannelId) {
@@ -96,9 +93,18 @@ func (c *Connection) sendConnUnsubscribed(connId ConnectionId, ids ...ChannelId)
 	subMsg := &proto.UnsubscribedToChannelsMessage{ConnId: uint32(connId), ChannelIds: channelIds}
 	c.SendWithGlobalChannel(proto.MessageType_UNSUB_TO_CHANNEL, subMsg)
 }
+*/
 
-func (c *Connection) sendUnsubscribed(ids ...ChannelId) {
-	c.sendConnUnsubscribed(c.id, ids...)
+func (c *Connection) sendSubscribed(ch *Channel) {
+	c.Send(ch.id, proto.MessageType_SUB_TO_CHANNEL, &proto.SubscribedToChannelMessage{
+		ConnId:     uint32(c.id),
+		SubOptions: &ch.subscribedConnections[c.id].options,
+	})
+}
+func (c *Connection) sendUnsubscribed(ch *Channel) {
+	c.Send(ch.id, proto.MessageType_UNSUB_TO_CHANNEL, &proto.UnsubscribedToChannelMessage{
+		ConnId: uint32(c.id),
+	})
 }
 
 func (ch *Channel) AddConnectionSubscribedNotification(connId ConnectionId) {

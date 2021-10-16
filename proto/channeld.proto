@@ -85,6 +85,7 @@ message ListChannelResultMessage {
     repeated ChannelInfo channels = 1;
 }
 
+/*
 message SubscribedToChannelsMessage {
     uint32 connId = 1;
     repeated uint32 channelIds = 2;
@@ -94,6 +95,17 @@ message SubscribedToChannelsMessage {
 message UnsubscribedToChannelsMessage {
     uint32 connId = 1;
     repeated uint32 channelIds = 2;
+}
+*/
+
+message SubscribedToChannelMessage {
+    // The connection to be added to the channel is not necessarily the one sends the message 
+    uint32 connId = 1;
+    ChannelSubscriptionOptions subOptions = 2;
+}
+
+message UnsubscribedToChannelMessage {
+    uint32 connId = 1;
 }
 
 message ChannelDataUpdateMessage {
