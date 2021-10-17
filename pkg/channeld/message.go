@@ -53,8 +53,10 @@ func handleCreateChannel(m Message, c *Connection, ch *Channel) {
 	}
 
 	var newChannel *Channel
-	// Global channel is initially created by the system. Creating the channel will attempt to own it.
-	if msg.ChannelType == proto.ChannelType_GLOBAL {
+	if msg.ChannelType == proto.ChannelType_UNKNOWN {
+		log.Panicln("Illegal attempt to create the UNKNOWN channel, connection: ", c)
+	} else if msg.ChannelType == proto.ChannelType_GLOBAL {
+		// Global channel is initially created by the system. Creating the channel will attempt to own it.
 		newChannel = globalChannel
 		if globalChannel.ownerConnection == nil {
 			globalChannel.ownerConnection = c
@@ -244,6 +246,11 @@ func handleSubToChannel(m Message, c *Connection, ch *Channel) {
 	if connToSub == nil {
 		log.Panicln("Invalid ConnectionId:", msg.ConnId)
 	}
+
+	if connToSub.id != c.id && c != ch.ownerConnection {
+		log.Panicf("%s is not the channel owner but tried to subscribe %s to %s\n", c, connToSub, ch)
+	}
+
 	err := connToSub.SubscribeToChannel(ch, msg.SubOptions)
 	if err != nil {
 		log.Panicf("%s failed to subscribe to %s, error: %s\n", connToSub, ch, err)
@@ -299,5 +306,11 @@ func handleChannelDataUpdate(m Message, c *Connection, ch *Channel) {
 	if err != nil {
 		log.Panicln(err)
 	}
-	ch.Data().OnUpdate(updateMsg, ch.GetTime())
+
+	if ch.Data() == nil {
+		ch.InitData(updateMsg, nil)
+		log.Printf("%s initialized data from update msg: %s\n", ch, updateMsg)
+	} else {
+		ch.Data().OnUpdate(updateMsg, ch.GetTime())
+	}
 }

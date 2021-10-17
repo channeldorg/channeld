@@ -8,6 +8,10 @@ import (
 	protobuf "google.golang.org/protobuf/proto"
 )
 
+func TestHandleListChannels(t *testing.T) {
+	// TODO
+}
+
 func TestMessageHandlers(t *testing.T) {
 	for name, value := range proto.MessageType_value {
 		msgType := proto.MessageType(value)

@@ -26,7 +26,7 @@ window.addEventListener("load", function(evt) {
             d.style.color = "red";
             break;
         case "WARN":
-            d.style.color = "yellow";
+            d.style.color = "orange";
             break;
         default:
             d.style.color = "#cccccc";
@@ -90,17 +90,24 @@ window.addEventListener("load", function(evt) {
 
     var handleSubToChannel = function(msg, channelId) {
         if (msg.connId == connId) {
-            joinedChannels[channelId] = {connIds: [connId]}
+            joinedChannels[channelId] = {connIds: [connId]};
+            curChannelId = channelId;
         } else {
-            joinedChannels[channelId].connIds.push(msg.connId)
+            joinedChannels[channelId].connIds.push(msg.connId);
         }
-        appendLog("User" + msg.connId + " joined channel " + channelId)
+        appendLog("User" + msg.connId + " joined channel " + channelId);
     };
 
     var handleChannelDataUpdate = function(msg, channelId) {
-        var chatChannelData = unmarshalAny(msg.data)
+        var chatChannelData = unmarshalAny(msg.data);
         for (const textMsg of chatChannelData.chatMessages) {
-            appendMessage("[" + new Date(textMsg.sendTime).toLocaleTimeString() + "]" + textMsg.sender + ": " + textMsg.content)
+            appendMessage("[" + new Date(textMsg.sendTime).toLocaleTimeString() + "]" + textMsg.sender + ": " + textMsg.content);
+        }
+    };
+
+    var handleListChannelResult = function(msg, channelId) {
+        for (const ci of msg.channels) {
+            appendLog("Channel(" + proto.ChannelType.valuesById[ci.channelType] + " " + ci.channelId + ") " + ci.metadata);
         }
     };
 
@@ -108,6 +115,7 @@ window.addEventListener("load", function(evt) {
     var protobufRoot;
     var proto = {};
     var messageHandlers = {};
+    var commands = {};
     
     protobuf.load("/proto", function(err, root) {
         if (err) {
@@ -121,6 +129,7 @@ window.addEventListener("load", function(evt) {
         proto.ChannelSubscriptionOptions = root.lookupType("channeld.ChannelSubscriptionOptions")
         proto.CreateChannelMessage = root.lookupType("channeld.CreateChannelMessage")
         proto.RemoveChannelMessage = root.lookupType("channeld.RemoveChannelMessage")
+        proto.ListChannelMessage = root.lookupType("channeld.ListChannelMessage")
         proto.ListChannelResultMessage = root.lookupType("channeld.ListChannelResultMessage")
         proto.ChannelInfo = root.lookupType("channeld.ListChannelResultMessage.ChannelInfo")
         proto.SubscribedToChannelMessage = root.lookupType("channeld.SubscribedToChannelMessage")
@@ -151,6 +160,35 @@ window.addEventListener("load", function(evt) {
             messageHandlers[proto.MessageType.values.AUTH] = {class: proto.AuthResultMessage, handler: handleAuthResult};
             messageHandlers[proto.MessageType.values.SUB_TO_CHANNEL] = {class: proto.SubscribedToChannelMessage, handler: handleSubToChannel};
             messageHandlers[proto.MessageType.values.CHANNEL_DATA_UPDATE] = {class: proto.ChannelDataUpdateMessage, handler: handleChannelDataUpdate};
+            messageHandlers[proto.MessageType.values.LIST_CHANNEL] = {class: proto.ListChannelResultMessage, handler: handleListChannelResult};
+ 
+            commands = {
+                "create": {
+                    "msgType": proto.MessageType.values.CREATE_CHANNEL,
+                    "msgClass": proto.CreateChannelMessage,
+                    "args": ["channelType", "metadata"]
+                },
+                "sub": {
+                    "msgType": proto.MessageType.values.SUB_TO_CHANNEL,
+                    "msgClass": proto.SubscribedToChannelMessage,
+                    "channelId": (args) => {return parseInt(args[0])},
+                    "args": ["channelId", "connId"]
+                },
+                "unsub": {
+                    "msgType": proto.MessageType.values.UNSUB_TO_CHANNEL,
+                    "msgClass": proto.UnsubscribedToChannelMessage,
+                    "channelId": (args) => {return parseInt(args[0])},
+                    "args": ["channelId", "connId"]
+                },
+                "list": {
+                    "msgType": proto.MessageType.values.LIST_CHANNEL,
+                    "msgClass": proto.ListChannelMessage,
+                    "channelId": (args) => {return 0}, //The ListChannelMessage can only be sent to the global channel.
+                    "args": ["typeFilter", (jo, arg) => {
+                        jo["metadataFilters"] = arg.split(',');
+                    }]
+                },
+            };
         })
     })
 
@@ -186,18 +224,57 @@ window.addEventListener("load", function(evt) {
         appendLog(evt.data, "ERROR");
     };
 
-    document.getElementById("send").onclick = function(evt) {
+
+    var sendInput = function() {
         if (!ws || connId == 0) {
+            return;
+        }
+
+        var content = input.value;
+        if (content[0] == '/') {
+            var components = content.substring(1).split(' ');
+            var cmd = commands[components[0]];
+            var args = components.slice(1);
+            if (!cmd) {
+                appendLog("Invalid command " + components[0], "WARN");
+                return;
+            }
+            var channelId = curChannelId;
+            if (typeof cmd.channelId === "function") {
+                channelId = cmd.channelId(args);
+            }
+            var jo = {};
+            for (var i = 0; i < args.length; i++) {
+                var arg = cmd.args[i];
+                if (typeof arg === "function") {
+                    arg(jo, args[i]);
+                } else {
+                    jo[arg] = args[i];
+                }
+            }
+            sendPacket(channelId, cmd.msgType, cmd.msgClass, jo);
+        } else {
+            sendPacket(curChannelId, proto.MessageType.values.CHANNEL_DATA_UPDATE, proto.ChannelDataUpdateMessage, {
+                data: marshalAny(proto.ChatChannelData.create({
+                    chatMessages: [
+                        {sendTime: new Date().getTime(), sender: "User" + connId, content: content}
+                    ]
+                }))
+            });
+        }
+        input.value = "";
+    };
+    
+    document.getElementById("send").onclick = function(evt) {
+        sendInput();
+        //return false;
+    };
+
+    document.getElementById("input").onkeydown = function(evt) {
+        if (evt.keyCode == 13) {
+            sendInput();
             return false;
         }
-        sendPacket(curChannelId, proto.MessageType.values.CHANNEL_DATA_UPDATE, proto.ChannelDataUpdateMessage, {
-            data: marshalAny(proto.ChatChannelData.create({
-                chatMessages: [
-                    {sendTime: new Date().getTime(), sender: "User" + connId, content: input.value}
-                ]
-            }))
-        });
-        return false;
     };
 
     window.onbeforeunload = function(evt) {
@@ -215,10 +292,8 @@ window.addEventListener("load", function(evt) {
 <table width="100%">
 <tr><td valign="top" width="100%">
 <div id="output" style="height: 50vh;overflow-y: scroll;background-color: white; border-color: black; border-style: solid;"></div>
-<form>
-<p><input id="input" type="text" value="Hello world!">
+<p><input id="input" type="text" placeholder="Hello Global!">
 <button id="send">Send</button>
-</form>
 </td></tr></table>
 </body>
 </html>
