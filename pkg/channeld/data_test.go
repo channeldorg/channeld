@@ -2,7 +2,6 @@ package channeld
 
 import (
 	"container/list"
-	"log"
 	"net"
 	"testing"
 	"time"
@@ -14,33 +13,39 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-type TestUpdateMessageSender struct {
-	queue []*proto.TestChannelDataMessage
+type testQueuedMessageSender struct {
+	MessageSender
+	msgQueue     []Message
+	msgProcessor func(Message) (Message, error)
 }
 
-func (s *TestUpdateMessageSender) Send(c *Connection, channelId ChannelId, msgType proto.MessageType, msg Message) {
-	// Extract the payload from the ChannelDataUpdatMessage
-	payload := msg.(*proto.ChannelDataUpdateMessage).Data
-	updateMsg, err := payload.UnmarshalNew()
-	payload.ProtoReflect()
-	if err != nil {
-		log.Panicln(err)
+func (s *testQueuedMessageSender) Send(c *Connection, channelId ChannelId, msgType proto.MessageType, msg Message) {
+	if s.msgProcessor != nil {
+		var err error
+		msg, err = s.msgProcessor(msg)
+		if err != nil {
+			panic(err)
+		}
 	}
-	s.queue = append(s.queue, updateMsg.(*proto.TestChannelDataMessage))
+	s.msgQueue = append(s.msgQueue, msg)
 }
 
 func addTestConnection(t ConnectionType) *Connection {
+	return addTestConnectionWithProcessor(t, nil)
+}
+
+func addTestConnectionWithProcessor(t ConnectionType, p func(Message) (Message, error)) *Connection {
 	conn1, _ := net.Pipe()
 	c := AddConnection(conn1, t)
-	c.sender = &TestUpdateMessageSender{queue: make([]*proto.TestChannelDataMessage, 0)}
+	c.sender = &testQueuedMessageSender{msgQueue: make([]Message, 0), msgProcessor: p}
 	return c
 }
 
-func (c *Connection) testQueue() []*proto.TestChannelDataMessage {
-	return c.sender.(*TestUpdateMessageSender).queue
+func (c *Connection) testQueue() []Message {
+	return c.sender.(*testQueuedMessageSender).msgQueue
 }
 
-func (c *Connection) latestMsg() *proto.TestChannelDataMessage {
+func (c *Connection) latestMsg() Message {
 	queue := c.testQueue()
 	if len(queue) > 0 {
 		return queue[len(queue)-1]
@@ -49,15 +54,22 @@ func (c *Connection) latestMsg() *proto.TestChannelDataMessage {
 	}
 }
 
+func testChannelDataMessageProcessor(msg Message) (Message, error) {
+	// Extract the payload from the ChannelDataUpdatMessage
+	payload := msg.(*proto.ChannelDataUpdateMessage).Data
+	updateMsg, err := payload.UnmarshalNew()
+	return updateMsg, err
+}
+
 // See the test case in [the design doc](doc/design.md#fan-out)
 // TODO: add test cases with FieldMasks (no fan-out if no property is updated)
 func TestFanOutChannelData(t *testing.T) {
-	InitConnections(3, "../../config/server_conn_fsm.json", "../../config/client_conn_fsm.json")
+	InitConnections(3, "", "")
 	InitChannels()
 
-	c0 := addTestConnection(SERVER)
-	c1 := addTestConnection(CLIENT)
-	c2 := addTestConnection(CLIENT)
+	c0 := addTestConnectionWithProcessor(SERVER, testChannelDataMessageProcessor)
+	c1 := addTestConnectionWithProcessor(CLIENT, testChannelDataMessageProcessor)
+	c2 := addTestConnectionWithProcessor(CLIENT, testChannelDataMessageProcessor)
 
 	testChannel := CreateChannel(proto.ChannelType_TEST, c0)
 	dataMsg := &proto.TestChannelDataMessage{
@@ -78,7 +90,7 @@ func TestFanOutChannelData(t *testing.T) {
 	testChannel.tickData(channelStartTime)
 	assert.Equal(t, 1, len(c1.testQueue()))
 	assert.Equal(t, 0, len(c2.testQueue()))
-	assert.EqualValues(t, dataMsg.Num, c1.latestMsg().Num)
+	assert.EqualValues(t, dataMsg.Num, c1.latestMsg().(*proto.TestChannelDataMessage).Num)
 
 	c2.SubscribeToChannel(testChannel, &proto.ChannelSubscriptionOptions{
 		FanOutIntervalMs: 100,
@@ -87,7 +99,7 @@ func TestFanOutChannelData(t *testing.T) {
 	testChannel.tickData(channelStartTime.AddMs(50))
 	assert.Equal(t, 1, len(c1.testQueue()))
 	assert.Equal(t, 1, len(c2.testQueue()))
-	assert.EqualValues(t, dataMsg.Num, c2.latestMsg().Num)
+	assert.EqualValues(t, dataMsg.Num, c2.latestMsg().(*proto.TestChannelDataMessage).Num)
 
 	// U1 arrives
 	u1 := &proto.TestChannelDataMessage{Text: "b"}
@@ -98,9 +110,9 @@ func TestFanOutChannelData(t *testing.T) {
 	assert.Equal(t, 2, len(c1.testQueue()))
 	assert.Equal(t, 1, len(c2.testQueue()))
 	// U1 doesn't have "ClientConnNum" property
-	assert.NotEqualValues(t, dataMsg.Num, c1.latestMsg().Num)
-	assert.EqualValues(t, "b", c1.latestMsg().Text)
-	assert.EqualValues(t, "a", c2.latestMsg().Text)
+	assert.NotEqualValues(t, dataMsg.Num, c1.latestMsg().(*proto.TestChannelDataMessage).Num)
+	assert.EqualValues(t, "b", c1.latestMsg().(*proto.TestChannelDataMessage).Text)
+	assert.EqualValues(t, "a", c2.latestMsg().(*proto.TestChannelDataMessage).Text)
 
 	// U2 arrives
 	u2 := &proto.TestChannelDataMessage{Text: "c"}
@@ -110,8 +122,8 @@ func TestFanOutChannelData(t *testing.T) {
 	testChannel.tickData(channelStartTime.AddMs(150))
 	assert.Equal(t, 3, len(c1.testQueue()))
 	assert.Equal(t, 2, len(c2.testQueue()))
-	assert.EqualValues(t, "c", c1.latestMsg().Text)
-	assert.EqualValues(t, "c", c2.latestMsg().Text)
+	assert.EqualValues(t, "c", c1.latestMsg().(*proto.TestChannelDataMessage).Text)
+	assert.EqualValues(t, "c", c2.latestMsg().(*proto.TestChannelDataMessage).Text)
 }
 
 func TestListMoveElement(t *testing.T) {

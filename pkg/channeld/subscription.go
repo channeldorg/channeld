@@ -13,14 +13,6 @@ const (
 	DefaultFanOutIntervalMs uint32 = 20
 )
 
-/* TODO: delete this code block - the definition has been moved to protobuf
-type ChannelSubscriptionOptions struct {
-	CanUpdateData  bool
-	DataFieldMasks []string
-	FanOutInterval time.Duration
-}
-*/
-
 type ChannelSubscription struct {
 	options proto.ChannelSubscriptionOptions
 	//fanOutDataMsg  Message

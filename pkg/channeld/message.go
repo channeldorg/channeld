@@ -11,12 +11,12 @@ import (
 type Message = protobuf.Message //protoreflect.ProtoMessage
 // The parameters of the handler function: 1. the weak-typed Message object popped from the message queue; 2. the connection that received the message; 3. the channel that the message is specified to handle.
 type MessageHandlerFunc func(Message, *Connection, *Channel)
-type MessageMapEntry struct {
+type messageMapEntry struct {
 	msg     Message
 	handler MessageHandlerFunc
 }
 
-var MessageMap = map[proto.MessageType]*MessageMapEntry{
+var MessageMap = map[proto.MessageType]*messageMapEntry{
 	proto.MessageType_AUTH:                {&proto.AuthMessage{}, handleAuth},
 	proto.MessageType_CREATE_CHANNEL:      {&proto.CreateChannelMessage{}, handleCreateChannel},
 	proto.MessageType_REMOVE_CHANNEL:      {&proto.RemoveChannelMessage{}, handleRemoveChannel},
@@ -24,6 +24,28 @@ var MessageMap = map[proto.MessageType]*MessageMapEntry{
 	proto.MessageType_SUB_TO_CHANNEL:      {&proto.SubscribedToChannelMessage{}, handleSubToChannel},
 	proto.MessageType_UNSUB_TO_CHANNEL:    {&proto.UnsubscribedToChannelMessage{}, handleUnsubToChannel},
 	proto.MessageType_CHANNEL_DATA_UPDATE: {&proto.ChannelDataUpdateMessage{}, handleChannelDataUpdate},
+}
+
+func RegisterMessageHandler(msgType uint32, msg Message, handler MessageHandlerFunc) {
+	MessageMap[proto.MessageType(msgType)] = &messageMapEntry{msg, handler}
+}
+
+func handleUserSpaceMessage(m Message, c *Connection, ch *Channel) {
+	msg, ok := m.(*proto.UserSpaceMessage)
+	if !ok {
+		log.Panicln("Message is not a UserSpaceMessage, will not be handled.")
+	}
+
+	// TODO: forward or broadcast user-space messages
+	if c.connectionType == CLIENT {
+		if ch.ownerConnection != nil {
+			ch.ownerConnection.Send(ch.id, proto.MessageType(msg.MsgType), msg)
+		} else {
+			// TODO: client-authoratative broadcasting?
+		}
+	} else {
+
+	}
 }
 
 func handleAuth(m Message, c *Connection, ch *Channel) {
@@ -34,6 +56,8 @@ func handleAuth(m Message, c *Connection, ch *Channel) {
 	log.Printf("Auth PIT: %s, LT: %s\n", msg.PlayerIdentifierToken, msg.LoginToken)
 
 	// TODO: Authentication
+
+	c.fsm.MoveToNextState()
 
 	c.SendWithGlobalChannel(proto.MessageType_AUTH, &proto.AuthResultMessage{
 		Result: proto.AuthResultMessage_SUCCESSFUL,

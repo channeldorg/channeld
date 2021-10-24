@@ -1,6 +1,8 @@
 package channeld
 
 import (
+	"bufio"
+	"encoding/binary"
 	"testing"
 
 	"channeld.clewcat.com/channeld/proto"
@@ -9,7 +11,58 @@ import (
 )
 
 func TestHandleListChannels(t *testing.T) {
-	// TODO
+	InitConnections(1, "", "")
+	InitChannels()
+	c := addTestConnection(SERVER)
+	ch0 := globalChannel
+	ch1 := CreateChannel(proto.ChannelType_PRIVATE, c)
+	ch2 := CreateChannel(proto.ChannelType_SUBWORLD, c)
+	ch3 := CreateChannel(proto.ChannelType_SUBWORLD, c)
+	ch4 := CreateChannel(proto.ChannelType_TEST, c)
+	ch5 := CreateChannel(proto.ChannelType_TEST, c)
+	ch6 := CreateChannel(proto.ChannelType_TEST, c)
+
+	ch1.metadata = "aaa"
+	ch2.metadata = "bbb"
+	ch3.metadata = "ccc"
+	ch4.metadata = "aab"
+	ch5.metadata = "bbc"
+	ch6.metadata = "abc"
+
+	handleListChannel(&proto.ListChannelMessage{}, c, ch0)
+	// No filter - all channels match
+	assert.Equal(t, 7, len(c.latestMsg().(*proto.ListChannelResultMessage).Channels))
+
+	handleListChannel(&proto.ListChannelMessage{
+		TypeFilter: proto.ChannelType_SUBWORLD,
+	}, c, ch0)
+	// 2 matches: ch2 and ch3
+	assert.Equal(t, 2, len(c.latestMsg().(*proto.ListChannelResultMessage).Channels))
+
+	handleListChannel(&proto.ListChannelMessage{
+		MetadataFilters: []string{"aa"},
+	}, c, ch0)
+	// 2 matches: ch1 and ch4
+	assert.Equal(t, 2, len(c.latestMsg().(*proto.ListChannelResultMessage).Channels))
+
+	handleListChannel(&proto.ListChannelMessage{
+		MetadataFilters: []string{"bb", "cc"},
+	}, c, ch0)
+	// 3 matches: ch2, ch3, ch5
+	assert.Equal(t, 3, len(c.latestMsg().(*proto.ListChannelResultMessage).Channels))
+
+	handleListChannel(&proto.ListChannelMessage{
+		TypeFilter:      proto.ChannelType_TEST,
+		MetadataFilters: []string{"a", "b", "c"},
+	}, c, ch0)
+	// 3 matches: ch4, ch5, ch6
+	assert.Equal(t, 3, len(c.latestMsg().(*proto.ListChannelResultMessage).Channels))
+
+	handleListChannel(&proto.ListChannelMessage{
+		MetadataFilters: []string{"z"},
+	}, c, ch0)
+	// no match
+	assert.Equal(t, 0, len(c.latestMsg().(*proto.ListChannelResultMessage).Channels))
 }
 
 func TestMessageHandlers(t *testing.T) {
@@ -20,6 +73,62 @@ func TestMessageHandlers(t *testing.T) {
 		}
 		assert.NotNil(t, MessageMap[msgType], "Missing handler func for message type %s", name)
 	}
+}
+
+func TestMessageTypeConversion(t *testing.T) {
+	var n uint32 = 1
+	msgType1 := proto.MessageType(n)
+	assert.Equal(t, proto.MessageType_AUTH, msgType1)
+	msgType2 := proto.MessageType(uint32(999))
+	t.Log(msgType2)
+	_, exists := proto.MessageType_name[int32(msgType2)]
+	assert.False(t, exists)
+}
+
+func BenchmarkProtobufPacket(b *testing.B) {
+	p := &proto.Packet{
+		ChannelId: 0,
+		Broadcast: false,
+		StubId:    0,
+		MsgType:   8,
+		//BodySize:  0,
+		MsgBody: []byte{},
+	}
+
+	var size int = 0
+	for i := 0; i < b.N; i++ {
+		bytes, _ := protobuf.Marshal(p)
+		size += len(bytes)
+	}
+	b.Logf("Average packet size: %.2f", float64(size)/float64(b.N))
+	// Result:
+	// BenchmarkProtobufPacket-12    	10391634	       117.4 ns/op	       2 B/op	       1 allocs/op
+	// Average packet size: 2.00
+}
+
+type mockWriter struct{}
+
+func (w *mockWriter) Write(p []byte) (n int, err error) {
+	return 0, nil
+}
+func BenchmarkRawPacket(b *testing.B) {
+	mw := &mockWriter{}
+	w := bufio.NewWriterSize(mw, 20)
+	var size int = 0
+	for i := 0; i < b.N; i++ {
+		binary.Write(w, binary.BigEndian, uint32(0))
+		binary.Write(w, binary.BigEndian, false)
+		binary.Write(w, binary.BigEndian, uint32(0))
+		binary.Write(w, binary.BigEndian, uint32(8))
+		binary.Write(w, binary.BigEndian, uint32(0))
+		binary.Write(w, binary.BigEndian, []byte{})
+		size += w.Buffered()
+		w.Reset(mw)
+	}
+	b.Logf("Average buf size: %.2f", float64(size)/float64(b.N))
+	// Result:
+	// BenchmarkRawPacket-12    	 4974171	       239.3 ns/op	      44 B/op	       6 allocs/op
+	// Average buf size: 17.00
 }
 
 func TestMessageCopy(t *testing.T) {

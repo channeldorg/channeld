@@ -23,10 +23,10 @@ func main() {
 
 	sn := flag.String("sn", "tcp", "the network type for the server connections")
 	sa := flag.String("sa", ":11288", "the network address for the server connections")
-	sfsm := flag.String("sfsm", "../config/server_conn_fsm.json", "the path to the server FSM config")
+	sfsm := flag.String("sfsm", "../config/server_authoratative_fsm.json", "the path to the server FSM config")
 	cn := flag.String("cn", "tcp", "the network type for the client connections")
 	ca := flag.String("ca", ":12108", "the network address for the client connections")
-	cfsm := flag.String("cfsm", "../config/client_conn_fsm.json", "the path to the client FSM config")
+	cfsm := flag.String("cfsm", "../config/client_non_authoratative_fsm.json", "the path to the client FSM config")
 	cs := flag.Int("cs", 1024, "the connection map buffer size")
 
 	getopt.Parse()

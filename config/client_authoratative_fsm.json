@@ -7,15 +7,10 @@
         },
         {
             "Name": "OPEN",
-            "MsgTypeWhitelist": "6,7,100-99999",
+            "MsgTypeWhitelist": "3-65535",
             "MsgTypeBlacklist": ""
         }
     ],
     "Transitions": [
-        {
-            "FromState": "INIT",
-            "ToState": "OPEN",
-            "MsgType": 1
-        }
     ]
 }

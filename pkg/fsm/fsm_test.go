@@ -26,6 +26,12 @@ func TestLoad(t *testing.T) {
 	assert.Equal(t, &serverFSM.States[0], serverFSM.CurrentState())
 }
 
+func TestChange(t *testing.T) {
+	serverFSM := loadServerFSM(t)
+	assert.NoError(t, serverFSM.ChangeState("OPEN"))
+	assert.Error(t, serverFSM.ChangeState("BLAH"))
+}
+
 func TestTransitionAndMsgAllowence(t *testing.T) {
 	serverFSM := loadServerFSM(t)
 	assert.Equal(t, "INIT", serverFSM.CurrentState().Name)

@@ -16,6 +16,7 @@
             "MsgTypeBlacklist": ""
         }
     ],
+    "InitState" : "INIT",
     "Transitions": [
         {
             "FromState": "INIT",

@@ -8,9 +8,9 @@ option go_package = "/proto";
 
 message Packet {
     uint32 channelId = 1;
-    uint32 stubId = 2;
-    uint32 msgType = 3;
-    uint32 bodySize = 4;
+    bool broadcast = 2;
+    uint32 stubId = 3;
+    uint32 msgType = 4;
     bytes msgBody = 5;
 }
 
@@ -37,6 +37,12 @@ enum MessageType {
     SUB_TO_CHANNEL = 6;
     UNSUB_TO_CHANNEL = 7;
     CHANNEL_DATA_UPDATE = 8;
+    USER_SPACE_START = 100;
+}
+
+message UserSpaceMessage {
+    uint32 msgType = 1;
+    bytes msgBody = 2;
 }
 
 message AuthMessage {

@@ -1,13 +1,24 @@
 # Core features
-- [x] FSM-based message filtering
 - [x] Channel sub/unsub
 - [x] Data update and fan-out
+- [x] FSM-based message filtering
+- [ ] Authentication
 - [ ] Spatial-based sub/unsub
 - [ ] Spatial-basd load-balancing
 
 # Modules
+- [ ] Stub(RPC) support
 - [x] WebSocket support
 - [ ] KCP support
+
+# Optimizations
+- [x] Read/write the packet using Protobuf
+- [ ] Use [gogoprotobuf](https://github.com/gogo/protobuf) for faster marshalling/unmarshalling
+
+# Tests
+- [.] Unit tests
+- [ ] Smoke tests
+- [ ] Scale tests
 
 # SDKs
 - [ ] Javascript SDK

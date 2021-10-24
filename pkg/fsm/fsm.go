@@ -2,6 +2,7 @@ package fsm
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"strconv"
 	"strings"
@@ -23,6 +24,7 @@ type StateTransition struct {
 }
 
 type FiniteStateMachine struct {
+	InitState   *string
 	States      []State
 	Transitions []StateTransition
 
@@ -97,6 +99,10 @@ func Load(bytes []byte) (FiniteStateMachine, error) {
 			}
 			fromState.transitions[transition.MsgType] = toState
 		}
+
+		if fsm.InitState != nil {
+			err = fsm.ChangeState(*fsm.InitState)
+		}
 	}
 	return fsm, err
 }
@@ -114,4 +120,23 @@ func (fsm *FiniteStateMachine) OnReceived(msgType uint32) {
 
 func (fsm *FiniteStateMachine) CurrentState() *State {
 	return fsm.currentState
+}
+
+func (fsm *FiniteStateMachine) ChangeState(name string) error {
+	state, exists := fsm.stateNameMap[name]
+	if exists {
+		fsm.currentState = state
+		return nil
+	}
+	return errors.New("Invalid state name: " + name)
+}
+
+func (fsm *FiniteStateMachine) MoveToNextState() bool {
+	for i := 0; i < len(fsm.States)-1; i++ {
+		if fsm.currentState == &fsm.States[i] {
+			fsm.currentState = &fsm.States[i+1]
+			return true
+		}
+	}
+	return false
 }

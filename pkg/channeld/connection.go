@@ -29,6 +29,8 @@ const (
 
 type sendQueueMessage struct {
 	channelId ChannelId
+	broadcast bool
+	stubId    uint32
 	msgType   proto.MessageType
 	msg       Message
 }
@@ -38,9 +40,11 @@ type MessageSender interface {
 	Send(c *Connection, channelId ChannelId, msgType proto.MessageType, msg Message)
 }
 
-type QueuedMessageSender struct{}
+type queuedMessageSender struct {
+	MessageSender
+}
 
-func (s *QueuedMessageSender) Send(c *Connection, channelId ChannelId, msgType proto.MessageType, msg Message) {
+func (s *queuedMessageSender) Send(c *Connection, channelId ChannelId, msgType proto.MessageType, msg Message) {
 	c.sendQueue <- sendQueueMessage{
 		channelId: channelId,
 		msgType:   msgType,
@@ -111,7 +115,7 @@ func GetConnection(id ConnectionId) *Connection {
 func startGoroutines(connection *Connection) {
 	go func() {
 		for !connection.IsRemoving() {
-			connection.Receive()
+			connection.ReceivePacket()
 		}
 	}()
 
@@ -157,7 +161,7 @@ func AddConnection(c net.Conn, t ConnectionType) *Connection {
 		conn:           c,
 		reader:         bufio.NewReader(c),
 		writer:         bufio.NewWriter(c),
-		sender:         &QueuedMessageSender{},
+		sender:         &queuedMessageSender{},
 		sendQueue:      make(chan sendQueueMessage, 128),
 		removing:       0,
 	}
@@ -227,8 +231,78 @@ func readUint32(c *Connection) (uint32, error) {
 // 'CHNL' in ASCII
 const TAG_ID uint32 = 67<<24 | 72<<16 | 78<<8 | 76
 
-// TODO: read the packet using protobuf
-func (c *Connection) Receive() {
+func (c *Connection) ReceivePacket() {
+	tag, err := readBytes(c, 4)
+	if err != nil || tag[0] != 67 {
+		log.Println("Invalid tag:", tag, ", the packet will be dropped.", err)
+		_, isClosed := err.(*closeError)
+		if !isClosed {
+			// Drop the packet
+			ioutil.ReadAll(c.reader)
+		}
+		return
+	}
+
+	packetSize := int(tag[3])
+	if tag[1] != 72 {
+		packetSize = packetSize | int(tag[1])<<16 | int(tag[2])<<8
+	} else if tag[2] != 78 {
+		packetSize = packetSize | int(tag[2])<<8
+	}
+
+	bytes := make([]byte, packetSize)
+	if _, err := io.ReadFull(c.reader, bytes); err != nil {
+		log.Panic("Error reading packet: ", err)
+	}
+
+	var p proto.Packet
+	if err := protobuf.Unmarshal(bytes, &p); err != nil {
+		log.Panic("Error unmarshalling packet: ", err)
+	}
+
+	channel := GetChannel(ChannelId(p.ChannelId))
+	if channel == nil {
+		log.Println("Can't find channel by ID: ", p.ChannelId)
+		return
+	}
+
+	if p.StubId > 0 {
+		RPC().SaveStub(p.StubId, c)
+	}
+
+	entry := MessageMap[proto.MessageType(p.MsgType)]
+	if entry == nil && p.MsgType < uint32(proto.MessageType_USER_SPACE_START) {
+		log.Printf("%s sent undefined message type: %d\n", c, p.MsgType)
+		return
+	}
+
+	if !c.fsm.IsAllowed(p.MsgType) {
+		log.Printf("%s doesn't allow message type %d for current state.\n", c, p.MsgType)
+		return
+	}
+
+	var msg Message
+	var handler MessageHandlerFunc
+	if p.MsgType >= uint32(proto.MessageType_USER_SPACE_START) && entry == nil {
+		// User-space message without handler won't be deserialized.
+		msg = &proto.UserSpaceMessage{MsgType: p.MsgType, MsgBody: p.MsgBody}
+		handler = handleUserSpaceMessage
+	} else {
+		handler = entry.handler
+		// Always make a clone!
+		msg = protobuf.Clone(entry.msg)
+		err = protobuf.Unmarshal(p.MsgBody, msg)
+		if err != nil {
+			log.Panicln(err)
+		}
+	}
+
+	c.fsm.OnReceived(p.MsgType)
+
+	channel.PutMessage(msg, handler, c)
+}
+
+func (c *Connection) ReceiveRaw() {
 	if tag, err := readUint32(c); tag != TAG_ID {
 		log.Println("Invalid tag:", tag, ", the packet will be dropped.", err)
 		_, isClosed := err.(*closeError)
@@ -259,20 +333,19 @@ func (c *Connection) Receive() {
 		RPC().SaveStub(stubId, c)
 	}
 
-	// TODO: forward and broadcast user-space messages
-
 	msgType, err := readUint32(c)
 	if err != nil {
 		log.Println("Error when reading message type: ", err)
 		return
 	}
 	entry := MessageMap[proto.MessageType(msgType)]
-	if entry == nil {
-		log.Println("Undeinfed message type: ", msgType)
+	if entry == nil && msgType < uint32(proto.MessageType_USER_SPACE_START) {
+		log.Printf("%s sent undefined message type: %d\n", c, msgType)
+		return
 	}
 
 	if !c.fsm.IsAllowed(msgType) {
-		log.Printf("Message Type %d is not allow in state %s\n", msgType, c.fsm.CurrentState().Name)
+		log.Printf("%s doesn't allow message type %d for current state.\n", c, msgType)
 		return
 	}
 
@@ -287,16 +360,30 @@ func (c *Connection) Receive() {
 		log.Println("Error when reading message body: ", err)
 		return
 	}
-	// Always make a clone!
-	msg := protobuf.Clone(entry.msg)
-	err = protobuf.Unmarshal(body, msg)
-	if err != nil {
-		log.Panicln(err)
+
+	var msg Message
+	var handler MessageHandlerFunc
+	if msgType >= uint32(proto.MessageType_USER_SPACE_START) && entry == nil {
+		// User-space message without handler won't be deserialized.
+		msg = &proto.UserSpaceMessage{MsgType: msgType, MsgBody: body}
+		handler = handleUserSpaceMessage
+	} else {
+		handler = entry.handler
+		// Always make a clone!
+		msg = protobuf.Clone(entry.msg)
+		err = protobuf.Unmarshal(body, msg)
+		if err != nil {
+			log.Panicln(err)
+		}
 	}
 
 	c.fsm.OnReceived(msgType)
 
-	channel.PutMessage(msg, entry.handler, c)
+	channel.PutMessage(msg, handler, c)
+}
+
+func (c *Connection) ForwardPacket(channelId ChannelId, msgType proto.MessageType, bodySize uint32, msgBody []byte) {
+
 }
 
 func (c *Connection) Send(channelId ChannelId, msgType proto.MessageType, msg Message) {
@@ -318,22 +405,50 @@ func (c *Connection) SendWithGlobalChannel(msgType proto.MessageType, msg Messag
 func (c *Connection) Flush() {
 	for len(c.sendQueue) > 0 {
 		e := <-c.sendQueue
-		bytes, err := protobuf.Marshal(e.msg)
+		msgBody, err := protobuf.Marshal(e.msg)
 		if err != nil {
 			log.Printf("Failed to marshal message %d: %s\n", e.msgType, e.msg)
 			continue
 		}
-		if len(bytes) >= (1 << 32) {
-			log.Printf("Message body is too large, size: %d\n", len(bytes))
+		if len(msgBody) >= (1 << 24) {
+			log.Printf("Message body is too large, size: %d\n", len(msgBody))
 			continue
 		}
 
-		binary.Write(c.writer, binary.BigEndian, TAG_ID)
-		binary.Write(c.writer, binary.BigEndian, uint32(e.channelId))
-		binary.Write(c.writer, binary.BigEndian, uint32(0))
-		binary.Write(c.writer, binary.BigEndian, uint32(e.msgType))
-		binary.Write(c.writer, binary.BigEndian, uint32(len(bytes)))
-		binary.Write(c.writer, binary.BigEndian, bytes)
+		/*
+			binary.Write(c.writer, binary.BigEndian, TAG_ID)
+			binary.Write(c.writer, binary.BigEndian, uint32(e.channelId))
+			binary.Write(w, binary.BigEndian, e.broadcast)
+			binary.Write(c.writer, binary.BigEndian, uint32(e.stubId))
+			binary.Write(c.writer, binary.BigEndian, uint32(e.msgType))
+			binary.Write(c.writer, binary.BigEndian, uint32(len(msgBody)))
+			binary.Write(c.writer, binary.BigEndian, msgBody)
+		*/
+
+		bytes, err := protobuf.Marshal(&proto.Packet{
+			ChannelId: uint32(e.channelId),
+			Broadcast: e.broadcast,
+			StubId:    e.stubId,
+			MsgType:   uint32(e.msgType),
+			MsgBody:   msgBody,
+		})
+		if err != nil {
+			log.Println("Error marshalling packet: ", err)
+			continue
+		}
+
+		// 'CHNL' in ASCII
+		tag := []byte{67, 72, 78, 76}
+		len := len(bytes)
+		tag[3] = byte(len & 0xff)
+		if len > 0xff {
+			tag[2] = byte((len >> 8) & 0xff)
+		}
+		if len > 0xffff {
+			tag[1] = byte((len >> 16) & 0xff)
+		}
+		c.writer.Write(tag)
+		c.writer.Write(bytes)
 	}
 
 	c.writer.Flush()
