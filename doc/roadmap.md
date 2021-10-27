@@ -2,14 +2,16 @@
 - [x] Channel sub/unsub
 - [x] Data update and fan-out
 - [x] FSM-based message filtering
+- [x] Message broadcasting
 - [ ] Authentication
 - [ ] Spatial-based sub/unsub
 - [ ] Spatial-basd load-balancing
 
 # Modules
-- [ ] Stub(RPC) support
+- [.] Stub(RPC) support
 - [x] WebSocket support
 - [ ] KCP support
+- [ ] [Snappy](https://github.com/golang/snappy) compression support
 
 # Optimizations
 - [x] Read/write the packet using Protobuf

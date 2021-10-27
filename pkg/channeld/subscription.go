@@ -87,16 +87,22 @@ func (c *Connection) sendConnUnsubscribed(connId ConnectionId, ids ...ChannelId)
 }
 */
 
-func (c *Connection) sendSubscribed(ch *Channel) {
-	c.Send(ch.id, proto.MessageType_SUB_TO_CHANNEL, &proto.SubscribedToChannelMessage{
+func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel) {
+	ctx.Channel = ch
+	ctx.MsgType = proto.MessageType_SUB_TO_CHANNEL
+	ctx.Msg = &proto.SubscribedToChannelMessage{
 		ConnId:     uint32(c.id),
 		SubOptions: &ch.subscribedConnections[c.id].options,
-	})
+	}
+	c.Send(ctx)
 }
-func (c *Connection) sendUnsubscribed(ch *Channel) {
-	c.Send(ch.id, proto.MessageType_UNSUB_TO_CHANNEL, &proto.UnsubscribedToChannelMessage{
+func (c *Connection) sendUnsubscribed(ctx MessageContext, ch *Channel) {
+	ctx.Channel = ch
+	ctx.MsgType = proto.MessageType_UNSUB_TO_CHANNEL
+	ctx.Msg = &proto.UnsubscribedToChannelMessage{
 		ConnId: uint32(c.id),
-	})
+	}
+	c.Send(ctx)
 }
 
 func (ch *Channel) AddConnectionSubscribedNotification(connId ConnectionId) {

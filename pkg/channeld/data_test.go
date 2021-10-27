@@ -19,15 +19,15 @@ type testQueuedMessageSender struct {
 	msgProcessor func(Message) (Message, error)
 }
 
-func (s *testQueuedMessageSender) Send(c *Connection, channelId ChannelId, msgType proto.MessageType, msg Message) {
+func (s *testQueuedMessageSender) Send(c *Connection, ctx MessageContext) {
 	if s.msgProcessor != nil {
 		var err error
-		msg, err = s.msgProcessor(msg)
+		ctx.Msg, err = s.msgProcessor(ctx.Msg)
 		if err != nil {
 			panic(err)
 		}
 	}
-	s.msgQueue = append(s.msgQueue, msg)
+	s.msgQueue = append(s.msgQueue, ctx.Msg)
 }
 
 func addTestConnection(t ConnectionType) *Connection {

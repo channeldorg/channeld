@@ -9,8 +9,15 @@ import (
 )
 
 type Message = protobuf.Message //protoreflect.ProtoMessage
-// The parameters of the handler function: 1. the weak-typed Message object popped from the message queue; 2. the connection that received the message; 3. the channel that the message is specified to handle.
-type MessageHandlerFunc func(Message, *Connection, *Channel)
+type MessageContext struct {
+	MsgType    proto.MessageType
+	Msg        Message     // The weak-typed Message object popped from the message queue
+	Connection *Connection // The connection that received the message
+	Channel    *Channel    // The channel that handling the message
+	Broadcast  proto.BroadcastType
+	StubId     uint32
+}
+type MessageHandlerFunc func(ctx MessageContext)
 type messageMapEntry struct {
 	msg     Message
 	handler MessageHandlerFunc
@@ -30,26 +37,30 @@ func RegisterMessageHandler(msgType uint32, msg Message, handler MessageHandlerF
 	MessageMap[proto.MessageType(msgType)] = &messageMapEntry{msg, handler}
 }
 
-func handleUserSpaceMessage(m Message, c *Connection, ch *Channel) {
-	msg, ok := m.(*proto.UserSpaceMessage)
-	if !ok {
-		log.Panicln("Message is not a UserSpaceMessage, will not be handled.")
-	}
-
-	// TODO: forward or broadcast user-space messages
-	if c.connectionType == CLIENT {
-		if ch.ownerConnection != nil {
-			ch.ownerConnection.Send(ch.id, proto.MessageType(msg.MsgType), msg)
+func handleUserSpaceMessage(ctx MessageContext) {
+	// Forward or broadcast user-space messages
+	if ctx.Connection.connectionType == CLIENT {
+		if ctx.Channel.ownerConnection != nil {
+			ctx.Channel.ownerConnection.Send(ctx)
+		} else if ctx.Broadcast != proto.BroadcastType_NO {
+			if ctx.Channel.enableClientBroadcast {
+				ctx.Channel.Broadcast(ctx)
+			} else {
+				log.Panicf("%s attempted to broadcast message(%d) while %s's client broadcasting is disabled.\n", ctx.Connection, ctx.MsgType, ctx.Channel)
+			}
 		} else {
-			// TODO: client-authoratative broadcasting?
+			log.Printf("%s sent a user-space message(%d) but %s has no owner to forward the message.\n", ctx.Connection, ctx.MsgType, ctx.Channel)
 		}
 	} else {
-
+		ctx.Channel.Broadcast(ctx)
 	}
 }
 
-func handleAuth(m Message, c *Connection, ch *Channel) {
-	msg, ok := m.(*proto.AuthMessage)
+func handleAuth(ctx MessageContext) {
+	if ctx.Channel != globalChannel {
+		log.Panicln("Illegal attemp to authenticate outside the GLOBAL channel: ", ctx.Connection)
+	}
+	msg, ok := ctx.Msg.(*proto.AuthMessage)
 	if !ok {
 		log.Panicln("Message is not a AuthMessage, will not be handled.")
 	}
@@ -57,38 +68,39 @@ func handleAuth(m Message, c *Connection, ch *Channel) {
 
 	// TODO: Authentication
 
-	c.fsm.MoveToNextState()
+	ctx.Connection.fsm.MoveToNextState()
 
-	c.SendWithGlobalChannel(proto.MessageType_AUTH, &proto.AuthResultMessage{
+	ctx.Msg = &proto.AuthResultMessage{
 		Result: proto.AuthResultMessage_SUCCESSFUL,
-		ConnId: uint32(c.id),
-	})
+		ConnId: uint32(ctx.Connection.id),
+	}
+	ctx.Connection.Send(ctx)
 }
 
-func handleCreateChannel(m Message, c *Connection, ch *Channel) {
+func handleCreateChannel(ctx MessageContext) {
 	// Only the GLOBAL channel can handle channel creation/deletion/listing
-	if ch != globalChannel {
-		log.Panicln("Illegal attemp to create channel outside the GLOBAL channel, connection: ", c)
+	if ctx.Channel != globalChannel {
+		log.Panicln("Illegal attemp to create channel outside the GLOBAL channel, connection: ", ctx.Connection)
 	}
 
-	msg, ok := m.(*proto.CreateChannelMessage)
+	msg, ok := ctx.Msg.(*proto.CreateChannelMessage)
 	if !ok {
 		log.Panicln("Message is not a CreateChannelMessage, will not be handled.")
 	}
 
 	var newChannel *Channel
 	if msg.ChannelType == proto.ChannelType_UNKNOWN {
-		log.Panicln("Illegal attempt to create the UNKNOWN channel, connection: ", c)
+		log.Panicln("Illegal attempt to create the UNKNOWN channel, connection: ", ctx.Connection)
 	} else if msg.ChannelType == proto.ChannelType_GLOBAL {
 		// Global channel is initially created by the system. Creating the channel will attempt to own it.
 		newChannel = globalChannel
 		if globalChannel.ownerConnection == nil {
-			globalChannel.ownerConnection = c
+			globalChannel.ownerConnection = ctx.Connection
 		} else {
-			log.Panicln("Illegal attempt to create the GLOBAL channel, connection: ", c)
+			log.Panicln("Illegal attempt to create the GLOBAL channel, connection: ", ctx.Connection)
 		}
 	} else {
-		newChannel = CreateChannel(msg.ChannelType, c)
+		newChannel = CreateChannel(msg.ChannelType, ctx.Connection)
 	}
 
 	newChannel.metadata = msg.Metadata
@@ -102,40 +114,40 @@ func handleCreateChannel(m Message, c *Connection, ch *Channel) {
 	}
 
 	// Subscribe to channel after creation
-	c.SubscribeToChannel(newChannel, msg.SubOptions)
+	ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
 	// Also send the Sub message to the creator (no need to broadcast as there's only 1 subscriptor)
-	c.sendSubscribed(newChannel)
+	ctx.Connection.sendSubscribed(ctx, newChannel)
 }
 
-func handleRemoveChannel(m Message, c *Connection, ch *Channel) {
-	if ch != globalChannel {
-		log.Panicln("Illegal attemp to remove channel outside the GLOBAL channel, connection: ", c)
+func handleRemoveChannel(ctx MessageContext) {
+	if ctx.Channel != globalChannel {
+		log.Panicln("Illegal attemp to remove channel outside the GLOBAL channel, connection: ", ctx.Connection)
 	}
 
-	_, ok := m.(*proto.RemoveChannelMessage)
+	_, ok := ctx.Msg.(*proto.RemoveChannelMessage)
 	if !ok {
 		log.Panicln("Message is not a RemoveChannelMessage, will not be handled.")
 	}
 
 	// Only the owner can remove the channel
-	if ch.ownerConnection != c {
-		log.Panicf("%s tried to remove %s but it's not the owner.", c, ch)
+	if ctx.Channel.ownerConnection != ctx.Connection {
+		log.Panicf("%s tried to remove %s but it's not the owner.", ctx.Connection, ctx.Channel)
 	}
 
-	for connId := range ch.subscribedConnections {
+	for connId := range ctx.Channel.subscribedConnections {
 		sc := GetConnection(connId)
-		sc.sendUnsubscribed(ch)
+		sc.sendUnsubscribed(ctx, ctx.Channel)
 		//sc.Flush()
 	}
-	RemoveChannel(ch)
+	RemoveChannel(ctx.Channel)
 }
 
-func handleListChannel(m Message, c *Connection, ch *Channel) {
-	if ch != globalChannel {
-		log.Panicln("Illegal attemp to list channel outside the GLOBAL channel, connection: ", c)
+func handleListChannel(ctx MessageContext) {
+	if ctx.Channel != globalChannel {
+		log.Panicln("Illegal attemp to list channel outside the GLOBAL channel, connection: ", ctx.Connection)
 	}
 
-	msg, ok := m.(*proto.ListChannelMessage)
+	msg, ok := ctx.Msg.(*proto.ListChannelMessage)
 	if !ok {
 		log.Panicln("Message is not a ListChannelMessage, will not be handled.")
 	}
@@ -161,106 +173,14 @@ func handleListChannel(m Message, c *Connection, ch *Channel) {
 		}
 	}
 
-	c.SendWithGlobalChannel(proto.MessageType_LIST_CHANNEL, &proto.ListChannelResultMessage{
+	ctx.Msg = &proto.ListChannelResultMessage{
 		Channels: result,
-	})
+	}
+	ctx.Connection.Send(ctx)
 }
 
-/*
-// FIXME: the channel joining should be handled in corresponding channels, otherwise we need to make chan the Channel.subscribedConnections.
-func handleSubToChannels(m Message, c *Connection, ch *Channel) {
-	msg, ok := m.(*proto.SubscribedToChannelsMessage)
-	if !ok {
-		log.Panicln("Message is not a SubscribedToChannelsMessage, will not be handled.")
-	}
-
-	// The connection that subscribes. Could be different to c which sends the message.
-	connToSub := GetConnection(ConnectionId(msg.ConnId))
-	ownerConnectionChannelIds := make(map[*Connection][]ChannelId)
-	subChannelIds := make([]ChannelId, 0)
-	for id := range msg.ChannelIds {
-		ch := GetChannel(ChannelId(id))
-		if ch == nil {
-			log.Printf("Failed to subscribe to channel %d as it doesn't exist\n", id)
-			continue
-		}
-		err := connToSub.SubscribeToChannel(ch, msg.SubOptions)
-		if err != nil {
-			log.Printf("Failed to subscribe to channel %d, err: %s\n", id, err)
-			continue
-		}
-
-		// Optimize to send all channelIds to each owner connection once
-		if ch.ownerConnection != nil {
-			channelIds := ownerConnectionChannelIds[ch.ownerConnection]
-			if channelIds == nil {
-				channelIds = make([]ChannelId, 1)
-			}
-			channelIds = append(channelIds, ch.id)
-			ownerConnectionChannelIds[ch.ownerConnection] = channelIds
-		}
-
-		subChannelIds = append(subChannelIds, ch.id)
-	}
-
-	// Send to channel owners
-	for conn, channelIds := range ownerConnectionChannelIds {
-		conn.sendConnSubscribed(ConnectionId(msg.ConnId), channelIds...)
-		// conn.Flush()
-	}
-
-	// Send back to requester
-	c.sendConnSubscribed(c.id, subChannelIds...)
-}
-
-func handleUnsubToChannels(m Message, c *Connection, ch *Channel) {
-	msg, ok := m.(*proto.UnsubscribedToChannelsMessage)
-	if !ok {
-		log.Panicln("Message is not a UnsubscribedToChannelsMessage, will not be handled.")
-	}
-
-	connToUnsub := GetConnection(ConnectionId(msg.ConnId))
-	ownerConnectionChannelIds := make(map[*Connection][]ChannelId)
-	unsubChannelIds := make([]ChannelId, 0)
-	for id := range msg.ChannelIds {
-		ch := GetChannel(ChannelId(id))
-		if ch == nil {
-			log.Printf("Failed to unsubscribe to channel %d as it doesn't exist\n", id)
-			continue
-		}
-
-		err := connToUnsub.UnsubscribeToChannel(ch)
-		if err != nil {
-			log.Printf("Failed to unsubscribe to channel %d, err: %s\n", id, err)
-			continue
-		}
-
-		// Optimize to send all channelIds to each connection once
-		if ch.ownerConnection != nil {
-			channelIds := ownerConnectionChannelIds[ch.ownerConnection]
-			if channelIds == nil {
-				channelIds = make([]ChannelId, 1)
-			}
-			channelIds = append(channelIds, ch.id)
-			ownerConnectionChannelIds[ch.ownerConnection] = channelIds
-		}
-
-		unsubChannelIds = append(unsubChannelIds, ch.id)
-	}
-
-	// Send to channel owners
-	for conn, channelIds := range ownerConnectionChannelIds {
-		conn.sendConnUnsubscribed(ConnectionId(msg.ConnId), channelIds...)
-		// conn.Flush()
-	}
-
-	// Send back to requester
-	c.sendConnUnsubscribed(c.id, unsubChannelIds...)
-}
-*/
-
-func handleSubToChannel(m Message, c *Connection, ch *Channel) {
-	msg, ok := m.(*proto.SubscribedToChannelMessage)
+func handleSubToChannel(ctx MessageContext) {
+	msg, ok := ctx.Msg.(*proto.SubscribedToChannelMessage)
 	if !ok {
 		log.Panicln("Message is not a SubscribedToChannelMessage, will not be handled.")
 	}
@@ -271,23 +191,23 @@ func handleSubToChannel(m Message, c *Connection, ch *Channel) {
 		log.Panicln("Invalid ConnectionId:", msg.ConnId)
 	}
 
-	if connToSub.id != c.id && c != ch.ownerConnection {
-		log.Panicf("%s is not the channel owner but tried to subscribe %s to %s\n", c, connToSub, ch)
+	if connToSub.id != ctx.Connection.id && ctx.Connection != ctx.Channel.ownerConnection {
+		log.Panicf("%s is not the channel owner but tried to subscribe %s to %s\n", ctx.Connection, connToSub, ctx.Channel)
 	}
 
-	err := connToSub.SubscribeToChannel(ch, msg.SubOptions)
+	err := connToSub.SubscribeToChannel(ctx.Channel, msg.SubOptions)
 	if err != nil {
-		log.Panicf("%s failed to subscribe to %s, error: %s\n", connToSub, ch, err)
+		log.Panicf("%s failed to subscribe to %s, error: %s\n", connToSub, ctx.Channel, err)
 	}
 
-	connToSub.sendSubscribed(ch)
-	if ch.ownerConnection != nil {
-		ch.ownerConnection.sendSubscribed(ch)
+	connToSub.sendSubscribed(ctx, ctx.Channel)
+	if ctx.Channel.ownerConnection != nil {
+		ctx.Channel.ownerConnection.sendSubscribed(ctx, ctx.Channel)
 	}
 }
 
-func handleUnsubToChannel(m Message, c *Connection, ch *Channel) {
-	msg, ok := m.(*proto.UnsubscribedToChannelMessage)
+func handleUnsubToChannel(ctx MessageContext) {
+	msg, ok := ctx.Msg.(*proto.UnsubscribedToChannelMessage)
 	if !ok {
 		log.Panicln("Message is not a UnsubscribedToChannelMessage, will not be handled.")
 	}
@@ -297,32 +217,32 @@ func handleUnsubToChannel(m Message, c *Connection, ch *Channel) {
 	if connToUnsub == nil {
 		log.Panicln("Invalid ConnectionId:", msg.ConnId)
 	}
-	err := connToUnsub.UnsubscribeToChannel(ch)
+	err := connToUnsub.UnsubscribeToChannel(ctx.Channel)
 	if err != nil {
-		log.Panicf("%s failed to unsubscribe to %s, error: %s\n", connToUnsub, ch, err)
+		log.Panicf("%s failed to unsubscribe to %s, error: %s\n", connToUnsub, ctx.Channel, err)
 	}
 
-	connToUnsub.sendUnsubscribed(ch)
-	if ch.ownerConnection != nil {
-		if ch.ownerConnection == connToUnsub {
+	connToUnsub.sendUnsubscribed(ctx, ctx.Channel)
+	if ctx.Channel.ownerConnection != nil {
+		if ctx.Channel.ownerConnection == connToUnsub {
 			// Reset the owner if it unsubscribed
-			ch.ownerConnection = nil
+			ctx.Channel.ownerConnection = nil
 		} else {
-			ch.ownerConnection.sendUnsubscribed(ch)
+			ctx.Channel.ownerConnection.sendUnsubscribed(ctx, ctx.Channel)
 		}
 	}
 }
 
-func handleChannelDataUpdate(m Message, c *Connection, ch *Channel) {
+func handleChannelDataUpdate(ctx MessageContext) {
 	// Only channel owner or writable subsciptors can update the data
-	if ch.ownerConnection != c {
-		cs := ch.subscribedConnections[c.id]
+	if ctx.Channel.ownerConnection != ctx.Connection {
+		cs := ctx.Channel.subscribedConnections[ctx.Connection.id]
 		if cs == nil || !cs.options.CanUpdateData {
-			log.Panicf("%s tries to update %s but has no access.\n", c, ch)
+			log.Panicf("%s tries to update %s but has no access.\n", ctx.Connection, ctx.Channel)
 		}
 	}
 
-	msg, ok := m.(*proto.ChannelDataUpdateMessage)
+	msg, ok := ctx.Msg.(*proto.ChannelDataUpdateMessage)
 	if !ok {
 		log.Panicln("Message is not a ChannelDataUpdateMessage, will not be handled.")
 	}
@@ -331,10 +251,10 @@ func handleChannelDataUpdate(m Message, c *Connection, ch *Channel) {
 		log.Panicln(err)
 	}
 
-	if ch.Data() == nil {
-		ch.InitData(updateMsg, nil)
-		log.Printf("%s initialized data from update msg: %s\n", ch, updateMsg)
+	if ctx.Channel.Data() == nil {
+		ctx.Channel.InitData(updateMsg, nil)
+		log.Printf("%s initialized data from update msg: %s\n", ctx.Channel, updateMsg)
 	} else {
-		ch.Data().OnUpdate(updateMsg, ch.GetTime())
+		ctx.Channel.Data().OnUpdate(updateMsg, ctx.Channel.GetTime())
 	}
 }

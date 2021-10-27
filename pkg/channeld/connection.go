@@ -27,29 +27,26 @@ const (
 	CLIENT ConnectionType = 2
 )
 
-type sendQueueMessage struct {
-	channelId ChannelId
-	broadcast bool
-	stubId    uint32
-	msgType   proto.MessageType
-	msg       Message
-}
-
-// Add an interface before the underlying network layer for the test code.
+// Add an interface before the underlying network layer for the test purpose.
 type MessageSender interface {
-	Send(c *Connection, channelId ChannelId, msgType proto.MessageType, msg Message)
+	Send(c *Connection, ctx MessageContext) //(c *Connection, channelId ChannelId, msgType proto.MessageType, msg Message)
 }
 
 type queuedMessageSender struct {
 	MessageSender
 }
 
+/*
 func (s *queuedMessageSender) Send(c *Connection, channelId ChannelId, msgType proto.MessageType, msg Message) {
 	c.sendQueue <- sendQueueMessage{
 		channelId: channelId,
 		msgType:   msgType,
 		msg:       msg,
 	}
+}
+*/
+func (s *queuedMessageSender) Send(c *Connection, ctx MessageContext) {
+	c.sendQueue <- ctx
 }
 
 type Connection struct {
@@ -59,7 +56,7 @@ type Connection struct {
 	reader         *bufio.Reader
 	writer         *bufio.Writer
 	sender         MessageSender
-	sendQueue      chan sendQueueMessage
+	sendQueue      chan MessageContext
 	fsm            *fsm.FiniteStateMachine
 	removing       int32 // Don't put the removing into the FSM as 1) the FSM's states are user-defined. 2) the FSM doesn't have the race condition.
 }
@@ -162,7 +159,7 @@ func AddConnection(c net.Conn, t ConnectionType) *Connection {
 		reader:         bufio.NewReader(c),
 		writer:         bufio.NewWriter(c),
 		sender:         &queuedMessageSender{},
-		sendQueue:      make(chan sendQueueMessage, 128),
+		sendQueue:      make(chan MessageContext, 128),
 		removing:       0,
 	}
 	var fsm fsm.FiniteStateMachine
@@ -285,7 +282,7 @@ func (c *Connection) ReceivePacket() {
 	var handler MessageHandlerFunc
 	if p.MsgType >= uint32(proto.MessageType_USER_SPACE_START) && entry == nil {
 		// User-space message without handler won't be deserialized.
-		msg = &proto.UserSpaceMessage{MsgType: p.MsgType, MsgBody: p.MsgBody}
+		msg = &proto.UserSpaceMessage{MsgBody: p.MsgBody}
 		handler = handleUserSpaceMessage
 	} else {
 		handler = entry.handler
@@ -299,7 +296,7 @@ func (c *Connection) ReceivePacket() {
 
 	c.fsm.OnReceived(p.MsgType)
 
-	channel.PutMessage(msg, handler, c)
+	channel.PutMessage(msg, handler, c, &p)
 }
 
 func (c *Connection) ReceiveRaw() {
@@ -324,6 +321,11 @@ func (c *Connection) ReceiveRaw() {
 		return
 	}
 
+	broadcast, err := c.reader.ReadByte()
+	if err != nil {
+		log.Println("Error when reading Broadcast: ", err)
+		return
+	}
 	stubId, err := readUint32(c)
 	if err != nil {
 		log.Println("Error when reading StubId: ", err)
@@ -365,7 +367,7 @@ func (c *Connection) ReceiveRaw() {
 	var handler MessageHandlerFunc
 	if msgType >= uint32(proto.MessageType_USER_SPACE_START) && entry == nil {
 		// User-space message without handler won't be deserialized.
-		msg = &proto.UserSpaceMessage{MsgType: msgType, MsgBody: body}
+		msg = &proto.UserSpaceMessage{MsgBody: body}
 		handler = handleUserSpaceMessage
 	} else {
 		handler = entry.handler
@@ -379,35 +381,27 @@ func (c *Connection) ReceiveRaw() {
 
 	c.fsm.OnReceived(msgType)
 
-	channel.PutMessage(msg, handler, c)
+	channel.PutMessage(msg, handler, c, &proto.Packet{Broadcast: proto.BroadcastType(broadcast), StubId: stubId})
 }
 
 func (c *Connection) ForwardPacket(channelId ChannelId, msgType proto.MessageType, bodySize uint32, msgBody []byte) {
 
 }
 
-func (c *Connection) Send(channelId ChannelId, msgType proto.MessageType, msg Message) {
+func (c *Connection) Send(ctx MessageContext) {
 	if c.IsRemoving() {
 		return
 	}
 
-	c.sender.Send(c, channelId, msgType, msg)
-}
-
-func (c *Connection) SendWithGlobalChannel(msgType proto.MessageType, msg Message) {
-	if c.IsRemoving() {
-		return
-	}
-
-	c.Send(0, msgType, msg)
+	c.sender.Send(c, ctx)
 }
 
 func (c *Connection) Flush() {
 	for len(c.sendQueue) > 0 {
 		e := <-c.sendQueue
-		msgBody, err := protobuf.Marshal(e.msg)
+		msgBody, err := protobuf.Marshal(e.Msg)
 		if err != nil {
-			log.Printf("Failed to marshal message %d: %s\n", e.msgType, e.msg)
+			log.Printf("Failed to marshal message %d: %s\n", e.MsgType, e.Msg)
 			continue
 		}
 		if len(msgBody) >= (1 << 24) {
@@ -415,21 +409,11 @@ func (c *Connection) Flush() {
 			continue
 		}
 
-		/*
-			binary.Write(c.writer, binary.BigEndian, TAG_ID)
-			binary.Write(c.writer, binary.BigEndian, uint32(e.channelId))
-			binary.Write(w, binary.BigEndian, e.broadcast)
-			binary.Write(c.writer, binary.BigEndian, uint32(e.stubId))
-			binary.Write(c.writer, binary.BigEndian, uint32(e.msgType))
-			binary.Write(c.writer, binary.BigEndian, uint32(len(msgBody)))
-			binary.Write(c.writer, binary.BigEndian, msgBody)
-		*/
-
 		bytes, err := protobuf.Marshal(&proto.Packet{
-			ChannelId: uint32(e.channelId),
-			Broadcast: e.broadcast,
-			StubId:    e.stubId,
-			MsgType:   uint32(e.msgType),
+			ChannelId: uint32(e.Channel.id),
+			Broadcast: proto.BroadcastType_NO,
+			StubId:    e.StubId,
+			MsgType:   uint32(e.MsgType),
 			MsgBody:   msgBody,
 		})
 		if err != nil {

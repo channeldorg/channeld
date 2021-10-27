@@ -6,11 +6,27 @@ import "google/protobuf/any.proto";
 
 option go_package = "/proto";
 
+enum BroadcastType {
+    NO = 0;
+    ALL = 1;
+    ALL_BUT_SENDER = 2;
+}
+
 message Packet {
+    // The channel that the packet is sent to.
     uint32 channelId = 1;
-    bool broadcast = 2;
+
+    // Will the message be broadcasted to all connections in the channel? 
+    // ONLY works for the user-space messages. 
+    BroadcastType broadcast = 2;
+
+    // The stub for RPC callbacks.
     uint32 stubId = 3;
+
+    // The MessageType either defined in MessageType enum below, or defined in user space.
     uint32 msgType = 4;
+
+    // Protobuf-marshalled message body.
     bytes msgBody = 5;
 }
 
@@ -41,8 +57,7 @@ enum MessageType {
 }
 
 message UserSpaceMessage {
-    uint32 msgType = 1;
-    bytes msgBody = 2;
+    bytes msgBody = 1;
 }
 
 message AuthMessage {

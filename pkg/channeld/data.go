@@ -193,8 +193,13 @@ func (ch *Channel) fanOutDataUpdate(c *Connection, cs *ChannelSubscription, upda
 	if err != nil {
 		log.Panicln(err)
 	}
-	c.Send(ch.id, proto.MessageType_CHANNEL_DATA_UPDATE, &proto.ChannelDataUpdateMessage{
-		Data: any,
+	c.Send(MessageContext{
+		MsgType:    proto.MessageType_CHANNEL_DATA_UPDATE,
+		Msg:        &proto.ChannelDataUpdateMessage{Data: any},
+		Connection: nil,
+		Channel:    ch,
+		Broadcast:  proto.BroadcastType_NO,
+		StubId:     0,
 	})
 	// cs.lastFanOutTime = time.Now()
 	// cs.fanOutDataMsg = nil

@@ -29,38 +29,62 @@ func TestHandleListChannels(t *testing.T) {
 	ch5.metadata = "bbc"
 	ch6.metadata = "abc"
 
-	handleListChannel(&proto.ListChannelMessage{}, c, ch0)
+	handleListChannel(MessageContext{
+		Msg:        &proto.ListChannelMessage{},
+		Connection: c,
+		Channel:    ch0,
+	})
 	// No filter - all channels match
 	assert.Equal(t, 7, len(c.latestMsg().(*proto.ListChannelResultMessage).Channels))
 
-	handleListChannel(&proto.ListChannelMessage{
-		TypeFilter: proto.ChannelType_SUBWORLD,
-	}, c, ch0)
+	handleListChannel(MessageContext{
+		Msg: &proto.ListChannelMessage{
+			TypeFilter: proto.ChannelType_SUBWORLD,
+		},
+		Connection: c,
+		Channel:    ch0,
+	})
 	// 2 matches: ch2 and ch3
 	assert.Equal(t, 2, len(c.latestMsg().(*proto.ListChannelResultMessage).Channels))
 
-	handleListChannel(&proto.ListChannelMessage{
-		MetadataFilters: []string{"aa"},
-	}, c, ch0)
+	handleListChannel(MessageContext{
+		Msg: &proto.ListChannelMessage{
+			MetadataFilters: []string{"aa"},
+		},
+		Connection: c,
+		Channel:    ch0,
+	})
 	// 2 matches: ch1 and ch4
 	assert.Equal(t, 2, len(c.latestMsg().(*proto.ListChannelResultMessage).Channels))
 
-	handleListChannel(&proto.ListChannelMessage{
-		MetadataFilters: []string{"bb", "cc"},
-	}, c, ch0)
+	handleListChannel(MessageContext{
+		Msg: &proto.ListChannelMessage{
+			MetadataFilters: []string{"bb", "cc"},
+		},
+		Connection: c,
+		Channel:    ch0,
+	})
 	// 3 matches: ch2, ch3, ch5
 	assert.Equal(t, 3, len(c.latestMsg().(*proto.ListChannelResultMessage).Channels))
 
-	handleListChannel(&proto.ListChannelMessage{
-		TypeFilter:      proto.ChannelType_TEST,
-		MetadataFilters: []string{"a", "b", "c"},
-	}, c, ch0)
+	handleListChannel(MessageContext{
+		Msg: &proto.ListChannelMessage{
+			TypeFilter:      proto.ChannelType_TEST,
+			MetadataFilters: []string{"a", "b", "c"},
+		},
+		Connection: c,
+		Channel:    ch0,
+	})
 	// 3 matches: ch4, ch5, ch6
 	assert.Equal(t, 3, len(c.latestMsg().(*proto.ListChannelResultMessage).Channels))
 
-	handleListChannel(&proto.ListChannelMessage{
-		MetadataFilters: []string{"z"},
-	}, c, ch0)
+	handleListChannel(MessageContext{
+		Msg: &proto.ListChannelMessage{
+			MetadataFilters: []string{"z"},
+		},
+		Connection: c,
+		Channel:    ch0,
+	})
 	// no match
 	assert.Equal(t, 0, len(c.latestMsg().(*proto.ListChannelResultMessage).Channels))
 }
@@ -69,6 +93,9 @@ func TestMessageHandlers(t *testing.T) {
 	for name, value := range proto.MessageType_value {
 		msgType := proto.MessageType(value)
 		if msgType == proto.MessageType_INVALID {
+			continue
+		}
+		if msgType >= proto.MessageType_USER_SPACE_START {
 			continue
 		}
 		assert.NotNil(t, MessageMap[msgType], "Missing handler func for message type %s", name)
@@ -88,7 +115,7 @@ func TestMessageTypeConversion(t *testing.T) {
 func BenchmarkProtobufPacket(b *testing.B) {
 	p := &proto.Packet{
 		ChannelId: 0,
-		Broadcast: false,
+		Broadcast: proto.BroadcastType_ALL,
 		StubId:    0,
 		MsgType:   8,
 		//BodySize:  0,
@@ -102,8 +129,8 @@ func BenchmarkProtobufPacket(b *testing.B) {
 	}
 	b.Logf("Average packet size: %.2f", float64(size)/float64(b.N))
 	// Result:
-	// BenchmarkProtobufPacket-12    	10391634	       117.4 ns/op	       2 B/op	       1 allocs/op
-	// Average packet size: 2.00
+	// BenchmarkProtobufPacket-12    	9602565	       127.8 ns/op	       4 B/op	       1 allocs/op
+	// Average packet size: 4.00
 }
 
 type mockWriter struct{}
@@ -117,7 +144,7 @@ func BenchmarkRawPacket(b *testing.B) {
 	var size int = 0
 	for i := 0; i < b.N; i++ {
 		binary.Write(w, binary.BigEndian, uint32(0))
-		binary.Write(w, binary.BigEndian, false)
+		binary.Write(w, binary.BigEndian, byte(1))
 		binary.Write(w, binary.BigEndian, uint32(0))
 		binary.Write(w, binary.BigEndian, uint32(8))
 		binary.Write(w, binary.BigEndian, uint32(0))

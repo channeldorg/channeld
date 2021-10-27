@@ -10,17 +10,6 @@ import (
 	"channeld.clewcat.com/channeld/proto"
 )
 
-/* Use the definitions in channeld.proto instead
-type ChannelType uint8
-
-const (
-	WORLD   ChannelType = 1
-	PRIVATE ChannelType = 2
-	LEVEL   ChannelType = 3
-	REGION  ChannelType = 4
-)
-*/
-
 type ChannelState uint8
 
 const (
@@ -39,9 +28,8 @@ func (t ChannelTime) AddMs(ms uint32) ChannelTime {
 }
 
 type channelMessage struct {
-	msg     Message
+	ctx     MessageContext
 	handler MessageHandlerFunc
-	conn    *Connection
 }
 
 type Channel struct {
@@ -57,6 +45,7 @@ type Channel struct {
 	startTime             time.Time // Time since channel created
 	tickInterval          time.Duration
 	tickFrames            int
+	enableClientBroadcast bool
 	removing              int32
 }
 
@@ -124,8 +113,15 @@ func (ch *Channel) String() string {
 	return fmt.Sprintf("Channel(%s %d)", ch.channelType.String(), ch.id)
 }
 
-func (ch *Channel) PutMessage(msg Message, handler MessageHandlerFunc, conn *Connection) {
-	ch.inMsgQueue <- channelMessage{msg, handler, conn}
+func (ch *Channel) PutMessage(msg Message, handler MessageHandlerFunc, conn *Connection, p *proto.Packet) {
+	ch.inMsgQueue <- channelMessage{ctx: MessageContext{
+		MsgType:    proto.MessageType(p.MsgType),
+		Msg:        msg,
+		Connection: conn,
+		Channel:    ch,
+		Broadcast:  p.Broadcast,
+		StubId:     p.StubId,
+	}, handler: handler}
 }
 
 func (ch *Channel) GetTime() ChannelTime {
@@ -149,7 +145,11 @@ func (ch *Channel) Tick() {
 
 		for len(ch.inMsgQueue) > 0 {
 			cm := <-ch.inMsgQueue
-			cm.handler(cm.msg, cm.conn, ch)
+			if cm.ctx.Connection == nil {
+				log.Printf("%s drops message(%d) as the sender is lost.", ch, cm.ctx.MsgType)
+				continue
+			}
+			cm.handler(cm.ctx)
 			if ch.tickInterval > 0 && time.Since(tickStart) >= ch.tickInterval {
 				log.Printf("%s spent %dms handling messages, will delay the left ones(%d) to the next tick.", ch, time.Since(tickStart)/time.Millisecond, len(ch.inMsgQueue))
 				break
@@ -161,10 +161,15 @@ func (ch *Channel) Tick() {
 	}
 }
 
-func (ch *Channel) Broadcast(msgType proto.MessageType, msg Message) {
-
-}
-
-func (ch *Channel) BroadcastSub(connId ConnectionId) {
-
+func (ch *Channel) Broadcast(ctx MessageContext) {
+	for connId := range ctx.Channel.subscribedConnections {
+		c := GetConnection(connId)
+		if c == nil {
+			continue
+		}
+		if ctx.Broadcast == proto.BroadcastType_ALL_BUT_SENDER && c == ctx.Connection {
+			continue
+		}
+		c.Send(ctx)
+	}
 }
