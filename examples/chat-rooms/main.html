@@ -19,24 +19,25 @@ window.addEventListener("load", function(evt) {
         output.scroll(0, output.scrollHeight);
     };
 
-    var appendLog = function(message, level) {
+    var appendLog = function(message, color) {
         var d = document.createElement("div");
-        switch (level) {
-        case "ERROR":
-            d.style.color = "red";
-            break;
-        case "WARN":
-            d.style.color = "orange";
-            break;
-        default:
+        if (color)
+            d.style.color = color;
+        else
             d.style.color = "#cccccc";
-            break;
-        }
         
         d.textContent = message;
         output.appendChild(d);
         output.scroll(0, output.scrollHeight);       
     };
+
+    var appendWarn = function(message) {
+        appendLog(message, "orange");
+    }
+
+    var appendError = function(message) {
+        appendLog(message, "red");
+    }
 
     var getByteArray = function(uint32Num) {
         return [uint32Num >> 24, uint32Num >> 16, uint32Num >> 8, uint32Num & 0xff];
@@ -65,14 +66,26 @@ window.addEventListener("load", function(evt) {
         return null;
     };
 
-    var sendPacket = function(channelId, msgType, msgClass, jo) {
+    var stubCallbacks = ["reserved"];
+
+    var sendPacket = function(channelId, msgType, msgClass, jo, callback) {
         var msg = msgClass.create(jo);
         var msgBody = msgClass.encode(msg).finish();
 
+        var stubId = 0;
+        if (typeof callback === "function") {
+            while (stubCallbacks[stubId]) {
+                stubId++;
+                if (stubId >= 4294967296)
+                    stubId = 1;
+            }
+            stubCallbacks[stubId] = callback;
+        }
+        
         var packet = proto.Packet.create({
             channelId: channelId,
             broadcast: false,
-            stubId: 0,
+            stubId: stubId,
             msgType: msgType,
             msgBody: msgBody
         });
@@ -111,15 +124,6 @@ window.addEventListener("load", function(evt) {
         return proto.Packet.decode(bytes);
     };
 
-    var handleAuthResult = function(msg, channelId) {
-        connId = msg.connId;
-        appendLog("Auth result: " + msg.result + ", connId: " + connId)
-
-        sendPacket(0, proto.MessageType.values.SUB_TO_CHANNEL, proto.SubscribedToChannelMessage, {
-            connId: connId
-        });
-    };
-
     var handleSubToChannel = function(msg, channelId) {
         if (msg.connId == connId) {
             joinedChannels[channelId] = {connIds: [connId]};
@@ -151,7 +155,7 @@ window.addEventListener("load", function(evt) {
     
     protobuf.load("/proto", function(err, root) {
         if (err) {
-            appendLog(err, "ERROR");
+            appendError(err);
             return;
         }
         proto.Packet = root.lookupType("channeld.Packet");
@@ -174,7 +178,7 @@ window.addEventListener("load", function(evt) {
 
         protobuf.load("/proto/chat", function(err, root) {
             if (err) {
-                appendLog(err, "ERROR");
+                appendError(err);
                 return;
             }
             proto.ChatMessage = root.lookupType("chat.ChatMessage")
@@ -183,14 +187,14 @@ window.addEventListener("load", function(evt) {
             for (const key in proto) {
                 var value = proto[key]
                 if (!value) {
-                    appendLog("Missing proto type: " + key, "ERROR")
+                    appendError("Missing proto type: " + key);
                 } else {
                     // The full name has a leading dot. Save one without the dot for future comparison.
-                    value.typeName = value.fullName.substring(1)
+                    value.typeName = value.fullName.substring(1);
                 }
             }
 
-            messageHandlers[proto.MessageType.values.AUTH] = {class: proto.AuthResultMessage, handler: handleAuthResult};
+            messageHandlers[proto.MessageType.values.AUTH] = {class: proto.AuthResultMessage/* Use RPC callback instead of handler function */};
             messageHandlers[proto.MessageType.values.SUB_TO_CHANNEL] = {class: proto.SubscribedToChannelMessage, handler: handleSubToChannel};
             messageHandlers[proto.MessageType.values.CHANNEL_DATA_UPDATE] = {class: proto.ChannelDataUpdateMessage, handler: handleChannelDataUpdate};
             messageHandlers[proto.MessageType.values.LIST_CHANNEL] = {class: proto.ListChannelResultMessage, handler: handleListChannelResult};
@@ -233,6 +237,13 @@ window.addEventListener("load", function(evt) {
         sendPacket(0, proto.MessageType.values.AUTH, proto.AuthMessage, {
             playerIdentifierToken: "test",
             loginToken: "test"
+        }, function(msg, channelId) {
+            connId = msg.connId;
+            appendLog("Auth result: " + msg.result + ", connId: " + connId)
+
+            sendPacket(0, proto.MessageType.values.SUB_TO_CHANNEL, proto.SubscribedToChannelMessage, {
+                connId: connId
+            });
         });
     };
     ws.onclose = function(evt) {
@@ -240,28 +251,26 @@ window.addEventListener("load", function(evt) {
         ws = null;
     };
     ws.onmessage = function(evt) {
-/*
-        var bytes = new Uint8Array(evt.data);
-        var channelId = getUint32(bytes, 4);
-        var msgType = getUint32(bytes, 12);
-        var h = messageHandlers[msgType];
-        if (!h) {
-            appendLog("Invalid message type: " + msgType, "ERROR");
-            return;
-        }
-        var bodySize = getUint32(bytes, 16)
-        var msg = h.class.decode(bytes.subarray(20, 20 + bodySize))
-*/
         var p = readPacket(new Uint8Array(evt.data));
         var h = messageHandlers[p.msgType];
-        if (!h) {
-            appendLog("Invalid message type: " + p.msgType, "ERROR");
-            return;
+        if (p.stubId != 0) {
+            var callback = stubCallbacks[p.stubId];
+            if (callback) {
+                callback(h.class.decode(p.msgBody), p.channelId);
+                delete stubCallbacks[p.stubId];
+            } else {
+                appendWarn("Can't find RPC callback for stubId: " + p.stubId);
+            }
+        } else {
+            if (!h) {
+                appendError("Invalid message type: " + p.msgType);
+                return;
+            }
+            h.handler(h.class.decode(p.msgBody), p.channelId);
         }
-        h.handler(h.class.decode(p.msgBody), p.channelId);
     };
     ws.onerror = function(evt) {
-        appendLog(evt.data, "ERROR");
+        appendError(evt.data);
     };
 
 
@@ -271,12 +280,13 @@ window.addEventListener("load", function(evt) {
         }
 
         var content = input.value;
+        // Commands start with '/'
         if (content[0] == '/') {
             var components = content.substring(1).split(' ');
             var cmd = commands[components[0]];
             var args = components.slice(1);
             if (!cmd) {
-                appendLog("Invalid command " + components[0], "WARN");
+                appendWarn("Invalid command " + components[0]);
                 return;
             }
             var channelId = curChannelId;

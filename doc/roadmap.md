@@ -8,7 +8,7 @@
 - [ ] Spatial-basd load-balancing
 
 # Modules
-- [.] Stub(RPC) support
+- [x] Stub(RPC) support
 - [x] WebSocket support
 - [ ] KCP support
 - [ ] [Snappy](https://github.com/golang/snappy) compression support
