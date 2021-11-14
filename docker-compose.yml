@@ -1,0 +1,38 @@
+version: '3'
+services:
+  chat:
+    build:
+      context: .
+      dockerfile: examples/chat-rooms/Dockerfile
+    depends_on:
+      - prometheus
+    ports:
+      - "8080:8080"
+      - "12108:12108"
+    expose:
+      - "8080"
+      - "12108"
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    expose:
+      - "3000"
+  prometheus:
+    image: prom/prometheus
+    entrypoint: /bin/sh -c
+    command: |
+      'sh -s <<EOF
+        cat > ./prometheus.yml <<EON
+      global:
+        scrape_interval:     15s
+        evaluation_interval: 15s
+      scrape_configs:
+        - job_name: channeld
+          static_configs:
+          - targets: ['chat:8080']
+      EON
+      prometheus --config.file=./prometheus.yml
+      EOF'
+    ports:
+      - '9090:9090'

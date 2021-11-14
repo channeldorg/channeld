@@ -6,14 +6,17 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"channeld.clewcat.com/channeld/pkg/channeld"
 	"channeld.clewcat.com/channeld/proto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-var webAddr = flag.String("web", "localhost:8080", "http service address")
-var wsAddr = flag.String("ws", "localhost:12108", "websocket service address")
+// The addresses should only include the port for running in the docker containers.
+var webAddr = flag.String("web", ":8080", "http service address")
+var wsAddr = flag.String("ws", ":12108", "websocket service address")
 
 func handleChanneldProto(w http.ResponseWriter, r *http.Request) {
 	bytes, err := os.ReadFile("../../proto/channeld.proto")
@@ -37,7 +40,9 @@ func handleMain(w http.ResponseWriter, r *http.Request) {
 		log.Panic(err)
 	}
 
-	homeTemplate.Execute(w, *wsAddr)
+	localAddr := r.Host[:strings.Index(r.Host, ":")]
+	//log.Println(localAddr)
+	homeTemplate.Execute(w, localAddr+*wsAddr)
 }
 
 func main() {
@@ -45,11 +50,13 @@ func main() {
 	http.HandleFunc("/", handleMain)
 	http.HandleFunc("/proto", handleChanneldProto)
 	http.HandleFunc("/proto/chat", handleChatProto)
+	http.Handle("/metrics", promhttp.Handler())
 
+	channeld.InitMetrics()
 	channeld.InitConnections(1024, "../../config/server_authoratative_fsm.json", "../../config/client_authoratative_fsm.json")
 	channeld.InitChannels()
 	channeld.GetChannel(channeld.GlobalChannelId).InitData(
-		&proto.ChatChannelData{ChatMessages: []*proto.ChatMessage{ //make([]*proto.ChatMessage, 0)},
+		&proto.ChatChannelData{ChatMessages: []*proto.ChatMessage{
 			{Sender: "System", SendTime: time.Now().Unix(), Content: "Welcome!"},
 		}},
 		&channeld.DataMergeOptions{ListSizeLimit: 100},
@@ -58,4 +65,5 @@ func main() {
 	go channeld.StartListening(channeld.CLIENT, "ws", *wsAddr)
 
 	log.Fatal(http.ListenAndServe(*webAddr, nil))
+
 }

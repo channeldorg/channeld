@@ -21,7 +21,7 @@ CHNL(4B) | ChannelID(4B) | StubID(4B) | MessageType(4B) | BodySize(4B) | Message
 
 
 ## Performance
-channeld is aimmed to support 10Ks connections 1Ms packets per second on a single node, and 100Ms in a distributed system.
+channeld is aimmed to support 10Ks connections and 1Ms packets per second on a single node, and 100Ms packets in a distributed system.
 
 ## Examples:
 * Chat rooms

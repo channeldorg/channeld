@@ -1,0 +1,2 @@
+*.exe
+/examples/chat-rooms/*.code-workspace

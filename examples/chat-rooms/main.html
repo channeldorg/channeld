@@ -115,9 +115,9 @@ window.addEventListener("load", function(evt) {
 
     var readPacket = function(uint8Arr) {
         var packetSize = uint8Arr[3]
-        if (uint8Arr[1] != 0x72)
+        if (uint8Arr[1] != 72)
             packetSize = packetSize | uint8Arr[1]<<16 | uint8Arr[2]<<8;
-        else if (uint8Arr[2] != 0x78)
+        else if (uint8Arr[2] != 78)
             packetSize = packetSize | uint8Arr[2]<<8;
 
         var bytes = uint8Arr.subarray(4, 4 + packetSize);
@@ -127,7 +127,6 @@ window.addEventListener("load", function(evt) {
     var handleSubToChannel = function(msg, channelId) {
         if (msg.connId == connId) {
             joinedChannels[channelId] = {connIds: [connId]};
-            curChannelId = channelId;
         } else {
             joinedChannels[channelId].connIds.push(msg.connId);
         }
@@ -135,6 +134,9 @@ window.addEventListener("load", function(evt) {
     };
 
     var handleChannelDataUpdate = function(msg, channelId) {
+        if (channelId != curChannelId)
+            return;
+
         var chatChannelData = unmarshalAny(msg.data);
         for (const textMsg of chatChannelData.chatMessages) {
             appendMessage("[" + new Date(textMsg.sendTime).toLocaleTimeString() + "]" + textMsg.sender + ": " + textMsg.content);
@@ -152,6 +154,7 @@ window.addEventListener("load", function(evt) {
     var proto = {};
     var messageHandlers = {};
     var commands = {};
+    var ws;
     
     protobuf.load("/proto", function(err, root) {
         if (err) {
@@ -209,13 +212,17 @@ window.addEventListener("load", function(evt) {
                     "msgType": proto.MessageType.values.SUB_TO_CHANNEL,
                     "msgClass": proto.SubscribedToChannelMessage,
                     "channelId": (args) => {return parseInt(args[0])},
-                    "args": ["channelId", "connId"]
+                    "args": ["channelId", (jo, arg) => {
+                        jo["connId"] = arg ? parseInt(arg) : connId;
+                    }]
                 },
                 "unsub": {
                     "msgType": proto.MessageType.values.UNSUB_TO_CHANNEL,
                     "msgClass": proto.UnsubscribedToChannelMessage,
                     "channelId": (args) => {return parseInt(args[0])},
-                    "args": ["channelId", "connId"]
+                    "args": ["channelId", (jo, arg) => {
+                        jo["connId"] = arg ? parseInt(arg) : connId;
+                    }]
                 },
                 "list": {
                     "msgType": proto.MessageType.values.LIST_CHANNEL,
@@ -225,53 +232,62 @@ window.addEventListener("load", function(evt) {
                         jo["metadataFilters"] = arg.split(',');
                     }]
                 },
+                "switch": {
+                    "args": [(jo, arg) => {
+                        curChannelId = parseInt(arg);
+                    }]
+                }
             };
+
+            
+
+            ws = new WebSocket("ws://{{.}}");
+            ws.binaryType = "arraybuffer";
+            ws.onopen = function(evt) {
+                appendLog("Server connected.");
+
+                sendPacket(0, proto.MessageType.values.AUTH, proto.AuthMessage, {
+                    playerIdentifierToken: "test",
+                    loginToken: "test"
+                }, function(msg, channelId) {
+                    connId = msg.connId;
+                    appendLog("Auth result: " + msg.result + ", connId: " + connId)
+
+                    sendPacket(0, proto.MessageType.values.SUB_TO_CHANNEL, proto.SubscribedToChannelMessage, {
+                        connId: connId
+                    });
+                });
+            };
+            ws.onclose = function(evt) {
+                appendLog("Server disconnected.");
+                ws = null;
+            };
+            ws.onmessage = function(evt) {
+                var p = readPacket(new Uint8Array(evt.data));
+                var h = messageHandlers[p.msgType];
+                if (p.stubId != 0) {
+                    var callback = stubCallbacks[p.stubId];
+                    if (callback) {
+                        callback(h.class.decode(p.msgBody), p.channelId);
+                        delete stubCallbacks[p.stubId];
+                    } else {
+                        appendWarn("Can't find RPC callback for stubId: " + p.stubId);
+                    }
+                } else {
+                    if (!h) {
+                        appendError("Invalid message type: " + p.msgType);
+                        return;
+                    }
+                    h.handler(h.class.decode(p.msgBody), p.channelId);
+                }
+            };
+            ws.onerror = function(evt) {
+                appendError(evt.data);
+            };
+
+
         })
     })
-
-    var ws = new WebSocket("ws://{{.}}");
-    ws.binaryType = "arraybuffer";
-    ws.onopen = function(evt) {
-        appendLog("Server connected.");
-
-        sendPacket(0, proto.MessageType.values.AUTH, proto.AuthMessage, {
-            playerIdentifierToken: "test",
-            loginToken: "test"
-        }, function(msg, channelId) {
-            connId = msg.connId;
-            appendLog("Auth result: " + msg.result + ", connId: " + connId)
-
-            sendPacket(0, proto.MessageType.values.SUB_TO_CHANNEL, proto.SubscribedToChannelMessage, {
-                connId: connId
-            });
-        });
-    };
-    ws.onclose = function(evt) {
-        appendLog("Server disconnected.");
-        ws = null;
-    };
-    ws.onmessage = function(evt) {
-        var p = readPacket(new Uint8Array(evt.data));
-        var h = messageHandlers[p.msgType];
-        if (p.stubId != 0) {
-            var callback = stubCallbacks[p.stubId];
-            if (callback) {
-                callback(h.class.decode(p.msgBody), p.channelId);
-                delete stubCallbacks[p.stubId];
-            } else {
-                appendWarn("Can't find RPC callback for stubId: " + p.stubId);
-            }
-        } else {
-            if (!h) {
-                appendError("Invalid message type: " + p.msgType);
-                return;
-            }
-            h.handler(h.class.decode(p.msgBody), p.channelId);
-        }
-    };
-    ws.onerror = function(evt) {
-        appendError(evt.data);
-    };
 
 
     var sendInput = function() {
@@ -302,7 +318,10 @@ window.addEventListener("load", function(evt) {
                     jo[arg] = args[i];
                 }
             }
-            sendPacket(channelId, cmd.msgType, cmd.msgClass, jo);
+
+            if (cmd.msgType > 0) {
+                sendPacket(channelId, cmd.msgType, cmd.msgClass, jo);
+            }
         } else {
             sendPacket(curChannelId, proto.MessageType.values.CHANNEL_DATA_UPDATE, proto.ChannelDataUpdateMessage, {
                 data: marshalAny(proto.ChatChannelData.create({

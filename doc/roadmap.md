@@ -4,6 +4,7 @@
 - [x] FSM-based message filtering
 - [x] Message broadcasting
 - [ ] Authentication
+- [ ] Health check
 - [ ] Spatial-based sub/unsub
 - [ ] Spatial-basd load-balancing
 
@@ -11,7 +12,9 @@
 - [x] Stub(RPC) support
 - [x] WebSocket support
 - [ ] KCP support
-- [ ] [Snappy](https://github.com/golang/snappy) compression support
+- [ ] [Snappy](https://github.com/golang/snappy) compression
+- [ ] [Markov-chain](https://en.wikipedia.org/wiki/Markov_chain) compression
+- [.] Prometheus integration
 
 # Optimizations
 - [x] Read/write the packet using Protobuf
@@ -30,7 +33,7 @@
 # Example projects
 - [.] Chat rooms
     - [x] Implement the Javascript framework
-    - [.] Implement the commands
+    - [x] Implement the commands
     - [ ] Scale test with 10K connections
     - [ ] Implement the UI
 - [ ] Seamless world travelling

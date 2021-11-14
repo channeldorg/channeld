@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -26,6 +27,16 @@ const (
 	SERVER ConnectionType = 1
 	CLIENT ConnectionType = 2
 )
+
+func (t ConnectionType) String() string {
+	if t == SERVER {
+		return "SERVER"
+	} else if t == CLIENT {
+		return "CLIENT"
+	} else {
+		return "UNKNOW"
+	}
+}
 
 // Add an interface before the underlying network layer for the test purpose.
 type MessageSender interface {
@@ -75,6 +86,8 @@ func InitConnections(connSize int, serverFsmPath string, clientFsmPath string) {
 	}
 	if err != nil {
 		log.Println("Failed to read server FSM", err)
+	} else {
+		log.Println("Loaded server FSM, current state: ", serverFsm.CurrentState().Name)
 	}
 
 	bytes, err = os.ReadFile(clientFsmPath)
@@ -83,6 +96,8 @@ func InitConnections(connSize int, serverFsmPath string, clientFsmPath string) {
 	}
 	if err != nil {
 		log.Println("Failed to read client FSM", err)
+	} else {
+		log.Println("Loaded client FSM, current state: ", clientFsm.CurrentState().Name)
 	}
 
 	/* Split each Connection.Flush into a goroutine (see AddConnection)
@@ -125,6 +140,8 @@ func startGoroutines(connection *Connection) {
 }
 
 func StartListening(t ConnectionType, network string, address string) {
+	log.Printf("Start listening to %s: %s://%s", t, network, address)
+
 	// TODO: add "kcp" network types
 	if network == "ws" || network == "websocket" {
 		startWebSocketServer(t, address)
@@ -198,8 +215,11 @@ func (e *closeError) Error() string {
 func readBytes(c *Connection, len uint) ([]byte, error) {
 	bytes := make([]byte, len)
 	if _, err := io.ReadFull(c.reader, bytes); err != nil {
-		switch err.(type) {
+		switch err := err.(type) {
 		case *net.OpError:
+			log.Printf("%s %s error: %s\n", c.String(), err.Op, c.conn.RemoteAddr().String())
+			RemoveConnection(c)
+			return nil, &closeError{err}
 		case *websocket.CloseError:
 			log.Printf("%s disconnected: %s\n", c.String(), c.conn.RemoteAddr().String())
 			RemoveConnection(c)
@@ -216,7 +236,7 @@ func readBytes(c *Connection, len uint) ([]byte, error) {
 	return bytes, nil
 }
 
-func readUint32(c *Connection) (uint32, error) {
+func _(c *Connection) (uint32, error) {
 	bytes, err := readBytes(c, 4)
 	if err != nil {
 		return 0, err
@@ -224,9 +244,6 @@ func readUint32(c *Connection) (uint32, error) {
 		return binary.BigEndian.Uint32(bytes), nil
 	}
 }
-
-// 'CHNL' in ASCII
-const TAG_ID uint32 = 67<<24 | 72<<16 | 78<<8 | 76
 
 func (c *Connection) ReceivePacket() {
 	tag, err := readBytes(c, 4)
@@ -263,10 +280,6 @@ func (c *Connection) ReceivePacket() {
 		return
 	}
 
-	if p.StubId > 0 {
-		RPC().SaveStub(p.StubId, c)
-	}
-
 	entry := MessageMap[proto.MessageType(p.MsgType)]
 	if entry == nil && p.MsgType < uint32(proto.MessageType_USER_SPACE_START) {
 		log.Printf("%s sent undefined message type: %d\n", c, p.MsgType)
@@ -297,95 +310,15 @@ func (c *Connection) ReceivePacket() {
 	c.fsm.OnReceived(p.MsgType)
 
 	channel.PutMessage(msg, handler, c, &p)
-}
 
-func (c *Connection) ReceiveRaw() {
-	if tag, err := readUint32(c); tag != TAG_ID {
-		log.Println("Invalid tag:", tag, ", the packet will be dropped.", err)
-		_, isClosed := err.(*closeError)
-		if !isClosed {
-			// Drop the packet
-			ioutil.ReadAll(c.reader)
-		}
-		return
-	}
+	// TODO: record to Prometheus
+	// Measures: connection num, channel num, network bandwidth, packet receive rate, send rate, CPU usage, memory usage
 
-	channelId, err := readUint32(c)
-	if err != nil {
-		log.Println("Error when reading ChannelId: ", err)
-		return
-	}
-	channel := GetChannel(ChannelId(channelId))
-	if channel == nil {
-		log.Println("Can't find channel by ID: ", channelId)
-		return
-	}
-
-	broadcast, err := c.reader.ReadByte()
-	if err != nil {
-		log.Println("Error when reading Broadcast: ", err)
-		return
-	}
-	stubId, err := readUint32(c)
-	if err != nil {
-		log.Println("Error when reading StubId: ", err)
-		return
-	}
-	if stubId > 0 {
-		RPC().SaveStub(stubId, c)
-	}
-
-	msgType, err := readUint32(c)
-	if err != nil {
-		log.Println("Error when reading message type: ", err)
-		return
-	}
-	entry := MessageMap[proto.MessageType(msgType)]
-	if entry == nil && msgType < uint32(proto.MessageType_USER_SPACE_START) {
-		log.Printf("%s sent undefined message type: %d\n", c, msgType)
-		return
-	}
-
-	if !c.fsm.IsAllowed(msgType) {
-		log.Printf("%s doesn't allow message type %d for current state.\n", c, msgType)
-		return
-	}
-
-	bodySize, err := readUint32(c)
-	if err != nil {
-		log.Println("Error when reading body size: ", err)
-		return
-	}
-
-	body, err := readBytes(c, uint(bodySize))
-	if err != nil {
-		log.Println("Error when reading message body: ", err)
-		return
-	}
-
-	var msg Message
-	var handler MessageHandlerFunc
-	if msgType >= uint32(proto.MessageType_USER_SPACE_START) && entry == nil {
-		// User-space message without handler won't be deserialized.
-		msg = &proto.UserSpaceMessage{MsgBody: body}
-		handler = handleUserSpaceMessage
-	} else {
-		handler = entry.handler
-		// Always make a clone!
-		msg = protobuf.Clone(entry.msg)
-		err = protobuf.Unmarshal(body, msg)
-		if err != nil {
-			log.Panicln(err)
-		}
-	}
-
-	c.fsm.OnReceived(msgType)
-
-	channel.PutMessage(msg, handler, c, &proto.Packet{Broadcast: proto.BroadcastType(broadcast), StubId: stubId})
-}
-
-func (c *Connection) ForwardPacket(channelId ChannelId, msgType proto.MessageType, bodySize uint32, msgBody []byte) {
-
+	packetReceived.WithLabelValues(
+		strconv.Itoa(packetSize),
+		strconv.FormatUint(uint64(p.ChannelId), 10),
+		strconv.FormatUint(uint64(p.MsgType), 10),
+	).Inc()
 }
 
 func (c *Connection) Send(ctx MessageContext) {
@@ -396,54 +329,53 @@ func (c *Connection) Send(ctx MessageContext) {
 	c.sender.Send(c, ctx)
 }
 
+func WritePacket(writer io.Writer, channelId uint32, broadcast proto.BroadcastType, stubId uint32, msgType uint32, msg Message) error {
+	msgBody, err := protobuf.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal message %d: %s. Error: %v", msgType, msg, err)
+	}
+	if len(msgBody) >= (1 << 24) {
+		return fmt.Errorf("message body is too large, size: %d. Error: %v", len(msgBody), err)
+	}
+
+	bytes, err := protobuf.Marshal(&proto.Packet{
+		ChannelId: channelId,
+		Broadcast: broadcast,
+		StubId:    stubId,
+		MsgType:   msgType,
+		MsgBody:   msgBody,
+	})
+	if err != nil {
+		return fmt.Errorf("error marshalling packet: %v", err)
+	}
+
+	// 'CHNL' in ASCII
+	tag := []byte{67, 72, 78, 76}
+	len := len(bytes)
+	tag[3] = byte(len & 0xff)
+	if len > 0xff {
+		tag[2] = byte((len >> 8) & 0xff)
+	}
+	if len > 0xffff {
+		tag[1] = byte((len >> 16) & 0xff)
+	}
+	writer.Write(tag)
+	writer.Write(bytes)
+	return nil
+}
+
 func (c *Connection) Flush() {
 	for len(c.sendQueue) > 0 {
 		e := <-c.sendQueue
-		msgBody, err := protobuf.Marshal(e.Msg)
+		err := WritePacket(c.writer, uint32(e.Channel.id), proto.BroadcastType_NO, e.StubId, uint32(e.MsgType), e.Msg)
 		if err != nil {
-			log.Printf("Failed to marshal message %d: %s\n", e.MsgType, e.Msg)
-			continue
+			log.Println(err)
 		}
-		if len(msgBody) >= (1 << 24) {
-			log.Printf("Message body is too large, size: %d\n", len(msgBody))
-			continue
-		}
-
-		bytes, err := protobuf.Marshal(&proto.Packet{
-			ChannelId: uint32(e.Channel.id),
-			Broadcast: proto.BroadcastType_NO,
-			StubId:    e.StubId,
-			MsgType:   uint32(e.MsgType),
-			MsgBody:   msgBody,
-		})
-		if err != nil {
-			log.Println("Error marshalling packet: ", err)
-			continue
-		}
-
-		// 'CHNL' in ASCII
-		tag := []byte{67, 72, 78, 76}
-		len := len(bytes)
-		tag[3] = byte(len & 0xff)
-		if len > 0xff {
-			tag[2] = byte((len >> 8) & 0xff)
-		}
-		if len > 0xffff {
-			tag[1] = byte((len >> 16) & 0xff)
-		}
-		c.writer.Write(tag)
-		c.writer.Write(bytes)
 	}
 
 	c.writer.Flush()
 }
 
 func (c *Connection) String() string {
-	var typeName string
-	if c.connectionType == SERVER {
-		typeName = "SERVER"
-	} else if c.connectionType == CLIENT {
-		typeName = "CLIENT"
-	}
-	return fmt.Sprintf("Connection(%s %d %s)", typeName, c.id, c.fsm.CurrentState().Name)
+	return fmt.Sprintf("Connection(%s %d %s)", c.connectionType, c.id, c.fsm.CurrentState().Name)
 }

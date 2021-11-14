@@ -60,11 +60,11 @@ func handleAuth(ctx MessageContext) {
 	if ctx.Channel != globalChannel {
 		log.Panicln("Illegal attemp to authenticate outside the GLOBAL channel: ", ctx.Connection)
 	}
-	msg, ok := ctx.Msg.(*proto.AuthMessage)
+	_, ok := ctx.Msg.(*proto.AuthMessage)
 	if !ok {
 		log.Panicln("Message is not a AuthMessage, will not be handled.")
 	}
-	log.Printf("Auth PIT: %s, LT: %s\n", msg.PlayerIdentifierToken, msg.LoginToken)
+	//log.Printf("Auth PIT: %s, LT: %s\n", msg.PlayerIdentifierToken, msg.LoginToken)
 
 	// TODO: Authentication
 
@@ -185,7 +185,7 @@ func handleSubToChannel(ctx MessageContext) {
 		log.Panicln("Message is not a SubscribedToChannelMessage, will not be handled.")
 	}
 
-	// The connection that subscribes. Could be different to c which sends the message.
+	// The connection that subscribes. Could be different to the connection that sends the message.
 	connToSub := GetConnection(ConnectionId(msg.ConnId))
 	if connToSub == nil {
 		log.Panicln("Invalid ConnectionId:", msg.ConnId)

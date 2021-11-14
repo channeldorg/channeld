@@ -10,40 +10,40 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type WSConn struct {
+type wsConn struct {
 	conn *websocket.Conn
 }
 
-func (c *WSConn) Read(b []byte) (n int, err error) {
+func (c *wsConn) Read(b []byte) (n int, err error) {
 	_, body, err := c.conn.ReadMessage()
 	return copy(b, body), err
 }
 
-func (c *WSConn) Write(b []byte) (n int, err error) {
+func (c *wsConn) Write(b []byte) (n int, err error) {
 	return len(b), c.conn.WriteMessage(websocket.BinaryMessage, b)
 }
 
-func (c *WSConn) Close() error {
+func (c *wsConn) Close() error {
 	return c.conn.Close()
 }
 
-func (c *WSConn) LocalAddr() net.Addr {
+func (c *wsConn) LocalAddr() net.Addr {
 	return c.conn.LocalAddr()
 }
 
-func (c *WSConn) RemoteAddr() net.Addr {
+func (c *wsConn) RemoteAddr() net.Addr {
 	return c.conn.RemoteAddr()
 }
 
-func (c *WSConn) SetDeadline(t time.Time) error {
+func (c *wsConn) SetDeadline(t time.Time) error {
 	return c.conn.UnderlyingConn().SetDeadline(t)
 }
 
-func (c *WSConn) SetReadDeadline(t time.Time) error {
+func (c *wsConn) SetReadDeadline(t time.Time) error {
 	return c.conn.SetReadDeadline(t)
 }
 
-func (c *WSConn) SetWriteDeadline(t time.Time) error {
+func (c *wsConn) SetWriteDeadline(t time.Time) error {
 	return c.conn.SetWriteDeadline(t)
 }
 
@@ -82,7 +82,7 @@ func startWebSocketServer(t ConnectionType, address string) {
 		if err != nil {
 			log.Panic(err)
 		}
-		c := AddConnection(&WSConn{conn}, t)
+		c := AddConnection(&wsConn{conn}, t)
 		startGoroutines(c)
 	})
 
