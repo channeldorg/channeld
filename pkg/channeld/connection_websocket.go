@@ -1,13 +1,13 @@
 package channeld
 
 import (
-	"log"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"go.uber.org/zap"
 )
 
 type wsConn struct {
@@ -80,7 +80,7 @@ func startWebSocketServer(t ConnectionType, address string) {
 	mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			log.Panic(err)
+			logger.Panic("Upgrade to websocket connection", zap.Error(err))
 		}
 		c := AddConnection(&wsConn{conn}, t)
 		startGoroutines(c)
@@ -93,5 +93,5 @@ func startWebSocketServer(t ConnectionType, address string) {
 
 	defer server.Close()
 
-	log.Println(server.ListenAndServe())
+	logger.Error("stopped listening", zap.Error(server.ListenAndServe()))
 }

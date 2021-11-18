@@ -18,7 +18,7 @@ func main() {
 		"ca", "clientAddress",
 		"cfsm", "clientConnFSM",
 
-		"cs", "connSize",
+		// "cs", "connSize",
 	)
 
 	sn := flag.String("sn", "tcp", "the network type for the server connections")
@@ -27,12 +27,13 @@ func main() {
 	cn := flag.String("cn", "tcp", "the network type for the client connections")
 	ca := flag.String("ca", ":12108", "the network address for the client connections")
 	cfsm := flag.String("cfsm", "../config/client_non_authoratative_fsm.json", "the path to the client FSM config")
-	cs := flag.Int("cs", 1024, "the connection map buffer size")
+	// cs := flag.Int("cs", 1024, "the connection map buffer size")
 
 	getopt.Parse()
 	flag.Parse()
 
-	channeld.InitConnections(*cs, *sfsm, *cfsm)
+	channeld.InitLogsAndMetrics()
+	channeld.InitConnections(*sfsm, *cfsm)
 	channeld.InitChannels()
 
 	go channeld.StartListening(channeld.SERVER, *sn, *sa)

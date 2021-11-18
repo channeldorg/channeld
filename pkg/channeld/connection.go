@@ -6,16 +6,17 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"os"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"channeld.clewcat.com/channeld/pkg/fsm"
 	"channeld.clewcat.com/channeld/proto"
 	"github.com/gorilla/websocket"
+	"go.uber.org/zap"
 	protobuf "google.golang.org/protobuf/proto"
 )
 
@@ -72,22 +73,24 @@ type Connection struct {
 	removing       int32 // Don't put the removing into the FSM as 1) the FSM's states are user-defined. 2) the FSM doesn't have the race condition.
 }
 
-var allConnections map[ConnectionId]*Connection
+var allConnections sync.Map // map[ConnectionId]*Connection
 var nextConnectionId uint64 = 0
 var serverFsm fsm.FiniteStateMachine
 var clientFsm fsm.FiniteStateMachine
 
-func InitConnections(connSize int, serverFsmPath string, clientFsmPath string) {
-	allConnections = make(map[ConnectionId]*Connection, connSize)
-
+func InitConnections(serverFsmPath string, clientFsmPath string) {
 	bytes, err := os.ReadFile(serverFsmPath)
 	if err == nil {
 		serverFsm, err = fsm.Load(bytes)
 	}
 	if err != nil {
-		log.Println("Failed to read server FSM", err)
+		logger.Panic("failed to read server FSM",
+			zap.Error(err),
+		)
 	} else {
-		log.Println("Loaded server FSM, current state: ", serverFsm.CurrentState().Name)
+		logger.Info("loaded server FSM",
+			zap.String("current state", serverFsm.CurrentState().Name),
+		)
 	}
 
 	bytes, err = os.ReadFile(clientFsmPath)
@@ -95,9 +98,11 @@ func InitConnections(connSize int, serverFsmPath string, clientFsmPath string) {
 		clientFsm, err = fsm.Load(bytes)
 	}
 	if err != nil {
-		log.Println("Failed to read client FSM", err)
+		logger.Panic("failed to read client FSM", zap.Error(err))
 	} else {
-		log.Println("Loaded client FSM, current state: ", clientFsm.CurrentState().Name)
+		logger.Info("loaded client FSM",
+			zap.String("currentState", clientFsm.CurrentState().Name),
+		)
 	}
 
 	/* Split each Connection.Flush into a goroutine (see AddConnection)
@@ -116,8 +121,12 @@ func InitConnections(connSize int, serverFsmPath string, clientFsmPath string) {
 }
 
 func GetConnection(id ConnectionId) *Connection {
-	c := allConnections[id]
-	if c != nil && !c.IsRemoving() {
+	v, ok := allConnections.Load(id)
+	if ok {
+		c := v.(*Connection)
+		if c.IsRemoving() {
+			return nil
+		}
 		return c
 	} else {
 		return nil
@@ -140,7 +149,11 @@ func startGoroutines(connection *Connection) {
 }
 
 func StartListening(t ConnectionType, network string, address string) {
-	log.Printf("Start listening to %s: %s://%s", t, network, address)
+	logger.Info("start listenning",
+		zap.String("connType", t.String()),
+		zap.String("network", network),
+		zap.String("address", address),
+	)
 
 	// TODO: add "kcp" network types
 	if network == "ws" || network == "websocket" {
@@ -149,7 +162,7 @@ func StartListening(t ConnectionType, network string, address string) {
 
 		listener, err := net.Listen(network, address)
 		if err != nil {
-			log.Fatal(err)
+			logger.Panic("failed to listen", zap.Error(err))
 			return
 		}
 
@@ -158,7 +171,7 @@ func StartListening(t ConnectionType, network string, address string) {
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
-				log.Println(err)
+				logger.Error("failed to accept connection", zap.Error(err))
 			} else {
 				connection := AddConnection(conn, t)
 				startGoroutines(connection)
@@ -189,7 +202,9 @@ func AddConnection(c net.Conn, t ConnectionType) *Connection {
 		connection.fsm = &fsm
 	}
 
-	allConnections[connection.id] = connection
+	allConnections.Store(connection.id, connection)
+
+	connectionNum.WithLabelValues(t.String()).Inc()
 
 	return connection
 }
@@ -197,7 +212,9 @@ func AddConnection(c net.Conn, t ConnectionType) *Connection {
 func RemoveConnection(c *Connection) {
 	atomic.AddInt32(&c.removing, 1)
 	c.conn.Close()
-	delete(allConnections, c.id)
+	allConnections.Delete(c.id)
+
+	connectionNum.WithLabelValues(c.connectionType.String()).Dec()
 }
 
 func (c *Connection) IsRemoving() bool {
@@ -217,17 +234,25 @@ func readBytes(c *Connection, len uint) ([]byte, error) {
 	if _, err := io.ReadFull(c.reader, bytes); err != nil {
 		switch err := err.(type) {
 		case *net.OpError:
-			log.Printf("%s %s error: %s\n", c.String(), err.Op, c.conn.RemoteAddr().String())
+			c.Logger().Warn("read bytes",
+				zap.String("op", err.Op),
+				zap.String("remoteAddr", c.conn.RemoteAddr().String()),
+				zap.Error(err),
+			)
 			RemoveConnection(c)
 			return nil, &closeError{err}
 		case *websocket.CloseError:
-			log.Printf("%s disconnected: %s\n", c.String(), c.conn.RemoteAddr().String())
+			c.Logger().Info("disconnected",
+				zap.String("remoteAddr", c.conn.RemoteAddr().String()),
+			)
 			RemoveConnection(c)
 			return nil, &closeError{err}
 		}
 
 		if err == io.EOF {
-			log.Printf("%s disconnected: %s\n", c.String(), c.conn.RemoteAddr().String())
+			c.Logger().Info("disconnected",
+				zap.String("remoteAddr", c.conn.RemoteAddr().String()),
+			)
 			RemoveConnection(c)
 			return nil, &closeError{err}
 		}
@@ -246,9 +271,16 @@ func _(c *Connection) (uint32, error) {
 }
 
 func (c *Connection) ReceivePacket() {
+	// FIXME: read all bytes once into a buffer
 	tag, err := readBytes(c, 4)
-	if err != nil || tag[0] != 67 {
-		log.Println("Invalid tag:", tag, ", the packet will be dropped.", err)
+	if err != nil {
+		return
+	}
+	if tag[0] != 67 {
+		c.Logger().Warn("invalid tag, the packet will be dropped",
+			zap.ByteString("tag", tag),
+			zap.Error(err),
+		)
 		_, isClosed := err.(*closeError)
 		if !isClosed {
 			// Drop the packet
@@ -266,28 +298,35 @@ func (c *Connection) ReceivePacket() {
 
 	bytes := make([]byte, packetSize)
 	if _, err := io.ReadFull(c.reader, bytes); err != nil {
-		log.Panic("Error reading packet: ", err)
+		c.Logger().Error("reading packet", zap.Error(err))
+		return
 	}
+
+	bytesReceived.Add(float64(packetSize + 4))
 
 	var p proto.Packet
 	if err := protobuf.Unmarshal(bytes, &p); err != nil {
-		log.Panic("Error unmarshalling packet: ", err)
+		c.Logger().Error("unmarshalling packet", zap.Error(err))
+		return
 	}
 
 	channel := GetChannel(ChannelId(p.ChannelId))
 	if channel == nil {
-		log.Println("Can't find channel by ID: ", p.ChannelId)
+		c.Logger().Warn("can't find channel",
+			zap.Uint32("channelId", p.ChannelId),
+			zap.Uint32("msgType", p.MsgType),
+		)
 		return
 	}
 
 	entry := MessageMap[proto.MessageType(p.MsgType)]
 	if entry == nil && p.MsgType < uint32(proto.MessageType_USER_SPACE_START) {
-		log.Printf("%s sent undefined message type: %d\n", c, p.MsgType)
+		c.Logger().Error("undefined message type", zap.Uint32("msgType", p.MsgType))
 		return
 	}
 
 	if !c.fsm.IsAllowed(p.MsgType) {
-		log.Printf("%s doesn't allow message type %d for current state.\n", c, p.MsgType)
+		c.Logger().Warn("message is not allowed for current state", zap.Uint32("msgType", p.MsgType))
 		return
 	}
 
@@ -303,7 +342,8 @@ func (c *Connection) ReceivePacket() {
 		msg = protobuf.Clone(entry.msg)
 		err = protobuf.Unmarshal(p.MsgBody, msg)
 		if err != nil {
-			log.Panicln(err)
+			c.Logger().Error("unmarshalling message", zap.Error(err))
+			return
 		}
 	}
 
@@ -312,10 +352,9 @@ func (c *Connection) ReceivePacket() {
 	channel.PutMessage(msg, handler, c, &p)
 
 	// TODO: record to Prometheus
-	// Measures: connection num, channel num, network bandwidth, packet receive rate, send rate, CPU usage, memory usage
+	// Measures: connection num, channel num, CPU usage, memory usage
 
 	packetReceived.WithLabelValues(
-		strconv.Itoa(packetSize),
 		strconv.FormatUint(uint64(p.ChannelId), 10),
 		strconv.FormatUint(uint64(p.MsgType), 10),
 	).Inc()
@@ -329,13 +368,13 @@ func (c *Connection) Send(ctx MessageContext) {
 	c.sender.Send(c, ctx)
 }
 
-func WritePacket(writer io.Writer, channelId uint32, broadcast proto.BroadcastType, stubId uint32, msgType uint32, msg Message) error {
+func WritePacket(writer io.Writer, channelId uint32, broadcast proto.BroadcastType, stubId uint32, msgType uint32, msg Message) (int, error) {
 	msgBody, err := protobuf.Marshal(msg)
 	if err != nil {
-		return fmt.Errorf("failed to marshal message %d: %s. Error: %v", msgType, msg, err)
+		return 0, fmt.Errorf("failed to marshal message %d: %s. Error: %w", msgType, msg, err)
 	}
 	if len(msgBody) >= (1 << 24) {
-		return fmt.Errorf("message body is too large, size: %d. Error: %v", len(msgBody), err)
+		return 0, fmt.Errorf("message body is too large, size: %d. Error: %w", len(msgBody), err)
 	}
 
 	bytes, err := protobuf.Marshal(&proto.Packet{
@@ -346,7 +385,7 @@ func WritePacket(writer io.Writer, channelId uint32, broadcast proto.BroadcastTy
 		MsgBody:   msgBody,
 	})
 	if err != nil {
-		return fmt.Errorf("error marshalling packet: %v", err)
+		return 0, fmt.Errorf("error marshalling packet: %w", err)
 	}
 
 	// 'CHNL' in ASCII
@@ -359,17 +398,25 @@ func WritePacket(writer io.Writer, channelId uint32, broadcast proto.BroadcastTy
 	if len > 0xffff {
 		tag[1] = byte((len >> 16) & 0xff)
 	}
+	/* Avoid writing multple times. With WebSocket, every Write() sends a message.
 	writer.Write(tag)
-	writer.Write(bytes)
-	return nil
+	*/
+
+	return writer.Write(append(tag, bytes...))
 }
 
 func (c *Connection) Flush() {
 	for len(c.sendQueue) > 0 {
 		e := <-c.sendQueue
-		err := WritePacket(c.writer, uint32(e.Channel.id), proto.BroadcastType_NO, e.StubId, uint32(e.MsgType), e.Msg)
+		len, err := WritePacket(c.writer, uint32(e.Channel.id), proto.BroadcastType_NO, e.StubId, uint32(e.MsgType), e.Msg)
 		if err != nil {
-			log.Println(err)
+			c.Logger().Error("flushing packet", zap.Uint32("msgType", uint32(e.MsgType)), zap.Error(err))
+		} else {
+			packetSent.WithLabelValues(
+				strconv.FormatUint(uint64(e.Channel.id), 10),
+				strconv.FormatUint(uint64(e.MsgType), 10),
+			).Inc()
+			bytesSent.Add(float64(len))
 		}
 	}
 
@@ -378,4 +425,13 @@ func (c *Connection) Flush() {
 
 func (c *Connection) String() string {
 	return fmt.Sprintf("Connection(%s %d %s)", c.connectionType, c.id, c.fsm.CurrentState().Name)
+}
+
+// FIXME: every call clones the logger!
+func (c *Connection) Logger() *zap.Logger {
+	return logger.With(
+		zap.String("connType", c.connectionType.String()),
+		zap.Uint32("connId", uint32(c.id)),
+		zap.String("connState", c.fsm.CurrentState().Name),
+	)
 }

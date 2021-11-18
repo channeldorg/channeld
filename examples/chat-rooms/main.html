@@ -15,8 +15,10 @@ window.addEventListener("load", function(evt) {
     var appendMessage = function(message) {
         var d = document.createElement("div");
         d.textContent = message;
+        var isAtBottom = (output.scrollHeight - Math.abs(output.scrollTop) === output.clientHeight)
         output.appendChild(d);
-        output.scroll(0, output.scrollHeight);
+        if (isAtBottom)
+            output.scroll(0, output.scrollHeight);
     };
 
     var appendLog = function(message, color) {

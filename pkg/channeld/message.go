@@ -1,10 +1,10 @@
 package channeld
 
 import (
-	"log"
 	"strings"
 
 	"channeld.clewcat.com/channeld/proto"
+	"go.uber.org/zap"
 	protobuf "google.golang.org/protobuf/proto"
 )
 
@@ -46,10 +46,17 @@ func handleUserSpaceMessage(ctx MessageContext) {
 			if ctx.Channel.enableClientBroadcast {
 				ctx.Channel.Broadcast(ctx)
 			} else {
-				log.Panicf("%s attempted to broadcast message(%d) while %s's client broadcasting is disabled.\n", ctx.Connection, ctx.MsgType, ctx.Channel)
+				ctx.Connection.Logger().Error("illegal attempt to broadcast message as the channel's client broadcasting is disabled",
+					zap.Uint32("msgType", uint32(ctx.MsgType)),
+					zap.String("channelType", ctx.Channel.channelType.String()),
+					zap.Uint32("channelId", uint32(ctx.Channel.id)),
+				)
 			}
 		} else {
-			log.Printf("%s sent a user-space message(%d) but %s has no owner to forward the message.\n", ctx.Connection, ctx.MsgType, ctx.Channel)
+			ctx.Channel.Logger().Error("channel has no owner to forward the user-space messaged",
+				zap.Uint32("msgType", uint32(ctx.MsgType)),
+				zap.Uint32("connId", uint32(ctx.Connection.id)),
+			)
 		}
 	} else {
 		ctx.Channel.Broadcast(ctx)
@@ -58,11 +65,13 @@ func handleUserSpaceMessage(ctx MessageContext) {
 
 func handleAuth(ctx MessageContext) {
 	if ctx.Channel != globalChannel {
-		log.Panicln("Illegal attemp to authenticate outside the GLOBAL channel: ", ctx.Connection)
+		ctx.Connection.Logger().Error("illegal attemp to authenticate outside the GLOBAL channel")
+		return
 	}
 	_, ok := ctx.Msg.(*proto.AuthMessage)
 	if !ok {
-		log.Panicln("Message is not a AuthMessage, will not be handled.")
+		ctx.Connection.Logger().Error("mssage is not a AuthMessage, will not be handled.")
+		return
 	}
 	//log.Printf("Auth PIT: %s, LT: %s\n", msg.PlayerIdentifierToken, msg.LoginToken)
 
@@ -80,34 +89,48 @@ func handleAuth(ctx MessageContext) {
 func handleCreateChannel(ctx MessageContext) {
 	// Only the GLOBAL channel can handle channel creation/deletion/listing
 	if ctx.Channel != globalChannel {
-		log.Panicln("Illegal attemp to create channel outside the GLOBAL channel, connection: ", ctx.Connection)
+		ctx.Connection.Logger().Error("illegal attemp to create channel outside the GLOBAL channel")
+		return
 	}
 
 	msg, ok := ctx.Msg.(*proto.CreateChannelMessage)
 	if !ok {
-		log.Panicln("Message is not a CreateChannelMessage, will not be handled.")
+		ctx.Connection.Logger().Error("message is not a CreateChannelMessage, will not be handled.")
+		return
 	}
 
 	var newChannel *Channel
+	var err error
 	if msg.ChannelType == proto.ChannelType_UNKNOWN {
-		log.Panicln("Illegal attempt to create the UNKNOWN channel, connection: ", ctx.Connection)
+		ctx.Connection.Logger().Error("illegal attemp to create the UNKNOWN channel")
+		return
 	} else if msg.ChannelType == proto.ChannelType_GLOBAL {
 		// Global channel is initially created by the system. Creating the channel will attempt to own it.
 		newChannel = globalChannel
 		if globalChannel.ownerConnection == nil {
 			globalChannel.ownerConnection = ctx.Connection
 		} else {
-			log.Panicln("Illegal attempt to create the GLOBAL channel, connection: ", ctx.Connection)
+			ctx.Connection.Logger().Error("illegal attemp to create the GLOBAL channel")
+			return
 		}
 	} else {
-		newChannel = CreateChannel(msg.ChannelType, ctx.Connection)
+		newChannel, err = CreateChannel(msg.ChannelType, ctx.Connection)
+		if err != nil {
+			ctx.Connection.Logger().Error("failed to create channel",
+				zap.Uint32("channelType", uint32(msg.ChannelType)),
+				zap.Error(err),
+			)
+			return
+		}
 	}
+	newChannel.Logger().Info("created channel with owner", zap.Uint32("ownerConnId", uint32(newChannel.ownerConnection.id)))
 
 	newChannel.metadata = msg.Metadata
 	if msg.Data != nil {
 		dataMsg, err := msg.Data.UnmarshalNew()
 		if err != nil {
-			log.Printf("Failed to unmarshal data message when creating %s, error: %s\n", newChannel, err)
+			newChannel.Logger().Error("failed to unmarshal data message for the new channel", zap.Error(err))
+			return
 		} else {
 			newChannel.InitData(dataMsg, nil)
 		}
@@ -115,47 +138,76 @@ func handleCreateChannel(ctx MessageContext) {
 
 	// Subscribe to channel after creation
 	ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
-	// Also send the Sub message to the creator (no need to broadcast as there's only 1 subscriptor)
-	ctx.Connection.sendSubscribed(ctx, newChannel)
+	// Also send the Sub message to the creator (no need to broadcast as there's only 1 subscriber)
+	ctx.Connection.sendSubscribed(ctx, newChannel, ctx.StubId)
 }
 
 func handleRemoveChannel(ctx MessageContext) {
 	if ctx.Channel != globalChannel {
-		log.Panicln("Illegal attemp to remove channel outside the GLOBAL channel, connection: ", ctx.Connection)
+		ctx.Connection.Logger().Error("illegal attemp to remove channel outside the GLOBAL channel")
+		return
 	}
 
-	_, ok := ctx.Msg.(*proto.RemoveChannelMessage)
+	msg, ok := ctx.Msg.(*proto.RemoveChannelMessage)
 	if !ok {
-		log.Panicln("Message is not a RemoveChannelMessage, will not be handled.")
+		ctx.Connection.Logger().Error("message is not a RemoveChannelMessage, will not be handled.")
+		return
 	}
 
+	channelToRemove := GetChannel(ChannelId(msg.ChannelId))
+	if channelToRemove == nil {
+		ctx.Connection.Logger().Error("invalid channelId for removing", zap.Uint32("channelId", msg.ChannelId))
+		return
+	}
 	// Only the owner can remove the channel
-	if ctx.Channel.ownerConnection != ctx.Connection {
-		log.Panicf("%s tried to remove %s but it's not the owner.", ctx.Connection, ctx.Channel)
+	if channelToRemove.ownerConnection != ctx.Connection {
+		ownerConnId := uint32(0)
+		if channelToRemove.ownerConnection != nil {
+			ownerConnId = uint32(channelToRemove.ownerConnection.id)
+		}
+		ctx.Connection.Logger().Error("illegal attemp to remove channel as the connection is not the channel owner",
+			zap.String("channelType", channelToRemove.channelType.String()),
+			zap.Uint32("channelId", uint32(channelToRemove.id)),
+			zap.Uint32("ownerConnId", ownerConnId),
+		)
+		return
 	}
 
-	for connId := range ctx.Channel.subscribedConnections {
+	for connId := range channelToRemove.subscribedConnections {
 		sc := GetConnection(connId)
-		sc.sendUnsubscribed(ctx, ctx.Channel)
-		//sc.Flush()
+		if sc != nil {
+			//sc.sendUnsubscribed(ctx, channelToRemove, 0)
+			respond := ctx
+			respond.StubId = 0
+			sc.Send(respond)
+		}
 	}
-	RemoveChannel(ctx.Channel)
+	RemoveChannel(channelToRemove)
+
+	ctx.Connection.Logger().Info("removed channel",
+		zap.String("channelType", channelToRemove.channelType.String()),
+		zap.Uint32("channelId", uint32(channelToRemove.id)),
+		zap.Int("subs", len(channelToRemove.subscribedConnections)),
+	)
 }
 
 func handleListChannel(ctx MessageContext) {
 	if ctx.Channel != globalChannel {
-		log.Panicln("Illegal attemp to list channel outside the GLOBAL channel, connection: ", ctx.Connection)
+		ctx.Connection.Logger().Error("illegal attemp to list channel outside the GLOBAL channel")
+		return
 	}
 
 	msg, ok := ctx.Msg.(*proto.ListChannelMessage)
 	if !ok {
-		log.Panicln("Message is not a ListChannelMessage, will not be handled.")
+		ctx.Connection.Logger().Error("message is not a ListChannelMessage, will not be handled.")
+		return
 	}
 
 	result := make([]*proto.ListChannelResultMessage_ChannelInfo, 0)
-	for _, channel := range allChannels {
+	allChannels.Range(func(k interface{}, v interface{}) bool {
+		channel := v.(*Channel)
 		if msg.TypeFilter != proto.ChannelType_UNKNOWN && msg.TypeFilter != channel.channelType {
-			continue
+			return true
 		}
 		matched := len(msg.MetadataFilters) == 0
 		for _, keyword := range msg.MetadataFilters {
@@ -171,7 +223,8 @@ func handleListChannel(ctx MessageContext) {
 				Metadata:    channel.metadata,
 			})
 		}
-	}
+		return true
+	})
 
 	ctx.Msg = &proto.ListChannelResultMessage{
 		Channels: result,
@@ -182,53 +235,72 @@ func handleListChannel(ctx MessageContext) {
 func handleSubToChannel(ctx MessageContext) {
 	msg, ok := ctx.Msg.(*proto.SubscribedToChannelMessage)
 	if !ok {
-		log.Panicln("Message is not a SubscribedToChannelMessage, will not be handled.")
+		ctx.Connection.Logger().Error("message is not a SubscribedToChannelMessage, will not be handled.")
+		return
 	}
 
 	// The connection that subscribes. Could be different to the connection that sends the message.
 	connToSub := GetConnection(ConnectionId(msg.ConnId))
 	if connToSub == nil {
-		log.Panicln("Invalid ConnectionId:", msg.ConnId)
+		ctx.Connection.Logger().Error("invalid ConnectionId for sub", zap.Uint32("connId", msg.ConnId))
+		return
 	}
 
 	if connToSub.id != ctx.Connection.id && ctx.Connection != ctx.Channel.ownerConnection {
-		log.Panicf("%s is not the channel owner but tried to subscribe %s to %s\n", ctx.Connection, connToSub, ctx.Channel)
+		ctx.Connection.Logger().Error("illegal attemp to sub another connection as the sender is not the channel owener",
+			zap.Uint32("subConnId", msg.ConnId),
+			zap.String("channelType", ctx.Channel.channelType.String()),
+			zap.Uint32("channelId", uint32(ctx.Channel.id)),
+		)
+		return
 	}
 
 	err := connToSub.SubscribeToChannel(ctx.Channel, msg.SubOptions)
 	if err != nil {
-		log.Panicf("%s failed to subscribe to %s, error: %s\n", connToSub, ctx.Channel, err)
+		ctx.Connection.Logger().Error("failed to sub to channel",
+			zap.String("channelType", ctx.Channel.channelType.String()),
+			zap.Uint32("channelId", uint32(ctx.Channel.id)),
+			zap.Error(err),
+		)
+		return
 	}
 
-	connToSub.sendSubscribed(ctx, ctx.Channel)
+	connToSub.sendSubscribed(ctx, ctx.Channel, ctx.StubId)
 	if ctx.Channel.ownerConnection != nil {
-		ctx.Channel.ownerConnection.sendSubscribed(ctx, ctx.Channel)
+		ctx.Channel.ownerConnection.sendSubscribed(ctx, ctx.Channel, 0)
 	}
 }
 
 func handleUnsubToChannel(ctx MessageContext) {
 	msg, ok := ctx.Msg.(*proto.UnsubscribedToChannelMessage)
 	if !ok {
-		log.Panicln("Message is not a UnsubscribedToChannelMessage, will not be handled.")
+		ctx.Connection.Logger().Error("message is not a UnsubscribedToChannelMessage, will not be handled.")
+		return
 	}
 
 	// The connection that unsubscribes. Could be different to c which sends the message.
 	connToUnsub := GetConnection(ConnectionId(msg.ConnId))
 	if connToUnsub == nil {
-		log.Panicln("Invalid ConnectionId:", msg.ConnId)
+		ctx.Connection.Logger().Error("invalid ConnectionId for unsub", zap.Uint32("connId", msg.ConnId))
+		return
 	}
 	err := connToUnsub.UnsubscribeToChannel(ctx.Channel)
 	if err != nil {
-		log.Panicf("%s failed to unsubscribe to %s, error: %s\n", connToUnsub, ctx.Channel, err)
+		ctx.Connection.Logger().Error("failed to unsub to channel",
+			zap.String("channelType", ctx.Channel.channelType.String()),
+			zap.Uint32("channelId", uint32(ctx.Channel.id)),
+			zap.Error(err),
+		)
+		return
 	}
 
-	connToUnsub.sendUnsubscribed(ctx, ctx.Channel)
+	connToUnsub.sendUnsubscribed(ctx, ctx.Channel, ctx.StubId)
 	if ctx.Channel.ownerConnection != nil {
 		if ctx.Channel.ownerConnection == connToUnsub {
 			// Reset the owner if it unsubscribed
 			ctx.Channel.ownerConnection = nil
 		} else {
-			ctx.Channel.ownerConnection.sendUnsubscribed(ctx, ctx.Channel)
+			ctx.Channel.ownerConnection.sendUnsubscribed(ctx, ctx.Channel, 0)
 		}
 	}
 }
@@ -238,22 +310,28 @@ func handleChannelDataUpdate(ctx MessageContext) {
 	if ctx.Channel.ownerConnection != ctx.Connection {
 		cs := ctx.Channel.subscribedConnections[ctx.Connection.id]
 		if cs == nil || !cs.options.CanUpdateData {
-			log.Panicf("%s tries to update %s but has no access.\n", ctx.Connection, ctx.Channel)
+			ctx.Connection.Logger().Error("attempt to update channel data but has no access",
+				zap.String("channelType", ctx.Channel.channelType.String()),
+				zap.Uint32("channelId", uint32(ctx.Channel.id)),
+			)
+			return
 		}
 	}
 
 	msg, ok := ctx.Msg.(*proto.ChannelDataUpdateMessage)
 	if !ok {
-		log.Panicln("Message is not a ChannelDataUpdateMessage, will not be handled.")
+		ctx.Connection.Logger().Error("message is not a ChannelDataUpdateMessage, will not be handled.")
+		return
 	}
 	updateMsg, err := msg.Data.UnmarshalNew()
 	if err != nil {
-		log.Panicln(err)
+		ctx.Connection.Logger().Error("failed to unmarshal channel update data", zap.Error(err))
+		return
 	}
 
 	if ctx.Channel.Data() == nil {
 		ctx.Channel.InitData(updateMsg, nil)
-		log.Printf("%s initialized data from update msg: %s\n", ctx.Channel, updateMsg)
+		ctx.Channel.Logger().Info("initialized channel data from update msg", zap.Any("msg", updateMsg))
 	} else {
 		ctx.Channel.Data().OnUpdate(updateMsg, ctx.Channel.GetTime())
 	}

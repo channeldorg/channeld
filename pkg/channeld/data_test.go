@@ -64,14 +64,14 @@ func testChannelDataMessageProcessor(msg Message) (Message, error) {
 // See the test case in [the design doc](doc/design.md#fan-out)
 // TODO: add test cases with FieldMasks (no fan-out if no property is updated)
 func TestFanOutChannelData(t *testing.T) {
-	InitConnections(3, "", "")
+	InitLogsAndMetrics()
 	InitChannels()
 
 	c0 := addTestConnectionWithProcessor(SERVER, testChannelDataMessageProcessor)
 	c1 := addTestConnectionWithProcessor(CLIENT, testChannelDataMessageProcessor)
 	c2 := addTestConnectionWithProcessor(CLIENT, testChannelDataMessageProcessor)
 
-	testChannel := CreateChannel(proto.ChannelType_TEST, c0)
+	testChannel, _ := CreateChannel(proto.ChannelType_TEST, c0)
 	dataMsg := &proto.TestChannelDataMessage{
 		Text: "a",
 		Num:  1,
@@ -185,7 +185,8 @@ func TestDataMergeOptions(t *testing.T) {
 }
 
 func TestReflectChannelData(t *testing.T) {
-	globalData := ReflectChannelData(proto.ChannelType_TEST, nil)
+	globalData, err := ReflectChannelData(proto.ChannelType_TEST, nil)
+	assert.NoError(t, err)
 	assert.NotNil(t, globalData)
 	assert.IsType(t, &proto.TestChannelDataMessage{}, globalData.msg)
 }

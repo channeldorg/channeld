@@ -3,9 +3,10 @@ package fsm
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"strconv"
 	"strings"
+
+	"go.uber.org/zap"
 )
 
 type State struct {
@@ -43,18 +44,18 @@ func parseMsgTypes(s string, f func(msgType uint32)) {
 		if len(fromTo) == 1 {
 			msgType, err := strconv.ParseUint(fromTo[0], 10, 32)
 			if err != nil {
-				log.Panicf("Can't convert '%s' to uint32\n", fromTo[0])
+				logger.Errorf("Can't convert '%s' to uint32\n", fromTo[0])
 			} else {
 				f(uint32(msgType))
 			}
 		} else {
 			fromType, err := strconv.ParseUint(fromTo[0], 10, 32)
 			if err != nil {
-				log.Panicf("Can't convert '%s' to uint32\n", fromTo[0])
+				logger.Errorf("Can't convert '%s' to uint32\n", fromTo[0])
 			} else {
 				toType, err := strconv.ParseUint(fromTo[1], 10, 32)
 				if err != nil {
-					log.Panicf("Can't convert '%s' to uint32\n", fromTo[1])
+					logger.Errorf("Can't convert '%s' to uint32\n", fromTo[1])
 				} else {
 					for i := fromType; i <= toType; i += 1 {
 						f(uint32(i))
@@ -66,7 +67,15 @@ func parseMsgTypes(s string, f func(msgType uint32)) {
 	}
 }
 
+var logger *zap.SugaredLogger
+
 func Load(bytes []byte) (FiniteStateMachine, error) {
+	if logger == nil {
+		l, _ := zap.NewProduction()
+		defer l.Sync()
+		logger = l.Sugar()
+	}
+
 	var fsm FiniteStateMachine
 	err := json.Unmarshal(bytes, &fsm)
 	if err == nil {
@@ -89,12 +98,12 @@ func Load(bytes []byte) (FiniteStateMachine, error) {
 		for _, transition := range fsm.Transitions {
 			fromState, exists := fsm.stateNameMap[transition.FromState]
 			if !exists {
-				log.Printf("Invalid FromState in StateTransition: %s -> %s (%d)\n", transition.FromState, transition.ToState, transition.MsgType)
+				logger.Errorf("invalid FromState in StateTransition: %s -> %s (%d)\n", transition.FromState, transition.ToState, transition.MsgType)
 				continue
 			}
 			toState, exists := fsm.stateNameMap[transition.ToState]
 			if !exists {
-				log.Printf("Invalid ToState in StateTransition: %s -> %s (%d)\n", transition.FromState, transition.ToState, transition.MsgType)
+				logger.Errorf("invalid ToState in StateTransition: %s -> %s (%d)\n", transition.FromState, transition.ToState, transition.MsgType)
 				continue
 			}
 			fromState.transitions[transition.MsgType] = toState

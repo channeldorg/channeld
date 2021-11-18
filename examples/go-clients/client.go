@@ -1,11 +1,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"channeld.clewcat.com/channeld/proto"
@@ -22,10 +23,11 @@ type messageMapEntry struct {
 
 type Client struct {
 	Id                 uint32
-	subscribedChannels []uint32
+	subscribedChannels map[uint32]struct{}
 	conn               net.Conn
 	messageMap         map[uint32]*messageMapEntry
 	stubCallbacks      map[uint32]MessageHandlerFunc
+	writeMutex         sync.Mutex
 }
 
 func NewClient(addr string) (*Client, error) {
@@ -44,7 +46,7 @@ func NewClient(addr string) (*Client, error) {
 		}
 	}
 	c := &Client{
-		subscribedChannels: make([]uint32, 0),
+		subscribedChannels: make(map[uint32]struct{}),
 		conn:               conn,
 		messageMap:         make(map[uint32]*messageMapEntry),
 		stubCallbacks: map[uint32]MessageHandlerFunc{
@@ -55,7 +57,7 @@ func NewClient(addr string) (*Client, error) {
 
 	c.SetMessageEntry(uint32(proto.MessageType_AUTH), &proto.AuthResultMessage{}, defaultMessageHandler)
 	c.SetMessageEntry(uint32(proto.MessageType_CREATE_CHANNEL), &proto.CreateChannelMessage{}, defaultMessageHandler)
-	c.SetMessageEntry(uint32(proto.MessageType_REMOVE_CHANNEL), &proto.RemoveChannelMessage{}, defaultMessageHandler)
+	c.SetMessageEntry(uint32(proto.MessageType_REMOVE_CHANNEL), &proto.RemoveChannelMessage{}, handleRemoveChannel)
 	c.SetMessageEntry(uint32(proto.MessageType_AUTH), &proto.AuthResultMessage{}, defaultMessageHandler)
 	c.SetMessageEntry(uint32(proto.MessageType_SUB_TO_CHANNEL), &proto.SubscribedToChannelMessage{}, handleSubToChannel)
 	c.SetMessageEntry(uint32(proto.MessageType_UNSUB_TO_CHANNEL), &proto.UnsubscribedToChannelMessage{}, handleUnsubToChannel)
@@ -104,18 +106,17 @@ func (client *Client) Auth(lt string, pit string) chan *proto.AuthResultMessage 
 	return result
 }
 
+func handleRemoveChannel(client *Client, channelId uint32, m Message) {
+	msg := m.(*proto.RemoveChannelMessage)
+	delete(client.subscribedChannels, msg.ChannelId)
+}
+
 func handleSubToChannel(client *Client, channelId uint32, m Message) {
-	client.subscribedChannels = append(client.subscribedChannels, channelId)
+	client.subscribedChannels[channelId] = struct{}{}
 }
 
 func handleUnsubToChannel(c *Client, channelId uint32, m Message) {
-	for i, chid := range c.subscribedChannels {
-		if chid == channelId {
-			c.subscribedChannels[i] = c.subscribedChannels[len(c.subscribedChannels)-1]
-			c.subscribedChannels = c.subscribedChannels[:len(c.subscribedChannels)-1]
-			return
-		}
-	}
+	delete(c.subscribedChannels, channelId)
 }
 
 func defaultMessageHandler(client *Client, channelId uint32, m Message) {
@@ -139,11 +140,11 @@ func readBytes(conn net.Conn, len uint) ([]byte, error) {
 	return bytes, nil
 }
 
-func (client *Client) Receive() {
+func (client *Client) Receive() error {
+
 	tag, err := readBytes(client.conn, 4)
 	if err != nil || tag[0] != 67 {
-		log.Println("Invalid tag:", tag, ", the packet will be dropped.", err)
-		return
+		return fmt.Errorf("invalid tag: %s, the packet will be dropped: %w", tag, err)
 	}
 
 	packetSize := int(tag[3])
@@ -155,25 +156,24 @@ func (client *Client) Receive() {
 
 	bytes := make([]byte, packetSize)
 	if _, err := io.ReadFull(client.conn, bytes); err != nil {
-		log.Panic("Error reading packet: ", err)
+		return fmt.Errorf("error reading packet: %w", err)
 	}
 
 	var p proto.Packet
 	if err := protobuf.Unmarshal(bytes, &p); err != nil {
-		log.Panic("Error unmarshalling packet: ", err)
+		return fmt.Errorf("error unmarshalling packet: %w", err)
 	}
 
 	entry := client.messageMap[p.MsgType]
 	if entry == nil {
-		log.Printf("No message type registered: %d", p.MsgType)
-		return
+		return fmt.Errorf("no message type registered: %d", p.MsgType)
 	}
 
 	// Always make a clone!
 	msg := protobuf.Clone(entry.msg)
 	err = protobuf.Unmarshal(p.MsgBody, msg)
 	if err != nil {
-		log.Panicln(err)
+		return fmt.Errorf("failed to unmarshal message: %w", err)
 	}
 
 	for _, handler := range entry.handlers {
@@ -186,6 +186,7 @@ func (client *Client) Receive() {
 			callback(client, p.ChannelId, msg)
 		}
 	}
+	return nil
 }
 
 func (client *Client) Send(channelId uint32, broadcast proto.BroadcastType, msgType uint32, msg Message, callback MessageHandlerFunc) error {
@@ -199,10 +200,10 @@ func (client *Client) Send(channelId uint32, broadcast proto.BroadcastType, msgT
 
 	msgBody, err := protobuf.Marshal(msg)
 	if err != nil {
-		return fmt.Errorf("failed to marshal message %d: %s. Error: %v", msgType, msg, err)
+		return fmt.Errorf("failed to marshal message %d: %s. Error: %w", msgType, msg, err)
 	}
 	if len(msgBody) >= (1 << 24) {
-		return fmt.Errorf("message body is too large, size: %d. Error: %v", len(msgBody), err)
+		return fmt.Errorf("message body is too large, size: %d. Error: %w", len(msgBody), err)
 	}
 
 	bytes, err := protobuf.Marshal(&proto.Packet{
@@ -213,7 +214,7 @@ func (client *Client) Send(channelId uint32, broadcast proto.BroadcastType, msgT
 		MsgBody:   msgBody,
 	})
 	if err != nil {
-		return fmt.Errorf("error marshalling packet: %v", err)
+		return fmt.Errorf("error marshalling packet: %w", err)
 	}
 
 	// 'CHNL' in ASCII
@@ -226,6 +227,9 @@ func (client *Client) Send(channelId uint32, broadcast proto.BroadcastType, msgT
 	if len > 0xffff {
 		tag[1] = byte((len >> 16) & 0xff)
 	}
+
+	client.writeMutex.Lock()
+	defer client.writeMutex.Unlock()
 	/* With WebSocket, every Write() sends a message.
 	client.conn.Write(tag)
 	client.conn.Write(bytes)
@@ -242,7 +246,15 @@ type wsConn struct {
 
 func (c *wsConn) Read(b []byte) (n int, err error) {
 	if c.readBuf == nil || c.readIdx >= len(c.readBuf) {
+		defer func() {
+			if recover() != nil {
+				err = errors.New("read on failed connection")
+			}
+		}()
 		_, c.readBuf, err = c.conn.ReadMessage()
+		if err != nil {
+			return 0, err
+		}
 		c.readIdx = 0
 	}
 	n = copy(b, c.readBuf[c.readIdx:])

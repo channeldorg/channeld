@@ -11,16 +11,16 @@ import (
 )
 
 func TestHandleListChannels(t *testing.T) {
-	InitConnections(1, "", "")
+	InitLogsAndMetrics()
 	InitChannels()
 	c := addTestConnection(SERVER)
 	ch0 := globalChannel
-	ch1 := CreateChannel(proto.ChannelType_PRIVATE, c)
-	ch2 := CreateChannel(proto.ChannelType_SUBWORLD, c)
-	ch3 := CreateChannel(proto.ChannelType_SUBWORLD, c)
-	ch4 := CreateChannel(proto.ChannelType_TEST, c)
-	ch5 := CreateChannel(proto.ChannelType_TEST, c)
-	ch6 := CreateChannel(proto.ChannelType_TEST, c)
+	ch1, _ := CreateChannel(proto.ChannelType_PRIVATE, c)
+	ch2, _ := CreateChannel(proto.ChannelType_SUBWORLD, c)
+	ch3, _ := CreateChannel(proto.ChannelType_SUBWORLD, c)
+	ch4, _ := CreateChannel(proto.ChannelType_TEST, c)
+	ch5, _ := CreateChannel(proto.ChannelType_TEST, c)
+	ch6, _ := CreateChannel(proto.ChannelType_TEST, c)
 
 	ch1.metadata = "aaa"
 	ch2.metadata = "bbb"

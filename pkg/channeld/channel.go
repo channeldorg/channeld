@@ -2,12 +2,14 @@ package channeld
 
 import (
 	"container/list"
+	"errors"
 	"fmt"
-	"log"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"channeld.clewcat.com/channeld/proto"
+	"go.uber.org/zap"
 )
 
 type ChannelState uint8
@@ -46,6 +48,7 @@ type Channel struct {
 	tickInterval          time.Duration
 	tickFrames            int
 	enableClientBroadcast bool
+	logger                *zap.Logger
 	removing              int32
 }
 
@@ -55,22 +58,26 @@ const (
 )
 
 var nextChannelId ChannelId = GlobalChannelId
-var allChannels map[ChannelId]*Channel
+var allChannels sync.Map //map[ChannelId]*Channel
 var globalChannel *Channel
 
 func InitChannels() {
-	allChannels = make(map[ChannelId]*Channel, 1024)
-	globalChannel = CreateChannel(proto.ChannelType_GLOBAL, nil)
-	allChannels[GlobalChannelId] = globalChannel
+	globalChannel, _ = CreateChannel(proto.ChannelType_GLOBAL, nil)
+	allChannels.Store(GlobalChannelId, globalChannel)
 }
 
 func GetChannel(id ChannelId) *Channel {
-	return allChannels[id]
+	ch, ok := allChannels.Load(id)
+	if ok {
+		return ch.(*Channel)
+	} else {
+		return nil
+	}
 }
 
-func CreateChannel(t proto.ChannelType, owner *Connection) *Channel {
+func CreateChannel(t proto.ChannelType, owner *Connection) (*Channel, error) {
 	if t == proto.ChannelType_GLOBAL && globalChannel != nil {
-		log.Panicln("Failed to create WORLD channel as it already exists.")
+		return nil, errors.New("failed to create WORLD channel as it already exists")
 	}
 
 	ch := &Channel{
@@ -86,34 +93,42 @@ func CreateChannel(t proto.ChannelType, owner *Connection) *Channel {
 		startTime:    time.Now(),
 		tickInterval: DefaultTickInterval,
 		tickFrames:   0,
-		removing:     0,
+		logger: logger.With(
+			zap.String("channelType", t.String()),
+			zap.Uint32("channelId", uint32(nextChannelId)),
+		),
+		removing: 0,
 	}
 	if owner == nil {
 		ch.state = INIT
 	} else {
 		ch.state = OPEN
 	}
-	allChannels[nextChannelId] = ch
+	allChannels.Store(nextChannelId, ch)
 	nextChannelId += 1
 	go ch.Tick()
-	return ch
+
+	channelNum.WithLabelValues(ch.channelType.String()).Inc()
+
+	return ch, nil
 }
 
 func RemoveChannel(ch *Channel) {
 	atomic.AddInt32(&ch.removing, 1)
 	close(ch.inMsgQueue)
-	delete(allChannels, ch.id)
+	allChannels.Delete(ch.id)
+
+	channelNum.WithLabelValues(ch.channelType.String()).Dec()
 }
 
 func (ch *Channel) IsRemoving() bool {
 	return ch.removing > 0
 }
 
-func (ch *Channel) String() string {
-	return fmt.Sprintf("Channel(%s %d)", ch.channelType.String(), ch.id)
-}
-
 func (ch *Channel) PutMessage(msg Message, handler MessageHandlerFunc, conn *Connection, p *proto.Packet) {
+	if ch.IsRemoving() {
+		return
+	}
 	ch.inMsgQueue <- channelMessage{ctx: MessageContext{
 		MsgType:    proto.MessageType(p.MsgType),
 		Msg:        msg,
@@ -146,12 +161,15 @@ func (ch *Channel) Tick() {
 		for len(ch.inMsgQueue) > 0 {
 			cm := <-ch.inMsgQueue
 			if cm.ctx.Connection == nil {
-				log.Printf("%s drops message(%d) as the sender is lost.", ch, cm.ctx.MsgType)
+				ch.Logger().Warn("drops message as the sender is lost", zap.Uint32("msgType", uint32(cm.ctx.MsgType)))
 				continue
 			}
 			cm.handler(cm.ctx)
 			if ch.tickInterval > 0 && time.Since(tickStart) >= ch.tickInterval {
-				log.Printf("%s spent %dms handling messages, will delay the left ones(%d) to the next tick.", ch, time.Since(tickStart)/time.Millisecond, len(ch.inMsgQueue))
+				ch.Logger().Warn("spent too long handling messages, will delay the left to the next tick",
+					zap.Duration("duration", time.Since(tickStart)),
+					zap.Int("remaining", len(ch.inMsgQueue)),
+				)
 				break
 			}
 		}
@@ -172,4 +190,12 @@ func (ch *Channel) Broadcast(ctx MessageContext) {
 		}
 		c.Send(ctx)
 	}
+}
+
+func (ch *Channel) String() string {
+	return fmt.Sprintf("Channel(%s %d)", ch.channelType.String(), ch.id)
+}
+
+func (ch *Channel) Logger() *zap.Logger {
+	return ch.logger
 }

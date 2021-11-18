@@ -3,12 +3,12 @@ package channeld
 import (
 	"container/list"
 	"fmt"
-	"log"
 	"strings"
 
 	"channeld.clewcat.com/channeld/proto"
 	"github.com/iancoleman/strcase"
 	"github.com/indiest/fmutils"
+	"go.uber.org/zap"
 	protobuf "google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
@@ -48,27 +48,20 @@ const (
 	MaxUpdateMsgBufferSize = 512
 )
 
-func ReflectChannelData(channelType proto.ChannelType, mergeOptions *DataMergeOptions) *ChannelData {
+func ReflectChannelData(channelType proto.ChannelType, mergeOptions *DataMergeOptions) (*ChannelData, error) {
 	channelTypeName := channelType.String()
 	dataTypeName := fmt.Sprintf("channeld.%sChannelDataMessage",
 		strcase.ToCamel(strings.ToLower(channelTypeName)))
 	dataType, err := protoregistry.GlobalTypes.FindMessageByName(protoreflect.FullName(dataTypeName))
 	if err != nil {
-		log.Panicln("Failed to create data for channel type", channelTypeName)
+		return nil, fmt.Errorf("failed to create data for channel type %s: %w", channelTypeName, err)
 	}
-	/*
-		msgTypeName := "CHANNEL_DATA_" + strings.ToUpper(channelTypeName)
-		msgType, exists := proto.MessageType_value[msgTypeName]
-		if !exists {
-			log.Panicln("Can't find data update message type by name", msgTypeName)
-		}
-	*/
+
 	return &ChannelData{
-		//msgType:         proto.MessageType(msgType),
 		msg:             dataType.New().Interface(),
 		mergeOptions:    mergeOptions,
 		updateMsgBuffer: list.New(),
-	}
+	}, nil
 }
 
 func (ch *Channel) InitData(dataMsg Message, mergeOptions *DataMergeOptions) {
@@ -191,7 +184,8 @@ func (ch *Channel) fanOutDataUpdate(c *Connection, cs *ChannelSubscription, upda
 	fmutils.Filter(updateMsg, cs.options.DataFieldMasks)
 	any, err := anypb.New(updateMsg)
 	if err != nil {
-		log.Panicln(err)
+		ch.Logger().Error("failed to marshal channel update data", zap.Error(err))
+		return
 	}
 	c.Send(MessageContext{
 		MsgType:    proto.MessageType_CHANNEL_DATA_UPDATE,

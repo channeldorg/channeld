@@ -15,20 +15,27 @@
             "MyTestFunction"
         ]
     },
-        {
-            "name": "Launch Package",
-            "type": "go",
-            "request": "launch",
-            "mode": "auto",
-            "program": "${workspaceFolder}"
-        },
-        {
-            "name": "Launch file",
-            "type": "go",
-            "request": "launch",
-            "mode": "debug",
-            "program": "${file}"
-        }
+    {
+        "name": "Launch Package",
+        "type": "go",
+        "request": "launch",
+        "mode": "auto",
+        "program": "${workspaceFolder}"
+    },
+    {
+        "name": "Launch file",
+        "type": "go",
+        "request": "launch",
+        "mode": "debug",
+        "program": "${file}"
+    },
+    {
+        "name": "Launch chat server",
+        "type": "go",
+        "request": "launch",
+        "mode": "debug",
+        "program": "examples/chat-rooms/main.go"
+    }
 
     ]
 }

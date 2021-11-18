@@ -2,10 +2,10 @@ package channeld
 
 import (
 	"container/list"
-	"fmt"
-	"log"
+	"errors"
 
 	"channeld.clewcat.com/channeld/proto"
+	"go.uber.org/zap"
 	protobuf "google.golang.org/protobuf/proto"
 )
 
@@ -23,7 +23,10 @@ type ChannelSubscription struct {
 func (c *Connection) SubscribeToChannel(ch *Channel, options *proto.ChannelSubscriptionOptions) error {
 	cs, exists := ch.subscribedConnections[c.id]
 	if exists {
-		log.Printf("%s already subscribed to %s, the subscription options will be merged.\n", c, ch)
+		c.Logger().Info("already subscribed to channel, the subscription options will be merged",
+			zap.String("channelType", ch.channelType.String()),
+			zap.Uint32("channelId", uint32(ch.id)),
+		)
 		if options != nil {
 			protobuf.Merge(&cs.options, options)
 		}
@@ -59,7 +62,7 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *proto.ChannelSubsc
 func (c *Connection) UnsubscribeToChannel(ch *Channel) error {
 	cs, exists := ch.subscribedConnections[c.id]
 	if !exists {
-		return fmt.Errorf("%s has not subscribed to %s yet", c, ch)
+		return errors.New("subscription does not exist")
 	} else {
 		ch.fanOutQueue.Remove(cs.fanOutElement)
 		delete(ch.subscribedConnections, c.id)
@@ -87,8 +90,9 @@ func (c *Connection) sendConnUnsubscribed(connId ConnectionId, ids ...ChannelId)
 }
 */
 
-func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel) {
+func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel, stubId uint32) {
 	ctx.Channel = ch
+	ctx.StubId = stubId
 	ctx.MsgType = proto.MessageType_SUB_TO_CHANNEL
 	ctx.Msg = &proto.SubscribedToChannelMessage{
 		ConnId:     uint32(c.id),
@@ -96,8 +100,9 @@ func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel) {
 	}
 	c.Send(ctx)
 }
-func (c *Connection) sendUnsubscribed(ctx MessageContext, ch *Channel) {
+func (c *Connection) sendUnsubscribed(ctx MessageContext, ch *Channel, stubId uint32) {
 	ctx.Channel = ch
+	ctx.StubId = stubId
 	ctx.MsgType = proto.MessageType_UNSUB_TO_CHANNEL
 	ctx.Msg = &proto.UnsubscribedToChannelMessage{
 		ConnId: uint32(c.id),
