@@ -1,12 +1,13 @@
 # Core features
-- [x] Channel sub/unsub
+- [x] Channel pub/sub
 - [x] Data update and fan-out
 - [x] FSM-based message filtering
 - [x] Message broadcasting
 - [ ] Authentication
 - [ ] Health check
-- [ ] Spatial-based sub/unsub
-- [ ] Spatial-basd load-balancing
+- [ ] Front-end load-balancing
+- [ ] Spatial-based pub/sub
+- [ ] Back-end load-balancing
 
 # Modules
 - [x] Stub(RPC) support
@@ -14,7 +15,8 @@
 - [ ] KCP support
 - [ ] [Snappy](https://github.com/golang/snappy) compression
 - [ ] [Markov-chain](https://en.wikipedia.org/wiki/Markov_chain) compression
-- [.] Prometheus integration
+- [ ] Encryption
+- [x] Prometheus integration
 
 # Optimizations
 - [x] Read/write the packet using Protobuf
@@ -26,16 +28,22 @@
 - [ ] Scale tests
 
 # SDKs
-- [ ] Javascript SDK
+- [ ] Web SDK
 - [ ] Unity SDK
 - [ ] Unreal SDK
 
 # Example projects
-- [.] Chat rooms
-    - [x] Implement the Javascript framework
+- [.] Web chat rooms
+    - [x] Implement the Javascript client library
     - [x] Implement the commands
-    - [ ] Scale test with 10K connections
-    - [ ] Implement the UI
-- [ ] Seamless world travelling
+    - [.] Scale test with 10K connections
+    - [ ] Complete the UI
+- [ ] Unity relay server
+    - [ ] Implement the C# client library
+    - [ ] Implement the reflection-based schema
+    - [ ] Implement the network replication
+- [ ] Unreal seamless world travelling
+    - [ ] Implement the C++ client library
+    - [ ] Integrate with Unreal's networking stack
+    - [ ] ...
 - [ ] Dynamic region load-balancing
-- [ ] Relay server

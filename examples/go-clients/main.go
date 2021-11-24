@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"os"
 	"sync"
 	"time"
 
@@ -11,12 +12,23 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
+var ServerAddr string = "ws://localhost:12108" //"ws://47.103.129.109:12108"
+
+const (
+	ClientNum                int           = 500
+	MaxChannelNum            int           = 100
+	RunDuration              time.Duration = 120 * time.Second
+	ConnectInterval          time.Duration = 100 * time.Millisecond
+	MaxTickInterval          time.Duration = 50 * time.Millisecond
+	ActionIntervalMultiplier float64       = 0.2
+)
+
 type clientData struct {
 	clientId          uint32
 	rnd               *rand.Rand
 	activeChannelId   uint32
 	createdChannelIds map[uint32]struct{}
-	listedChannels    map[uint32]struct{} //[]*proto.ListChannelResultMessage_ChannelInfo
+	listedChannels    map[uint32]struct{}
 }
 
 type clientAction struct {
@@ -30,7 +42,7 @@ var clientActions = []*clientAction{
 	{
 		name:        "listChannel",
 		probability: 1,
-		minInterval: time.Millisecond * 10000, //2000
+		minInterval: time.Millisecond * 20000, //2000
 		perform: func(client *Client, data *clientData) bool {
 			client.Send(0, proto.BroadcastType_NO, uint32(proto.MessageType_LIST_CHANNEL), &proto.ListChannelMessage{},
 				func(c *Client, channelId uint32, m Message) {
@@ -44,9 +56,13 @@ var clientActions = []*clientAction{
 	},
 	{
 		name:        "createChannel",
-		probability: 0.3,
+		probability: 0.05,
 		minInterval: time.Millisecond * 10000,
 		perform: func(client *Client, data *clientData) bool {
+			if len(data.listedChannels) >= MaxChannelNum {
+				return false
+			}
+
 			client.Send(0, proto.BroadcastType_NO, uint32(proto.MessageType_CREATE_CHANNEL), &proto.CreateChannelMessage{
 				ChannelType: proto.ChannelType_SUBWORLD,
 				Metadata:    fmt.Sprintf("Room%d", data.rnd.Uint32()),
@@ -64,7 +80,7 @@ var clientActions = []*clientAction{
 	},
 	{
 		name:        "removeChannel",
-		probability: 0.5,
+		probability: 0,
 		minInterval: time.Millisecond * 12000,
 		perform: func(client *Client, data *clientData) bool {
 			if len(data.createdChannelIds) == 0 {
@@ -87,7 +103,7 @@ var clientActions = []*clientAction{
 	},
 	{
 		name:        "subToChannel",
-		probability: 0.5,
+		probability: 0.1,
 		minInterval: time.Millisecond * 3000,
 		perform: func(client *Client, data *clientData) bool {
 			if list := data.listedChannels; len(list) > 1 {
@@ -104,6 +120,11 @@ var clientActions = []*clientAction{
 				channelIdToSub := randUint32(copy)
 				client.Send(channelIdToSub, proto.BroadcastType_NO, uint32(proto.MessageType_SUB_TO_CHANNEL), &proto.SubscribedToChannelMessage{
 					ConnId: client.Id,
+					SubOptions: &proto.ChannelSubscriptionOptions{
+						CanUpdateData:    true,
+						FanOutIntervalMs: 100,
+						DataFieldMasks:   []string{},
+					},
 				}, nil)
 				//log.Printf("Client(%d) SUB_TO_CHANNEL: %d", client.Id, channelIdToSub)
 				return true
@@ -113,7 +134,7 @@ var clientActions = []*clientAction{
 	},
 	{
 		name:        "unsubToChannel",
-		probability: 0.5,
+		probability: 0.1,
 		minInterval: time.Millisecond * 3000,
 		perform: func(client *Client, data *clientData) bool {
 			if len(client.subscribedChannels) <= 1 {
@@ -137,10 +158,6 @@ var clientActions = []*clientAction{
 		probability: 1,
 		minInterval: time.Millisecond * 1000,
 		perform: func(client *Client, data *clientData) bool {
-			if data.activeChannelId == 0 {
-				return false
-			}
-
 			dataUpdate, _ := anypb.New(&proto.ChatChannelData{
 				ChatMessages: []*proto.ChatMessage{{
 					Sender:   fmt.Sprintf("Client%d", client.Id),
@@ -183,7 +200,7 @@ func removeChannelId(client *Client, data *clientData, channelId uint32) {
 
 func runClient() {
 	defer wg.Done()
-	c, err := NewClient("ws://localhost:12108")
+	c, err := NewClient(ServerAddr)
 	if err != nil {
 		log.Println(err)
 		return
@@ -198,10 +215,7 @@ func runClient() {
 		}
 	}()
 
-	r := c.Auth("test", "test")
-	if (<-r).Result != proto.AuthResultMessage_SUCCESSFUL {
-		return
-	}
+	c.Auth("test", "test")
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -228,45 +242,49 @@ func runClient() {
 	})
 
 	actionInstances := map[*clientAction]*struct{ time.Time }{}
-	for t := time.Now(); time.Since(t) < 60*time.Second; {
+	for t := time.Now(); time.Since(t) < RunDuration; {
 		tickStartTime := time.Now()
 
-		var action *clientAction
-		actions := make([]*clientAction, 0)
-		var probSum float32 = 0
-		for _, a := range clientActions {
-			i, exists := actionInstances[a]
-			if !exists {
-				i = &struct{ time.Time }{time.Now()}
-				actionInstances[a] = i
-				actions = append(actions, a)
-				probSum += a.probability
-			} else {
-				if time.Since(i.Time) >= a.minInterval {
-					actions = append(actions, a)
-					probSum += a.probability
+		c.Tick()
+
+		// Authenticated
+		if c.Id > 0 {
+			var actionToPerform *clientAction
+			actions := make([]*clientAction, 0)
+			var probSum float32 = 0
+			for _, action := range clientActions {
+				instance, exists := actionInstances[action]
+				if !exists {
+					instance = &struct{ time.Time }{time.Now()}
+					actionInstances[action] = instance
+					actions = append(actions, action)
+					probSum += action.probability
+				} else {
+					if time.Since(instance.Time) >= time.Duration(float64(action.minInterval)*ActionIntervalMultiplier) {
+						actions = append(actions, action)
+						probSum += action.probability
+					}
+				}
+			}
+			probabilities := make([]float32, len(actions))
+			prob := data.rnd.Float32()
+			for i, a := range actions {
+				probabilities[i] = a.probability / probSum
+				prob -= probabilities[i]
+				if prob <= 0 {
+					actionToPerform = a
+					break
+				}
+			}
+
+			if actionToPerform != nil {
+				if actionToPerform.perform(c, data) {
+					actionInstances[actionToPerform].Time = time.Now()
 				}
 			}
 		}
-		probabilities := make([]float32, len(actions))
-		prob := data.rnd.Float32()
-		for i, a := range actions {
-			probabilities[i] = a.probability / probSum
-			prob -= probabilities[i]
-			if prob <= 0 {
-				action = a
-				break
-			}
-		}
 
-		if action != nil {
-			if action.perform(c, data) {
-				actionInstances[action].Time = time.Now()
-			}
-		}
-
-		// Max tick interval: 200ms
-		time.Sleep(50*time.Millisecond - time.Since(tickStartTime))
+		time.Sleep(MaxTickInterval - time.Since(tickStartTime))
 	}
 
 	c.Disconnect()
@@ -284,12 +302,14 @@ func randUint32(m map[uint32]struct{}) uint32 {
 var wg = sync.WaitGroup{}
 
 func main() {
-
-	for i := 0; i < 200; i++ {
+	if len(os.Args) > 1 {
+		ServerAddr = os.Args[1]
+	}
+	for i := 0; i < ClientNum; i++ {
 		wg.Add(1)
 		go runClient()
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(ConnectInterval)
 	}
-	//time.Sleep(60 * time.Second)
+
 	wg.Wait()
 }

@@ -135,6 +135,21 @@ window.addEventListener("load", function(evt) {
         appendLog("User" + msg.connId + " joined channel " + channelId);
     };
 
+    var handleUnsubToChannel = function(msg, channelId) {
+        if (msg.connId == connId) {
+            delete joinedChannels[channelId];
+        } else {
+            var subs = joinedChannels[channelId];
+            if (subs) {
+                var idx = subs.connIds.indexOf(msg.connId)
+                if (idx >= 0) {
+                    subs.connIds.splice(idx, 1)
+                }
+            }
+        }
+        appendLog("User" + msg.connId + " left channel " + channelId);
+    };
+
     var handleChannelDataUpdate = function(msg, channelId) {
         if (channelId != curChannelId)
             return;
@@ -201,6 +216,7 @@ window.addEventListener("load", function(evt) {
 
             messageHandlers[proto.MessageType.values.AUTH] = {class: proto.AuthResultMessage/* Use RPC callback instead of handler function */};
             messageHandlers[proto.MessageType.values.SUB_TO_CHANNEL] = {class: proto.SubscribedToChannelMessage, handler: handleSubToChannel};
+            messageHandlers[proto.MessageType.values.UNSUB_TO_CHANNEL] = {class: proto.UnsubscribedToChannelMessage, handler: handleUnsubToChannel};
             messageHandlers[proto.MessageType.values.CHANNEL_DATA_UPDATE] = {class: proto.ChannelDataUpdateMessage, handler: handleChannelDataUpdate};
             messageHandlers[proto.MessageType.values.LIST_CHANNEL] = {class: proto.ListChannelResultMessage, handler: handleListChannelResult};
  
@@ -209,6 +225,11 @@ window.addEventListener("load", function(evt) {
                     "msgType": proto.MessageType.values.CREATE_CHANNEL,
                     "msgClass": proto.CreateChannelMessage,
                     "args": ["channelType", "metadata"]
+                },
+                "remove": {
+                    "msgType": proto.MessageType.values.REMOVE_CHANNEL,
+                    "msgClass": proto.RemoveChannelMessage,
+                    "args": ["channelId"]
                 },
                 "sub": {
                     "msgType": proto.MessageType.values.SUB_TO_CHANNEL,
@@ -231,7 +252,7 @@ window.addEventListener("load", function(evt) {
                     "msgClass": proto.ListChannelMessage,
                     "channelId": (args) => {return 0}, //The ListChannelMessage can only be sent to the global channel.
                     "args": ["typeFilter", (jo, arg) => {
-                        jo["metadataFilters"] = arg.split(',');
+                        jo["metadataFilters"] = arg ? arg.split(',') : null;
                     }]
                 },
                 "switch": {
@@ -261,7 +282,7 @@ window.addEventListener("load", function(evt) {
                 });
             };
             ws.onclose = function(evt) {
-                appendLog("Server disconnected.");
+                appendWarn("Server disconnected.");
                 ws = null;
             };
             ws.onmessage = function(evt) {
@@ -312,12 +333,12 @@ window.addEventListener("load", function(evt) {
                 channelId = cmd.channelId(args);
             }
             var jo = {};
-            for (var i = 0; i < args.length; i++) {
-                var arg = cmd.args[i];
-                if (typeof arg === "function") {
-                    arg(jo, args[i]);
+            for (var i = 0; i < cmd.args.length; i++) {
+                var argKey = cmd.args[i];
+                if (typeof argKey === "function") {
+                    argKey(jo, args[i]);
                 } else {
-                    jo[arg] = args[i];
+                    jo[argKey] = args[i];
                 }
             }
 

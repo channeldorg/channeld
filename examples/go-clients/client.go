@@ -20,11 +20,18 @@ type messageMapEntry struct {
 	msg      Message
 	handlers []MessageHandlerFunc
 }
+type messageQueueEntry struct {
+	msg       Message
+	channelId uint32
+	stubId    uint32
+	handlers  []MessageHandlerFunc
+}
 
 type Client struct {
 	Id                 uint32
 	subscribedChannels map[uint32]struct{}
 	conn               net.Conn
+	msgQueue           chan messageQueueEntry
 	messageMap         map[uint32]*messageMapEntry
 	stubCallbacks      map[uint32]MessageHandlerFunc
 	writeMutex         sync.Mutex
@@ -37,6 +44,7 @@ func NewClient(addr string) (*Client, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		conn = &wsConn{conn: c}
 	} else {
 		var err error
@@ -48,6 +56,7 @@ func NewClient(addr string) (*Client, error) {
 	c := &Client{
 		subscribedChannels: make(map[uint32]struct{}),
 		conn:               conn,
+		msgQueue:           make(chan messageQueueEntry, 128),
 		messageMap:         make(map[uint32]*messageMapEntry),
 		stubCallbacks: map[uint32]MessageHandlerFunc{
 			// 0 is Reserved
@@ -88,22 +97,22 @@ func (client *Client) AddMessageHandler(msgType uint32, handlers ...MessageHandl
 	}
 }
 
-func (client *Client) Auth(lt string, pit string) chan *proto.AuthResultMessage {
-	result := make(chan *proto.AuthResultMessage)
+func (client *Client) Auth(lt string, pit string) {
+	//result := make(chan *proto.AuthResultMessage)
 	client.Send(0, proto.BroadcastType_NO, uint32(proto.MessageType_AUTH), &proto.AuthMessage{
 		LoginToken:            lt,
 		PlayerIdentifierToken: pit,
 	}, func(_ *Client, channelId uint32, m Message) {
 		msg := m.(*proto.AuthResultMessage)
 		client.Id = msg.ConnId
-		result <- msg
+		//result <- msg
 		if msg.Result == proto.AuthResultMessage_SUCCESSFUL {
 			client.Send(0, proto.BroadcastType_NO, uint32(proto.MessageType_SUB_TO_CHANNEL), &proto.SubscribedToChannelMessage{
 				ConnId: client.Id,
 			}, nil)
 		}
 	})
-	return result
+	//return result
 }
 
 func handleRemoveChannel(client *Client, channelId uint32, m Message) {
@@ -176,17 +185,25 @@ func (client *Client) Receive() error {
 		return fmt.Errorf("failed to unmarshal message: %w", err)
 	}
 
-	for _, handler := range entry.handlers {
-		handler(client, p.ChannelId, msg)
-	}
+	client.msgQueue <- messageQueueEntry{msg, p.ChannelId, p.StubId, entry.handlers}
+	return nil
+}
 
-	if p.StubId != 0 {
-		callback := client.stubCallbacks[p.StubId]
-		if callback != nil {
-			callback(client, p.ChannelId, msg)
+func (client *Client) Tick() {
+	for len(client.msgQueue) > 0 {
+		entry := <-client.msgQueue
+
+		for _, handler := range entry.handlers {
+			handler(client, entry.channelId, entry.msg)
+		}
+
+		if entry.stubId > 0 {
+			callback := client.stubCallbacks[entry.stubId]
+			if callback != nil {
+				callback(client, entry.channelId, entry.msg)
+			}
 		}
 	}
-	return nil
 }
 
 func (client *Client) Send(channelId uint32, broadcast proto.BroadcastType, msgType uint32, msg Message, callback MessageHandlerFunc) error {
@@ -245,6 +262,7 @@ type wsConn struct {
 }
 
 func (c *wsConn) Read(b []byte) (n int, err error) {
+	//c.SetReadDeadline(time.Now().Add(30 * time.Second))
 	if c.readBuf == nil || c.readIdx >= len(c.readBuf) {
 		defer func() {
 			if recover() != nil {

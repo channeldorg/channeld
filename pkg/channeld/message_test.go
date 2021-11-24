@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/binary"
 	"testing"
+	"time"
 
 	"channeld.clewcat.com/channeld/proto"
 	"github.com/stretchr/testify/assert"
@@ -114,7 +115,6 @@ func TestMessageTypeConversion(t *testing.T) {
 
 func BenchmarkProtobufPacket(b *testing.B) {
 	p := &proto.Packet{
-		ChannelId: 0,
 		Broadcast: proto.BroadcastType_ALL,
 		StubId:    0,
 		MsgType:   8,
@@ -124,6 +124,8 @@ func BenchmarkProtobufPacket(b *testing.B) {
 
 	var size int = 0
 	for i := 0; i < b.N; i++ {
+		// randomize the channel id between [0, 100)
+		p.ChannelId = uint32(time.Now().Nanosecond() % 100)
 		bytes, _ := protobuf.Marshal(p)
 		size += len(bytes)
 	}

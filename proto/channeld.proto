@@ -6,14 +6,9 @@ import "google/protobuf/any.proto";
 
 option go_package = "/proto";
 
-enum BroadcastType {
-    NO = 0;
-    ALL = 1;
-    ALL_BUT_SENDER = 2;
-}
-
 message Packet {
     // The channel that the packet is sent to.
+    // 0 means the message should be handled in the global channel (e.g. a @CreateChannel message)
     uint32 channelId = 1;
 
     // Will the message be broadcasted to all connections in the channel? 
@@ -21,13 +16,20 @@ message Packet {
     BroadcastType broadcast = 2;
 
     // The stub for RPC callbacks.
+    // 0 means the packet is not a RPC message.
     uint32 stubId = 3;
 
-    // The MessageType either defined in MessageType enum below, or defined in user space.
+    // The MessageType either defined in @MessageType enum, or defined in user space.
     uint32 msgType = 4;
 
     // Protobuf-marshalled message body.
     bytes msgBody = 5;
+}
+
+enum BroadcastType {
+    NO = 0;
+    ALL = 1;
+    ALL_BUT_SENDER = 2;
 }
 
 enum ChannelType {

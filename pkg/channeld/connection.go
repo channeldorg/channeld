@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -89,7 +88,7 @@ func InitConnections(serverFsmPath string, clientFsmPath string) {
 		)
 	} else {
 		logger.Info("loaded server FSM",
-			zap.String("current state", serverFsm.CurrentState().Name),
+			zap.String("currentState", serverFsm.CurrentState().Name),
 		)
 	}
 
@@ -212,6 +211,7 @@ func AddConnection(c net.Conn, t ConnectionType) *Connection {
 func RemoveConnection(c *Connection) {
 	atomic.AddInt32(&c.removing, 1)
 	c.conn.Close()
+	close(c.sendQueue)
 	allConnections.Delete(c.id)
 
 	connectionNum.WithLabelValues(c.connectionType.String()).Dec()
@@ -351,14 +351,17 @@ func (c *Connection) ReceivePacket() {
 
 	channel.PutMessage(msg, handler, c, &p)
 
-	// TODO: record to Prometheus
-	// Measures: connection num, channel num, CPU usage, memory usage
-
-	packetReceived.WithLabelValues(
+	packetReceived.Inc() /*.WithLabelValues(
 		strconv.FormatUint(uint64(p.ChannelId), 10),
 		strconv.FormatUint(uint64(p.MsgType), 10),
-	).Inc()
+	)*/
+
+	atomic.AddUint64(&packetsIn, 1)
 }
+
+var metricsRecordTime time.Time
+var packetsIn uint64
+var packetsOut uint64
 
 func (c *Connection) Send(ctx MessageContext) {
 	if c.IsRemoving() {
@@ -412,15 +415,29 @@ func (c *Connection) Flush() {
 		if err != nil {
 			c.Logger().Error("flushing packet", zap.Uint32("msgType", uint32(e.MsgType)), zap.Error(err))
 		} else {
-			packetSent.WithLabelValues(
+
+			packetSent.Inc() /*.WithLabelValues(
 				strconv.FormatUint(uint64(e.Channel.id), 10),
 				strconv.FormatUint(uint64(e.MsgType), 10),
-			).Inc()
+			)*/
+
+			atomic.AddUint64(&packetsOut, 1)
+
 			bytesSent.Add(float64(len))
 		}
 	}
 
 	c.writer.Flush()
+
+	if dt := time.Since(metricsRecordTime); dt >= time.Second {
+		packetReceiveRate.Set(float64(packetsIn*uint64(time.Second)) / float64(dt))
+		atomic.StoreUint64(&packetsIn, 0)
+
+		packetSendRate.Set(float64(packetsOut*uint64(time.Second)) / float64(dt))
+		atomic.StoreUint64(&packetsOut, 0)
+
+		metricsRecordTime = time.Now()
+	}
 }
 
 func (c *Connection) String() string {
