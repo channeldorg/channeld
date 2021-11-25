@@ -7,7 +7,7 @@
 - [ ] Health check
 - [ ] Front-end load-balancing
 - [ ] Spatial-based pub/sub
-- [ ] Back-end load-balancing
+- [ ] Spatial-based load-balancing
 
 # Modules
 - [x] Stub(RPC) support

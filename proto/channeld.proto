@@ -34,7 +34,7 @@ enum BroadcastType {
 
 enum ChannelType {
     UNKNOWN = 0;
-    GLOBAL = 1;   // Default channel. Any message without ChannelId specified will be sent to this channel. All connections join this channel.
+    GLOBAL = 1;   // Default channel. Any message without ChannelId specified will be sent to this channel.
     PRIVATE = 2;  // Per-connection channel. Useful to store the user data and subscribe the client to the data update.
     SUBWORLD = 3; // A game "room" in a session-based game, or a level in an MMORPG. Subworlds are spatially divided thus the interests are isolated.
     SPATIAL = 4;  // Spatial channels are spatailly connected. Using this channel to implement a seamless open world.
