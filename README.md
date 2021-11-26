@@ -2,6 +2,8 @@
 channeld is an open source, light-weight and efficient **messaging gateway** server designed for **distributed game servers** (typically MMO) 
 and other backend applications that require real-time, subscription-based user interaction with high concurrency (e.g. instance messenger server).
 
+![architecture](doc/architecture.jpg)
+
 ## Key features:
 * Protobuf-based binary protocol over TCP, KCP or WebSocket
 * Backend servers load-balancing with auto-scaling
