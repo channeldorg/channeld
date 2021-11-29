@@ -69,9 +69,12 @@ var upgrader websocket.Upgrader = websocket.Upgrader{
 }
 
 func startWebSocketServer(t ConnectionType, address string) {
+	if protocolIndex := strings.Index(address, "://"); protocolIndex >= 0 {
+		address = address[protocolIndex+3:]
+	}
+
 	pattern := "/"
-	pathIndex := strings.Index(address, "/")
-	if pathIndex >= 0 {
+	if pathIndex := strings.Index(address, "/"); pathIndex >= 0 {
 		pattern = address[pathIndex:]
 		address = address[:pathIndex-1]
 	}

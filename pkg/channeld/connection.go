@@ -15,6 +15,7 @@ import (
 	"channeld.clewcat.com/channeld/pkg/fsm"
 	"channeld.clewcat.com/channeld/proto"
 	"github.com/gorilla/websocket"
+	"github.com/xtaci/kcp-go"
 	"go.uber.org/zap"
 	protobuf "google.golang.org/protobuf/proto"
 )
@@ -154,29 +155,59 @@ func StartListening(t ConnectionType, network string, address string) {
 		zap.String("address", address),
 	)
 
-	// TODO: add "kcp" network types
-	if network == "ws" || network == "websocket" {
+	var listener net.Listener
+	var err error
+	switch network {
+	case "ws", "websocket":
 		startWebSocketServer(t, address)
-	} else {
+		return
+	case "kcp":
+		listener, err = kcp.Listen(address)
+	default:
+		listener, err = net.Listen(network, address)
+	}
 
-		listener, err := net.Listen(network, address)
+	if err != nil {
+		logger.Panic("failed to listen", zap.Error(err))
+		return
+	}
+
+	defer listener.Close()
+
+	for {
+		conn, err := listener.Accept()
 		if err != nil {
-			logger.Panic("failed to listen", zap.Error(err))
-			return
-		}
-
-		defer listener.Close()
-
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				logger.Error("failed to accept connection", zap.Error(err))
-			} else {
-				connection := AddConnection(conn, t)
-				startGoroutines(connection)
-			}
+			logger.Error("failed to accept connection", zap.Error(err))
+		} else {
+			connection := AddConnection(conn, t)
+			startGoroutines(connection)
 		}
 	}
+
+	// if network == "ws" || network == "websocket" {
+	// 	startWebSocketServer(t, address)
+	// } else if network == "kcp" {
+	// 	kcp.Listen(address)
+	// } else {
+
+	// 	listener, err := net.Listen(network, address)
+	// 	if err != nil {
+	// 		logger.Panic("failed to listen", zap.Error(err))
+	// 		return
+	// 	}
+
+	// 	defer listener.Close()
+
+	// 	for {
+	// 		conn, err := listener.Accept()
+	// 		if err != nil {
+	// 			logger.Error("failed to accept connection", zap.Error(err))
+	// 		} else {
+	// 			connection := AddConnection(conn, t)
+	// 			startGoroutines(connection)
+	// 		}
+	// 	}
+	// }
 }
 
 func AddConnection(c net.Conn, t ConnectionType) *Connection {

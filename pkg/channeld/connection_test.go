@@ -5,7 +5,31 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/stretchr/testify/assert"
+	"github.com/xtaci/kcp-go"
 )
+
+func TestKCPConnection(t *testing.T) {
+	InitLogsAndMetrics()
+	const addr string = "localhost:12108"
+	go func() {
+		StartListening(CLIENT, "kcp", addr)
+	}()
+	_, err := kcp.Dial(addr)
+	assert.NoError(t, err)
+}
+
+func TestWebSocketConnection(t *testing.T) {
+	InitLogsAndMetrics()
+	const addr string = "ws://localhost:8080"
+	go func() {
+		StartListening(CLIENT, "ws", addr)
+	}()
+	_, _, err := websocket.DefaultDialer.Dial(addr, nil)
+	assert.NoError(t, err)
+}
 
 func TestConcurrentAccessConnections(t *testing.T) {
 	InitLogsAndMetrics()
