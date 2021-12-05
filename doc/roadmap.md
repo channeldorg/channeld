@@ -12,7 +12,7 @@
 # Modules
 - [x] Stub(RPC) support
 - [x] WebSocket support
-- [ ] KCP support
+- [x] KCP support
 - [ ] [Snappy](https://github.com/golang/snappy) compression
 - [ ] [Markov-chain](https://en.wikipedia.org/wiki/Markov_chain) compression
 - [ ] Encryption
@@ -23,7 +23,7 @@
 - [ ] Use [gogoprotobuf](https://github.com/gogo/protobuf) for faster marshalling/unmarshalling
 
 # Tests
-- [.] Unit tests
+- [ ] Unit tests
 - [ ] Smoke tests
 - [ ] Scale tests
 
@@ -33,10 +33,10 @@
 - [ ] Unreal SDK
 
 # Example projects
-- [.] Web chat rooms
+- [x] Web chat rooms
     - [x] Implement the Javascript client library
     - [x] Implement the commands
-    - [.] Scale test with 10K connections
+    - [ ] Scale test with 10K connections
     - [ ] Complete the UI
 - [ ] Unity relay server
     - [ ] Implement the C# client library

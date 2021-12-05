@@ -3,20 +3,23 @@ channeld is an open source, light-weight and efficient **messaging gateway** ser
 and other backend applications that require real-time, subscription-based user interaction with high concurrency (e.g. instance messenger server).
 
 ![architecture](doc/architecture.png)
-See the concepts in the [design doc](doc/design.md)
+See the concepts in the [design doc](doc/design.md).
 
 ## Applications:
 There are three major types of application benifit from channeld's architecture design:
 ### Relay Servers:
 ![](doc/relay.png)
+
 channeld can be used as the relay server to forward/broadcast messages between game clients.
 
 ### Dedicated Server Gateway:
 ![](doc/dedicated.png)
+
 channeld can be used as the gateway server to route messages to different dedicated servers.
 
 ### Seamless Distributed Server:
 ![](doc/seamless.png)
+
 The ultimate purpose of channeld is to enable distributed composition of dedicated servers, together to form a seamless large virtual world.
 
 ## Key features:

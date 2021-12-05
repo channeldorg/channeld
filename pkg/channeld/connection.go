@@ -183,31 +183,6 @@ func StartListening(t ConnectionType, network string, address string) {
 			startGoroutines(connection)
 		}
 	}
-
-	// if network == "ws" || network == "websocket" {
-	// 	startWebSocketServer(t, address)
-	// } else if network == "kcp" {
-	// 	kcp.Listen(address)
-	// } else {
-
-	// 	listener, err := net.Listen(network, address)
-	// 	if err != nil {
-	// 		logger.Panic("failed to listen", zap.Error(err))
-	// 		return
-	// 	}
-
-	// 	defer listener.Close()
-
-	// 	for {
-	// 		conn, err := listener.Accept()
-	// 		if err != nil {
-	// 			logger.Error("failed to accept connection", zap.Error(err))
-	// 		} else {
-	// 			connection := AddConnection(conn, t)
-	// 			startGoroutines(connection)
-	// 		}
-	// 	}
-	// }
 }
 
 func AddConnection(c net.Conn, t ConnectionType) *Connection {
