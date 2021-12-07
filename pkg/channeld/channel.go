@@ -136,6 +136,7 @@ func (ch *Channel) PutMessage(msg Message, handler MessageHandlerFunc, conn *Con
 		Channel:    ch,
 		Broadcast:  p.Broadcast,
 		StubId:     p.StubId,
+		ChannelId:  p.ChannelId,
 	}, handler: handler}
 }
 

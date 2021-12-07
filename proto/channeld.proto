@@ -27,9 +27,15 @@ message Packet {
 }
 
 enum BroadcastType {
+    // No broadcast. All internal messages should use this type, and other types are ignored.
     NO = 0;
+    // Broadcast the message to all the connections in the channel, the sender included.
     ALL = 1;
+    // Broadcast the message to all the connections in the channel, the sender excluded.
     ALL_BUT_SENDER = 2;
+    // Forward the packet to the connection. Can only be used by the backend server. The channelId in the packet will then be used as the target connectionId.
+    // This has the same behavior as sending the packet to the PRIVATE channel owned by the target connection with BroadcastType = NO, but is less efficient as the message will be handled in the global channel.
+    SINGLE_CONNECTION = 3; 
 }
 
 enum ChannelType {

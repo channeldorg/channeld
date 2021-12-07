@@ -16,6 +16,7 @@ type MessageContext struct {
 	Channel    *Channel    // The channel that handling the message
 	Broadcast  proto.BroadcastType
 	StubId     uint32
+	ChannelId  uint32 // The original channelId in the Packet, could be different from Channel.id.
 }
 type MessageHandlerFunc func(ctx MessageContext)
 type messageMapEntry struct {
@@ -37,8 +38,8 @@ func RegisterMessageHandler(msgType uint32, msg Message, handler MessageHandlerF
 	MessageMap[proto.MessageType(msgType)] = &messageMapEntry{msg, handler}
 }
 
+// Forward or broadcast user-space messages
 func handleUserSpaceMessage(ctx MessageContext) {
-	// Forward or broadcast user-space messages
 	if ctx.Connection.connectionType == CLIENT {
 		if ctx.Channel.ownerConnection != nil {
 			ctx.Channel.ownerConnection.Send(ctx)
@@ -59,7 +60,32 @@ func handleUserSpaceMessage(ctx MessageContext) {
 			)
 		}
 	} else {
-		ctx.Channel.Broadcast(ctx)
+		switch ctx.Broadcast {
+		case proto.BroadcastType_NO:
+			if ctx.Channel.ownerConnection != nil {
+				ctx.Channel.ownerConnection.Send(ctx)
+			} else {
+				ctx.Connection.Logger().Error("cannot forward the message as the channel has no owner",
+					zap.Uint32("msgType", uint32(ctx.MsgType)),
+					zap.String("channelType", ctx.Channel.channelType.String()),
+					zap.Uint32("channelId", uint32(ctx.Channel.id)),
+				)
+			}
+
+		case proto.BroadcastType_ALL, proto.BroadcastType_ALL_BUT_SENDER:
+			ctx.Channel.Broadcast(ctx)
+
+		case proto.BroadcastType_SINGLE_CONNECTION:
+			conn := GetConnection(ConnectionId(ctx.ChannelId))
+			if conn != nil {
+				conn.Send(ctx)
+			} else {
+				ctx.Connection.Logger().Error("cannot forward the message as the target connection does not exist",
+					zap.Uint32("msgType", uint32(ctx.MsgType)),
+					zap.Uint32("targetConnId", ctx.ChannelId),
+				)
+			}
+		}
 	}
 }
 

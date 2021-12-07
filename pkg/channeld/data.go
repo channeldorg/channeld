@@ -194,6 +194,7 @@ func (ch *Channel) fanOutDataUpdate(c *Connection, cs *ChannelSubscription, upda
 		Channel:    ch,
 		Broadcast:  proto.BroadcastType_NO,
 		StubId:     0,
+		ChannelId:  uint32(ch.id),
 	})
 	// cs.lastFanOutTime = time.Now()
 	// cs.fanOutDataMsg = nil

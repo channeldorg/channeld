@@ -316,13 +316,19 @@ func (c *Connection) ReceivePacket() {
 		return
 	}
 
-	channel := GetChannel(ChannelId(p.ChannelId))
-	if channel == nil {
-		c.Logger().Warn("can't find channel",
-			zap.Uint32("channelId", p.ChannelId),
-			zap.Uint32("msgType", p.MsgType),
-		)
-		return
+	var channel *Channel
+	if p.Broadcast == proto.BroadcastType_SINGLE_CONNECTION {
+		// Single connection forwarding will be handled in the GLOBAL channel, as the channelId will be used as the target connId.
+		channel = globalChannel
+	} else {
+		channel := GetChannel(ChannelId(p.ChannelId))
+		if channel == nil {
+			c.Logger().Warn("can't find channel",
+				zap.Uint32("channelId", p.ChannelId),
+				zap.Uint32("msgType", p.MsgType),
+			)
+			return
+		}
 	}
 
 	entry := MessageMap[proto.MessageType(p.MsgType)]
