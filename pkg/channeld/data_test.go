@@ -2,6 +2,7 @@ package channeld
 
 import (
 	"container/list"
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -124,6 +125,29 @@ func TestFanOutChannelData(t *testing.T) {
 	assert.Equal(t, 2, len(c2.testQueue()))
 	assert.EqualValues(t, "c", c1.latestMsg().(*proto.TestChannelDataMessage).Text)
 	assert.EqualValues(t, "c", c2.latestMsg().(*proto.TestChannelDataMessage).Text)
+}
+
+func TestListRemoveElement(t *testing.T) {
+	list := list.New()
+	list.PushBack("a")
+	list.PushBack("b")
+	list.PushBack("b")
+	list.PushBack("c")
+	list.PushBack("b")
+	list.PushBack("d")
+	p := list.Front()
+	var n int = list.Len()
+	for i := 0; i < n; i++ {
+		fmt.Println(p.Value)
+		if p.Value == "b" {
+			tmp := p.Next()
+			list.Remove(p)
+			p = tmp
+			continue
+		}
+		p = p.Next()
+	}
+	assert.Equal(t, 3, list.Len())
 }
 
 func TestListMoveElement(t *testing.T) {

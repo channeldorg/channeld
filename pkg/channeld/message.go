@@ -32,6 +32,7 @@ var MessageMap = map[proto.MessageType]*messageMapEntry{
 	proto.MessageType_SUB_TO_CHANNEL:      {&proto.SubscribedToChannelMessage{}, handleSubToChannel},
 	proto.MessageType_UNSUB_TO_CHANNEL:    {&proto.UnsubscribedToChannelMessage{}, handleUnsubToChannel},
 	proto.MessageType_CHANNEL_DATA_UPDATE: {&proto.ChannelDataUpdateMessage{}, handleChannelDataUpdate},
+	proto.MessageType_DISCONNECT:          {&proto.DisconnectMessage{}, handleDisconnect},
 }
 
 func RegisterMessageHandler(msgType uint32, msg Message, handler MessageHandlerFunc) {
@@ -361,4 +362,38 @@ func handleChannelDataUpdate(ctx MessageContext) {
 	} else {
 		ctx.Channel.Data().OnUpdate(updateMsg, ctx.Channel.GetTime())
 	}
+}
+
+func handleDisconnect(ctx MessageContext) {
+	if ctx.Channel != globalChannel {
+		ctx.Connection.Logger().Error("illegal attemp to disconnect another connection outside the GLOBAL channel")
+		return
+	}
+
+	msg, ok := ctx.Msg.(*proto.DisconnectMessage)
+	if !ok {
+		ctx.Connection.Logger().Error("message is not a DisconnectMessage, will not be handled.")
+		return
+	}
+
+	connToDisconnect := GetConnection(ConnectionId(msg.ConnId))
+	if connToDisconnect == nil {
+		ctx.Connection.Logger().Warn("could not find the connection to disconnect",
+			zap.Uint32("targetConnId", msg.ConnId),
+		)
+		return
+	}
+
+	if err := connToDisconnect.Disconnect(); err != nil {
+		ctx.Connection.Logger().Warn("failed to disconnect a connection",
+			zap.Uint32("targetConnId", msg.ConnId),
+			zap.String("targetConnType", connToDisconnect.connectionType.String()),
+		)
+	} else {
+		ctx.Connection.Logger().Info("successfully disconnected a connection",
+			zap.Uint32("targetConnId", msg.ConnId),
+			zap.String("targetConnType", connToDisconnect.connectionType.String()),
+		)
+	}
+	RemoveConnection(connToDisconnect)
 }

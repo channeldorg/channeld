@@ -119,8 +119,12 @@ func (ch *Channel) tickData(t ChannelTime) {
 	for foci := 0; foci < ch.fanOutQueue.Len(); foci++ {
 		foc := focp.Value.(*fanOutConnection)
 		c := GetConnection(foc.connId)
-		if c == nil {
-			focp = focp.Next()
+		if c == nil || c.IsRemoving() {
+			// Unsub the connection from the channel
+			delete(ch.subscribedConnections, foc.connId)
+			tmp := focp.Next()
+			ch.fanOutQueue.Remove(focp)
+			focp = tmp
 			continue
 		}
 		cs := ch.subscribedConnections[foc.connId]

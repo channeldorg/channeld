@@ -61,15 +61,18 @@ enum MessageType {
     SUB_TO_CHANNEL = 6;
     UNSUB_TO_CHANNEL = 7;
     CHANNEL_DATA_UPDATE = 8;
+    DISCONNECT = 9;
     USER_SPACE_START = 100;
 }
 
 message UserSpaceMessage {
-    bytes msgBody = 1;
+    // The backend server generally needs the client connId to identify the sender.
+    uint32 sourceConnId = 1;
+    bytes msgBody = 2;
 }
 
 // The packet should have channelId = 0 in order to be handled.
-// Respond: @AuthResultMessage
+// Response: @AuthResultMessage
 message AuthMessage {
     string playerIdentifierToken = 1;
     string loginToken = 2;
@@ -92,7 +95,7 @@ message ChannelSubscriptionOptions {
 }
 
 // The packet should have channelId = 0 in order to be handled.
-// Respond: @SubscribedToChannelsMessage
+// Response: @SubscribedToChannelsMessage
 message CreateChannelMessage {
     ChannelType channelType = 1;
     string metadata = 2;
@@ -101,13 +104,13 @@ message CreateChannelMessage {
 }
 
 // The packet should have channelId = 0 in order to be handled.
-// Respond: all connections in the channel will receive @RemoveChannelMessage
+// Response: all connections in the channel will receive @RemoveChannelMessage
 message RemoveChannelMessage {
     uint32 channelId = 1;
 }
 
 // The packet should have channelId = 0 in order to be handled.
-// Respond: @ListChannelResultMessage
+// Response: @ListChannelResultMessage
 message ListChannelMessage {
     ChannelType typeFilter = 1;
     repeated string metadataFilters = 2;
@@ -122,21 +125,29 @@ message ListChannelResultMessage {
     repeated ChannelInfo channels = 1;
 }
 
-// Respond: @SubscribedToChannelMessage. The channel owner will receive the same message.
+// Response: @SubscribedToChannelMessage. The channel owner will receive the same message.
 message SubscribedToChannelMessage {
     // The connection to be added to the channel is not necessarily the one sends the message 
     uint32 connId = 1;
     ChannelSubscriptionOptions subOptions = 2;
 }
 
-// Respond: @UnsubscribedToChannelMessage. The channel owner will receive the same message.
+// Response: @UnsubscribedToChannelMessage. The channel owner will receive the same message.
 message UnsubscribedToChannelMessage {
     uint32 connId = 1;
 }
 
-// Respond: no. Each connection in the channel receives the @ChannelDataUpdateMessage in every @ChannelSubscriptionOptions.FanOutIntervalMs
+// Response: no. Each connection in the channel receives the @ChannelDataUpdateMessage in every @ChannelSubscriptionOptions.FanOutIntervalMs
 message ChannelDataUpdateMessage {
     google.protobuf.Any data = 1;
+}
+
+// Disconnect another connection from channeld. 
+// This message should only be sent by the server connection in a server-authoratative environment.
+// The packet should have channelId = 0 in order to be handled.
+// Response: no.
+message DisconnectMessage {
+    uint32 connId = 1;
 }
 
 

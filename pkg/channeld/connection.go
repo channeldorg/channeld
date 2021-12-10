@@ -180,6 +180,7 @@ func StartListening(t ConnectionType, network string, address string) {
 			logger.Error("failed to accept connection", zap.Error(err))
 		} else {
 			connection := AddConnection(conn, t)
+			connection.Logger().Debug("accepted connection")
 			startGoroutines(connection)
 		}
 	}
@@ -346,7 +347,7 @@ func (c *Connection) ReceivePacket() {
 	var handler MessageHandlerFunc
 	if p.MsgType >= uint32(proto.MessageType_USER_SPACE_START) && entry == nil {
 		// User-space message without handler won't be deserialized.
-		msg = &proto.UserSpaceMessage{MsgBody: p.MsgBody}
+		msg = &proto.UserSpaceMessage{SourceConnId: uint32(c.id), MsgBody: p.MsgBody}
 		handler = handleUserSpaceMessage
 	} else {
 		handler = entry.handler
@@ -358,6 +359,8 @@ func (c *Connection) ReceivePacket() {
 			return
 		}
 	}
+
+	c.Logger().Debug("received packet", zap.Uint32("msgType", p.MsgType), zap.Int("size", packetSize))
 
 	c.fsm.OnReceived(p.MsgType)
 
@@ -450,6 +453,10 @@ func (c *Connection) Flush() {
 
 		metricsRecordTime = time.Now()
 	}
+}
+
+func (c *Connection) Disconnect() error {
+	return c.conn.Close()
 }
 
 func (c *Connection) String() string {

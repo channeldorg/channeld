@@ -35,7 +35,14 @@
         "request": "launch",
         "mode": "debug",
         "program": "examples/chat-rooms/main.go"
+    },
+    {
+        "name": "Launch KCP",
+        "type": "go",
+        "request": "launch",
+        "mode": "debug",
+        "program": "cmd/main.go",
+        "args": ["-sn", "kcp", "-cn", "kcp"]
     }
-
     ]
 }
