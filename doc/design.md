@@ -53,10 +53,11 @@ BigWorld, Skynet, Photon, SpatialOS
 
 # How
 ## Binary protocol:
-[TAG] [Packet [ChannelID | BroadcastType | StubID | MessageType | MessageBody]
-1. The tag consists of 4 bytes. The first byte must be 67 which is the ASCII of 'C' character. The 2-4 bytes are the "dynamic" size of the packet, which means if the size is less than 65536(2^16), the second byte is 72('H' in ASCII), otherwise the byte is used for the size; if the size is less than 256(2^8), the third byte is 78('L' in ASCII), otherwise the byte is used for the size; the fourth and last byte is always used for the size. So, if the packet size is less than 256, which is most of the case, the TAG bytes are: [67 72 78 SIZE]
-2. The following are the marshalled bytes of the Packet (see the message definition in [channeld.proto](../proto/channeld.proto)). The header of a packet includes an uint32 ChannelID, an enum BroadcastType, an uint32 StubId, and an uint32 MessageType. Because it utilizes [Protobuf's encoding](https://developers.google.com/protocol-buffers/docs/encoding), in most cases the header only has 4 bytes (see the BenchmarkProtobufPacket in [message_test.go](../pkg/channeld/message_test.go))
-3. The message body is the marshalled bytes of the actual message that channeld will proceed or forward.
+[TAG] [[MessagePack0 [ChannelID | BroadcastType | StubID | MessageType | MessageBody] | MessagePack1 | MessagePack2 ...]
+1. A packet consists of a TAG, and a serial of MessagePacks (see the definition in [channeld.proto](../proto/channeld.proto))
+2. The tag has 4 bytes. The first byte must be 67 which is the ASCII of 'C' character. The 2-4 bytes are the "dynamic" size of the packet, which means if the size is less than 65536(2^16), the second byte is 72('H' in ASCII), otherwise the byte is used for the size; if the size is less than 256(2^8), the third byte is 78('L' in ASCII), otherwise the byte is used for the size; the fourth and last byte is always used for the size. So, if the packet size is less than 256, which is most of the case, the TAG bytes are: [67 72 78 SIZE]
+3. Each MessagePack consists of a header and a body. The header includes an uint32 ChannelID, an enum BroadcastType, an uint32 StubId, and an uint32 MessageType. Because it utilizes [Protobuf's encoding](https://developers.google.com/protocol-buffers/docs/encoding), in most cases the header only has 4 bytes (see *BenchmarkProtobufMessageBase* in [message_test.go](../pkg/channeld/message_test.go))
+4. The message body is the marshalled bytes of the actual message that channeld will proceed or forward.
 
 ## 竞态和权限问题：
 1. 连接列表可能被各个连接和频道goroutine写，需要加锁；

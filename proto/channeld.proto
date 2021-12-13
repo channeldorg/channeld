@@ -6,8 +6,14 @@ import "google/protobuf/any.proto";
 
 option go_package = "/proto";
 
+// The data packet that is sent between the endpoints. A packet can have multiple messages in the payload in one trip to improve the efficiency.
 message Packet {
-    // The channel that the packet is sent to.
+    repeated MessagePack messages = 1;
+}
+
+// The serialized message and the context of it.
+message MessagePack {
+    // The channel that the message is sent to.
     // 0 means the message should be handled in the global channel (e.g. a @CreateChannel message)
     uint32 channelId = 1;
 

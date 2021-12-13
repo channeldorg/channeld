@@ -317,66 +317,69 @@ func (c *Connection) ReceivePacket() {
 		return
 	}
 
+	for _, mp := range p.Messages {
+		c.receiveMessage(mp)
+	}
+
+	//c.Logger().Debug("received packet", zap.Int("size", packetSize))
+	packetReceived.Inc()
+}
+
+func (c *Connection) receiveMessage(mp *proto.MessagePack) {
 	var channel *Channel
-	if p.Broadcast == proto.BroadcastType_SINGLE_CONNECTION {
+	if mp.Broadcast == proto.BroadcastType_SINGLE_CONNECTION {
 		// Single connection forwarding will be handled in the GLOBAL channel, as the channelId will be used as the target connId.
 		channel = globalChannel
 	} else {
-		channel := GetChannel(ChannelId(p.ChannelId))
+		channel = GetChannel(ChannelId(mp.ChannelId))
 		if channel == nil {
 			c.Logger().Warn("can't find channel",
-				zap.Uint32("channelId", p.ChannelId),
-				zap.Uint32("msgType", p.MsgType),
+				zap.Uint32("channelId", mp.ChannelId),
+				zap.Uint32("msgType", mp.MsgType),
 			)
 			return
 		}
 	}
 
-	entry := MessageMap[proto.MessageType(p.MsgType)]
-	if entry == nil && p.MsgType < uint32(proto.MessageType_USER_SPACE_START) {
-		c.Logger().Error("undefined message type", zap.Uint32("msgType", p.MsgType))
+	entry := MessageMap[proto.MessageType(mp.MsgType)]
+	if entry == nil && mp.MsgType < uint32(proto.MessageType_USER_SPACE_START) {
+		c.Logger().Error("undefined message type", zap.Uint32("msgType", mp.MsgType))
 		return
 	}
 
-	if !c.fsm.IsAllowed(p.MsgType) {
-		c.Logger().Warn("message is not allowed for current state", zap.Uint32("msgType", p.MsgType))
+	if !c.fsm.IsAllowed(mp.MsgType) {
+		c.Logger().Warn("message is not allowed for current state", zap.Uint32("msgType", mp.MsgType))
 		return
 	}
 
 	var msg Message
 	var handler MessageHandlerFunc
-	if p.MsgType >= uint32(proto.MessageType_USER_SPACE_START) && entry == nil {
+	if mp.MsgType >= uint32(proto.MessageType_USER_SPACE_START) && entry == nil {
 		// User-space message without handler won't be deserialized.
-		msg = &proto.UserSpaceMessage{SourceConnId: uint32(c.id), MsgBody: p.MsgBody}
+		msg = &proto.UserSpaceMessage{SourceConnId: uint32(c.id), MsgBody: mp.MsgBody}
 		handler = handleUserSpaceMessage
 	} else {
 		handler = entry.handler
 		// Always make a clone!
 		msg = protobuf.Clone(entry.msg)
-		err = protobuf.Unmarshal(p.MsgBody, msg)
+		err := protobuf.Unmarshal(mp.MsgBody, msg)
 		if err != nil {
 			c.Logger().Error("unmarshalling message", zap.Error(err))
 			return
 		}
 	}
 
-	c.Logger().Debug("received packet", zap.Uint32("msgType", p.MsgType), zap.Int("size", packetSize))
+	c.fsm.OnReceived(mp.MsgType)
 
-	c.fsm.OnReceived(p.MsgType)
+	channel.PutMessage(msg, handler, c, mp)
 
-	channel.PutMessage(msg, handler, c, &p)
+	c.Logger().Debug("received message", zap.Uint32("msgType", mp.MsgType), zap.Int("size", len(mp.MsgBody)))
 
-	packetReceived.Inc() /*.WithLabelValues(
+	msgReceived.Inc() /*.WithLabelValues(
 		strconv.FormatUint(uint64(p.ChannelId), 10),
 		strconv.FormatUint(uint64(p.MsgType), 10),
 	)*/
-
-	atomic.AddUint64(&packetsIn, 1)
 }
-
-var metricsRecordTime time.Time
-var packetsIn uint64
-var packetsOut uint64
 
 func (c *Connection) Send(ctx MessageContext) {
 	if c.IsRemoving() {
@@ -386,24 +389,46 @@ func (c *Connection) Send(ctx MessageContext) {
 	c.sender.Send(c, ctx)
 }
 
-func WritePacket(writer io.Writer, channelId uint32, broadcast proto.BroadcastType, stubId uint32, msgType uint32, msg Message) (int, error) {
-	msgBody, err := protobuf.Marshal(msg)
-	if err != nil {
-		return 0, fmt.Errorf("failed to marshal message %d: %s. Error: %w", msgType, msg, err)
-	}
-	if len(msgBody) >= (1 << 24) {
-		return 0, fmt.Errorf("message body is too large, size: %d. Error: %w", len(msgBody), err)
+func (c *Connection) Flush() {
+	if len(c.sendQueue) == 0 {
+		return
 	}
 
-	bytes, err := protobuf.Marshal(&proto.Packet{
-		ChannelId: channelId,
-		Broadcast: broadcast,
-		StubId:    stubId,
-		MsgType:   msgType,
-		MsgBody:   msgBody,
-	})
+	p := proto.Packet{Messages: make([]*proto.MessagePack, 0, len(c.sendQueue))}
+	size := 0
+
+	// TODO: should we limit the message numbers per packet?
+	for len(c.sendQueue) > 0 {
+		mc := <-c.sendQueue
+		// The packet size should not exceed the capacity of 3 bytes
+		if size+protobuf.Size(mc.Msg) >= 0xfffff0 {
+			c.Logger().Warn("packet is going to be oversized")
+			break
+		}
+		msgBody, err := protobuf.Marshal(mc.Msg)
+		if err != nil {
+			c.Logger().Error("error marshalling message", zap.Error(err))
+			continue
+		}
+		p.Messages = append(p.Messages, &proto.MessagePack{
+			ChannelId: mc.ChannelId,
+			Broadcast: mc.Broadcast,
+			StubId:    mc.StubId,
+			MsgType:   uint32(mc.MsgType),
+			MsgBody:   msgBody,
+		})
+		size = protobuf.Size(&p)
+
+		msgSent.Inc() /*.WithLabelValues(
+			strconv.FormatUint(uint64(e.Channel.id), 10),
+			strconv.FormatUint(uint64(e.MsgType), 10),
+		)*/
+	}
+
+	bytes, err := protobuf.Marshal(&p)
 	if err != nil {
-		return 0, fmt.Errorf("error marshalling packet: %w", err)
+		c.Logger().Error("error marshalling packet", zap.Error(err))
+		return
 	}
 
 	// 'CHNL' in ASCII
@@ -416,43 +441,20 @@ func WritePacket(writer io.Writer, channelId uint32, broadcast proto.BroadcastTy
 	if len > 0xffff {
 		tag[1] = byte((len >> 16) & 0xff)
 	}
+
 	/* Avoid writing multple times. With WebSocket, every Write() sends a message.
 	writer.Write(tag)
 	*/
-
-	return writer.Write(append(tag, bytes...))
-}
-
-func (c *Connection) Flush() {
-	for len(c.sendQueue) > 0 {
-		e := <-c.sendQueue
-		len, err := WritePacket(c.writer, uint32(e.Channel.id), proto.BroadcastType_NO, e.StubId, uint32(e.MsgType), e.Msg)
-		if err != nil {
-			c.Logger().Error("flushing packet", zap.Uint32("msgType", uint32(e.MsgType)), zap.Error(err))
-		} else {
-
-			packetSent.Inc() /*.WithLabelValues(
-				strconv.FormatUint(uint64(e.Channel.id), 10),
-				strconv.FormatUint(uint64(e.MsgType), 10),
-			)*/
-
-			atomic.AddUint64(&packetsOut, 1)
-
-			bytesSent.Add(float64(len))
-		}
+	_, err = c.writer.Write(append(tag, bytes...))
+	if err != nil {
+		c.Logger().Error("error writing packet", zap.Error(err))
+		return
 	}
 
 	c.writer.Flush()
 
-	if dt := time.Since(metricsRecordTime); dt >= time.Second {
-		packetReceiveRate.Set(float64(packetsIn*uint64(time.Second)) / float64(dt))
-		atomic.StoreUint64(&packetsIn, 0)
-
-		packetSendRate.Set(float64(packetsOut*uint64(time.Second)) / float64(dt))
-		atomic.StoreUint64(&packetsOut, 0)
-
-		metricsRecordTime = time.Now()
-	}
+	packetSent.Inc()
+	bytesSent.Add(float64(len))
 }
 
 func (c *Connection) Disconnect() error {

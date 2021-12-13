@@ -7,12 +7,26 @@ import (
 
 var logger *zap.Logger
 
+var msgReceived = prometheus.NewCounter(
+	prometheus.CounterOpts{
+		Name: "messages_in",
+		Help: "Received messages",
+	},
+	//[]string{"channel", "msgType"},
+)
+
+var msgSent = prometheus.NewCounter(
+	prometheus.CounterOpts{
+		Name: "messages_out",
+		Help: "Sent messages",
+	},
+	//[]string{"channel", "msgType"},
+)
 var packetReceived = prometheus.NewCounter(
 	prometheus.CounterOpts{
 		Name: "packets_in",
 		Help: "Received packets",
 	},
-	//[]string{"channel", "msgType"},
 )
 
 var packetSent = prometheus.NewCounter(
@@ -20,22 +34,8 @@ var packetSent = prometheus.NewCounter(
 		Name: "packets_out",
 		Help: "Sent packets",
 	},
-	//[]string{"channel", "msgType"},
 )
 
-var packetReceiveRate = prometheus.NewGauge(
-	prometheus.GaugeOpts{
-		Name: "pps_in",
-		Help: "Received packets per second",
-	},
-)
-
-var packetSendRate = prometheus.NewGauge(
-	prometheus.GaugeOpts{
-		Name: "pps_out",
-		Help: "Sent packets per second",
-	},
-)
 var bytesReceived = prometheus.NewCounter(
 	prometheus.CounterOpts{
 		Name: "bytes_in",
@@ -70,10 +70,10 @@ func InitLogsAndMetrics() {
 	logger, _ = zap.NewDevelopment()
 	defer logger.Sync()
 
+	prometheus.MustRegister(msgReceived)
+	prometheus.MustRegister(msgSent)
 	prometheus.MustRegister(packetReceived)
 	prometheus.MustRegister(packetSent)
-	prometheus.MustRegister(packetReceiveRate)
-	prometheus.MustRegister(packetSendRate)
 	prometheus.MustRegister(bytesReceived)
 	prometheus.MustRegister(bytesSent)
 	prometheus.MustRegister(connectionNum)

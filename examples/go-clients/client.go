@@ -31,7 +31,8 @@ type Client struct {
 	Id                 uint32
 	subscribedChannels map[uint32]struct{}
 	conn               net.Conn
-	msgQueue           chan messageQueueEntry
+	incomingQueue      chan messageQueueEntry
+	outgoingQueue      chan *proto.MessagePack
 	messageMap         map[uint32]*messageMapEntry
 	stubCallbacks      map[uint32]MessageHandlerFunc
 	writeMutex         sync.Mutex
@@ -56,7 +57,8 @@ func NewClient(addr string) (*Client, error) {
 	c := &Client{
 		subscribedChannels: make(map[uint32]struct{}),
 		conn:               conn,
-		msgQueue:           make(chan messageQueueEntry, 128),
+		incomingQueue:      make(chan messageQueueEntry, 128),
+		outgoingQueue:      make(chan *proto.MessagePack, 32),
 		messageMap:         make(map[uint32]*messageMapEntry),
 		stubCallbacks: map[uint32]MessageHandlerFunc{
 			// 0 is Reserved
@@ -173,25 +175,28 @@ func (client *Client) Receive() error {
 		return fmt.Errorf("error unmarshalling packet: %w", err)
 	}
 
-	entry := client.messageMap[p.MsgType]
-	if entry == nil {
-		return fmt.Errorf("no message type registered: %d", p.MsgType)
+	for _, mp := range p.Messages {
+		entry := client.messageMap[mp.MsgType]
+		if entry == nil {
+			return fmt.Errorf("no message type registered: %d", mp.MsgType)
+		}
+
+		// Always make a clone!
+		msg := protobuf.Clone(entry.msg)
+		err = protobuf.Unmarshal(mp.MsgBody, msg)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal message: %w", err)
+		}
+
+		client.incomingQueue <- messageQueueEntry{msg, mp.ChannelId, mp.StubId, entry.handlers}
 	}
 
-	// Always make a clone!
-	msg := protobuf.Clone(entry.msg)
-	err = protobuf.Unmarshal(p.MsgBody, msg)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal message: %w", err)
-	}
-
-	client.msgQueue <- messageQueueEntry{msg, p.ChannelId, p.StubId, entry.handlers}
 	return nil
 }
 
-func (client *Client) Tick() {
-	for len(client.msgQueue) > 0 {
-		entry := <-client.msgQueue
+func (client *Client) Tick() error {
+	for len(client.incomingQueue) > 0 {
+		entry := <-client.incomingQueue
 
 		for _, handler := range entry.handlers {
 			handler(client, entry.channelId, entry.msg)
@@ -204,6 +209,21 @@ func (client *Client) Tick() {
 			}
 		}
 	}
+
+	if len(client.outgoingQueue) == 0 {
+		return nil
+	}
+
+	p := proto.Packet{Messages: make([]*proto.MessagePack, 0, len(client.outgoingQueue))}
+	size := 0
+	for len(client.outgoingQueue) > 0 {
+		mp := <-client.outgoingQueue
+		if size+protobuf.Size(mp) >= 0xfffff0 {
+			break
+		}
+		p.Messages = append(p.Messages, mp)
+	}
+	return client.writePacket(&p)
 }
 
 func (client *Client) Send(channelId uint32, broadcast proto.BroadcastType, msgType uint32, msg Message, callback MessageHandlerFunc) error {
@@ -219,17 +239,19 @@ func (client *Client) Send(channelId uint32, broadcast proto.BroadcastType, msgT
 	if err != nil {
 		return fmt.Errorf("failed to marshal message %d: %s. Error: %w", msgType, msg, err)
 	}
-	if len(msgBody) >= (1 << 24) {
-		return fmt.Errorf("message body is too large, size: %d. Error: %w", len(msgBody), err)
-	}
 
-	bytes, err := protobuf.Marshal(&proto.Packet{
+	client.outgoingQueue <- &proto.MessagePack{
 		ChannelId: channelId,
 		Broadcast: broadcast,
 		StubId:    stubId,
 		MsgType:   msgType,
 		MsgBody:   msgBody,
-	})
+	}
+	return nil
+}
+
+func (client *Client) writePacket(p *proto.Packet) error {
+	bytes, err := protobuf.Marshal(p)
 	if err != nil {
 		return fmt.Errorf("error marshalling packet: %w", err)
 	}

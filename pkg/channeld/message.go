@@ -9,6 +9,7 @@ import (
 )
 
 type Message = protobuf.Message //protoreflect.ProtoMessage
+// The context of a message for both sending and receiving
 type MessageContext struct {
 	MsgType    proto.MessageType
 	Msg        Message     // The weak-typed Message object popped from the message queue

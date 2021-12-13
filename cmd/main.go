@@ -4,22 +4,23 @@ import (
 	"flag"
 
 	"channeld.clewcat.com/channeld/pkg/channeld"
-	"rsc.io/getopt"
 )
 
 func main() {
 
-	getopt.Aliases(
-		"sn", "serverNetwork",
-		"sa", "serverAddress",
-		"sfsm", "serverConnFSM",
+	/*
+		getopt.Aliases(
+			"sn", "serverNetwork",
+			"sa", "serverAddress",
+			"sfsm", "serverConnFSM",
 
-		"cn", "clientNetwork",
-		"ca", "clientAddress",
-		"cfsm", "clientConnFSM",
+			"cn", "clientNetwork",
+			"ca", "clientAddress",
+			"cfsm", "clientConnFSM",
 
-		// "cs", "connSize",
-	)
+			// "cs", "connSize",
+		)
+	*/
 
 	sn := flag.String("sn", "tcp", "the network type for the server connections")
 	sa := flag.String("sa", ":11288", "the network address for the server connections")
@@ -29,7 +30,7 @@ func main() {
 	cfsm := flag.String("cfsm", "../config/client_non_authoratative_fsm.json", "the path to the client FSM config")
 	// cs := flag.Int("cs", 1024, "the connection map buffer size")
 
-	getopt.Parse()
+	//getopt.Parse()
 	flag.Parse()
 
 	channeld.InitLogsAndMetrics()
@@ -37,7 +38,7 @@ func main() {
 	channeld.InitChannels()
 
 	go channeld.StartListening(channeld.SERVER, *sn, *sa)
-	///* After all the server connections established, the client connection will be listened.*/
-	go channeld.StartListening(channeld.CLIENT, *cn, *ca)
+	// FIXME: After all the server connections are established, the client connection should be listened.*/
+	channeld.StartListening(channeld.CLIENT, *cn, *ca)
 
 }

@@ -125,18 +125,18 @@ func (ch *Channel) IsRemoving() bool {
 	return ch.removing > 0
 }
 
-func (ch *Channel) PutMessage(msg Message, handler MessageHandlerFunc, conn *Connection, p *proto.Packet) {
+func (ch *Channel) PutMessage(msg Message, handler MessageHandlerFunc, conn *Connection, pack *proto.MessagePack) {
 	if ch.IsRemoving() {
 		return
 	}
 	ch.inMsgQueue <- channelMessage{ctx: MessageContext{
-		MsgType:    proto.MessageType(p.MsgType),
+		MsgType:    proto.MessageType(pack.MsgType),
 		Msg:        msg,
 		Connection: conn,
 		Channel:    ch,
-		Broadcast:  p.Broadcast,
-		StubId:     p.StubId,
-		ChannelId:  p.ChannelId,
+		Broadcast:  pack.Broadcast,
+		StubId:     pack.StubId,
+		ChannelId:  pack.ChannelId,
 	}, handler: handler}
 }
 
