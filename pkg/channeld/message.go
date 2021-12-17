@@ -31,7 +31,7 @@ var MessageMap = map[proto.MessageType]*messageMapEntry{
 	proto.MessageType_REMOVE_CHANNEL:      {&proto.RemoveChannelMessage{}, handleRemoveChannel},
 	proto.MessageType_LIST_CHANNEL:        {&proto.ListChannelMessage{}, handleListChannel},
 	proto.MessageType_SUB_TO_CHANNEL:      {&proto.SubscribedToChannelMessage{}, handleSubToChannel},
-	proto.MessageType_UNSUB_TO_CHANNEL:    {&proto.UnsubscribedToChannelMessage{}, handleUnsubToChannel},
+	proto.MessageType_UNSUB_TO_CHANNEL:    {&proto.UnsubscribedToChannelMessage{}, handleUnsubFromChannel},
 	proto.MessageType_CHANNEL_DATA_UPDATE: {&proto.ChannelDataUpdateMessage{}, handleChannelDataUpdate},
 	proto.MessageType_DISCONNECT:          {&proto.DisconnectMessage{}, handleDisconnect},
 }
@@ -299,7 +299,7 @@ func handleSubToChannel(ctx MessageContext) {
 	}
 }
 
-func handleUnsubToChannel(ctx MessageContext) {
+func handleUnsubFromChannel(ctx MessageContext) {
 	msg, ok := ctx.Msg.(*proto.UnsubscribedToChannelMessage)
 	if !ok {
 		ctx.Connection.Logger().Error("message is not a UnsubscribedToChannelMessage, will not be handled.")
@@ -312,9 +312,9 @@ func handleUnsubToChannel(ctx MessageContext) {
 		ctx.Connection.Logger().Error("invalid ConnectionId for unsub", zap.Uint32("connId", msg.ConnId))
 		return
 	}
-	err := connToUnsub.UnsubscribeToChannel(ctx.Channel)
+	err := connToUnsub.UnsubscribeFromChannel(ctx.Channel)
 	if err != nil {
-		ctx.Connection.Logger().Error("failed to unsub to channel",
+		ctx.Connection.Logger().Error("failed to unsub from channel",
 			zap.String("channelType", ctx.Channel.channelType.String()),
 			zap.Uint32("channelId", uint32(ctx.Channel.id)),
 			zap.Error(err),

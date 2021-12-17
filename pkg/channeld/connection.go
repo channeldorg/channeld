@@ -35,7 +35,7 @@ func (t ConnectionType) String() string {
 	} else if t == CLIENT {
 		return "CLIENT"
 	} else {
-		return "UNKNOW"
+		return "UNKNOWN"
 	}
 }
 
@@ -48,15 +48,6 @@ type queuedMessageSender struct {
 	MessageSender
 }
 
-/*
-func (s *queuedMessageSender) Send(c *Connection, channelId ChannelId, msgType proto.MessageType, msg Message) {
-	c.sendQueue <- sendQueueMessage{
-		channelId: channelId,
-		msgType:   msgType,
-		msg:       msg,
-	}
-}
-*/
 func (s *queuedMessageSender) Send(c *Connection, ctx MessageContext) {
 	c.sendQueue <- ctx
 }
@@ -70,7 +61,7 @@ type Connection struct {
 	sender         MessageSender
 	sendQueue      chan MessageContext
 	fsm            *fsm.FiniteStateMachine
-	removing       int32 // Don't put the removing into the FSM as 1) the FSM's states are user-defined. 2) the FSM doesn't have the race condition.
+	removing       int32 // Don't put the removing state into the FSM as 1) the FSM's states are user-defined. 2) the FSM doesn't have the race condition.
 }
 
 var allConnections sync.Map // map[ConnectionId]*Connection
@@ -89,6 +80,7 @@ func InitConnections(serverFsmPath string, clientFsmPath string) {
 		)
 	} else {
 		logger.Info("loaded server FSM",
+			zap.String("path", serverFsmPath),
 			zap.String("currentState", serverFsm.CurrentState().Name),
 		)
 	}
@@ -101,6 +93,7 @@ func InitConnections(serverFsmPath string, clientFsmPath string) {
 		logger.Panic("failed to read client FSM", zap.Error(err))
 	} else {
 		logger.Info("loaded client FSM",
+			zap.String("path", clientFsmPath),
 			zap.String("currentState", clientFsm.CurrentState().Name),
 		)
 	}
@@ -198,14 +191,18 @@ func AddConnection(c net.Conn, t ConnectionType) *Connection {
 		sendQueue:      make(chan MessageContext, 128),
 		removing:       0,
 	}
+	// IMPORTANT: always make a value copy
 	var fsm fsm.FiniteStateMachine
 	switch t {
 	case SERVER:
 		fsm = serverFsm
-		fallthrough
 	case CLIENT:
 		fsm = clientFsm
-		connection.fsm = &fsm
+	}
+
+	connection.fsm = &fsm
+	if connection.fsm == nil {
+		logger.Panic("cannot set the FSM for connection", zap.String("connType", t.String()))
 	}
 
 	allConnections.Store(connection.id, connection)
@@ -216,6 +213,9 @@ func AddConnection(c net.Conn, t ConnectionType) *Connection {
 }
 
 func RemoveConnection(c *Connection) {
+	defer func() {
+		recover()
+	}()
 	atomic.AddInt32(&c.removing, 1)
 	c.conn.Close()
 	close(c.sendQueue)
@@ -356,7 +356,7 @@ func (c *Connection) receiveMessage(mp *proto.MessagePack) {
 	var handler MessageHandlerFunc
 	if mp.MsgType >= uint32(proto.MessageType_USER_SPACE_START) && entry == nil {
 		// User-space message without handler won't be deserialized.
-		msg = &proto.UserSpaceMessage{SourceConnId: uint32(c.id), MsgBody: mp.MsgBody}
+		msg = &proto.UserSpaceMessage{SourceConnId: uint32(c.id), Payload: mp.MsgBody}
 		handler = handleUserSpaceMessage
 	} else {
 		handler = entry.handler
@@ -418,6 +418,8 @@ func (c *Connection) Flush() {
 			MsgBody:   msgBody,
 		})
 		size = protobuf.Size(&p)
+
+		c.Logger().Debug("sent message", zap.Uint32("msgType", uint32(mc.MsgType)), zap.Int("size", len(msgBody)))
 
 		msgSent.Inc() /*.WithLabelValues(
 			strconv.FormatUint(uint64(e.Channel.id), 10),

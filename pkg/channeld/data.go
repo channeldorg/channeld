@@ -122,6 +122,15 @@ func (ch *Channel) tickData(t ChannelTime) {
 		if c == nil || c.IsRemoving() {
 			// Unsub the connection from the channel
 			delete(ch.subscribedConnections, foc.connId)
+			if ch.ownerConnection != nil {
+				if ch.ownerConnection == c {
+					// Reset the owner if it unsubscribed
+					ch.ownerConnection = nil
+				} else {
+					ch.ownerConnection.sendUnsubscribed(MessageContext{}, ch, 0)
+				}
+			}
+
 			tmp := focp.Next()
 			ch.fanOutQueue.Remove(focp)
 			focp = tmp

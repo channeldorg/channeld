@@ -71,10 +71,12 @@ enum MessageType {
     USER_SPACE_START = 100;
 }
 
+// Messages that are not handled in channeld. DO NOT send this message directly to channeld, as channeld uses it to wrap the payload and forward it to the target endpoint(s).
 message UserSpaceMessage {
     // The backend server generally needs the client connId to identify the sender.
     uint32 sourceConnId = 1;
-    bytes msgBody = 2;
+    // The user (client/server) decides to how serialize/deserialize the message.
+    bytes payload = 2;
 }
 
 // The packet should have channelId = 0 in order to be handled.

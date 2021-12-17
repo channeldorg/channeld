@@ -59,7 +59,7 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *proto.ChannelSubsc
 	return nil
 }
 
-func (c *Connection) UnsubscribeToChannel(ch *Channel) error {
+func (c *Connection) UnsubscribeFromChannel(ch *Channel) error {
 	cs, exists := ch.subscribedConnections[c.id]
 	if !exists {
 		return errors.New("subscription does not exist")
@@ -95,7 +95,7 @@ func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel, stubId uint
 	ctx.StubId = stubId
 	ctx.MsgType = proto.MessageType_SUB_TO_CHANNEL
 	ctx.Msg = &proto.SubscribedToChannelMessage{
-		ConnId:     uint32(c.id),
+		ConnId:     uint32(ctx.Connection.id),
 		SubOptions: &ch.subscribedConnections[c.id].options,
 	}
 	c.Send(ctx)
