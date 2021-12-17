@@ -31,7 +31,7 @@ var MessageMap = map[proto.MessageType]*messageMapEntry{
 	proto.MessageType_REMOVE_CHANNEL:      {&proto.RemoveChannelMessage{}, handleRemoveChannel},
 	proto.MessageType_LIST_CHANNEL:        {&proto.ListChannelMessage{}, handleListChannel},
 	proto.MessageType_SUB_TO_CHANNEL:      {&proto.SubscribedToChannelMessage{}, handleSubToChannel},
-	proto.MessageType_UNSUB_TO_CHANNEL:    {&proto.UnsubscribedToChannelMessage{}, handleUnsubFromChannel},
+	proto.MessageType_UNSUB_FROM_CHANNEL:  {&proto.UnsubscribedFromChannelMessage{}, handleUnsubFromChannel},
 	proto.MessageType_CHANNEL_DATA_UPDATE: {&proto.ChannelDataUpdateMessage{}, handleChannelDataUpdate},
 	proto.MessageType_DISCONNECT:          {&proto.DisconnectMessage{}, handleDisconnect},
 }
@@ -300,9 +300,9 @@ func handleSubToChannel(ctx MessageContext) {
 }
 
 func handleUnsubFromChannel(ctx MessageContext) {
-	msg, ok := ctx.Msg.(*proto.UnsubscribedToChannelMessage)
+	msg, ok := ctx.Msg.(*proto.UnsubscribedFromChannelMessage)
 	if !ok {
-		ctx.Connection.Logger().Error("message is not a UnsubscribedToChannelMessage, will not be handled.")
+		ctx.Connection.Logger().Error("message is not a UnsubscribedFromChannelMessage, will not be handled.")
 		return
 	}
 

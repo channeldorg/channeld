@@ -65,7 +65,7 @@ enum MessageType {
     REMOVE_CHANNEL = 4;
     LIST_CHANNEL = 5;
     SUB_TO_CHANNEL = 6;
-    UNSUB_TO_CHANNEL = 7;
+    UNSUB_FROM_CHANNEL = 7;
     CHANNEL_DATA_UPDATE = 8;
     DISCONNECT = 9;
     USER_SPACE_START = 100;
@@ -140,8 +140,8 @@ message SubscribedToChannelMessage {
     ChannelSubscriptionOptions subOptions = 2;
 }
 
-// Response: @UnsubscribedToChannelMessage. The channel owner will receive the same message.
-message UnsubscribedToChannelMessage {
+// Response: @UnsubscribedFromChannelMessage. The channel owner will receive the same message.
+message UnsubscribedFromChannelMessage {
     uint32 connId = 1;
 }
 

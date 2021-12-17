@@ -86,7 +86,7 @@ func (c *Connection) sendConnUnsubscribed(connId ConnectionId, ids ...ChannelId)
 		channelIds[i] = uint32(id)
 	}
 	subMsg := &proto.UnsubscribedToChannelsMessage{ConnId: uint32(connId), ChannelIds: channelIds}
-	c.SendWithGlobalChannel(proto.MessageType_UNSUB_TO_CHANNEL, subMsg)
+	c.SendWithGlobalChannel(proto.MessageType_UNSUB_FROM_CHANNEL, subMsg)
 }
 */
 
@@ -103,8 +103,8 @@ func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel, stubId uint
 func (c *Connection) sendUnsubscribed(ctx MessageContext, ch *Channel, stubId uint32) {
 	ctx.Channel = ch
 	ctx.StubId = stubId
-	ctx.MsgType = proto.MessageType_UNSUB_TO_CHANNEL
-	ctx.Msg = &proto.UnsubscribedToChannelMessage{
+	ctx.MsgType = proto.MessageType_UNSUB_FROM_CHANNEL
+	ctx.Msg = &proto.UnsubscribedFromChannelMessage{
 		ConnId: uint32(c.id),
 	}
 	c.Send(ctx)

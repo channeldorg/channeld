@@ -183,7 +183,7 @@ window.addEventListener("load", function(evt) {
         proto.ListChannelResultMessage = root.lookupType("channeld.ListChannelResultMessage");
         proto.ChannelInfo = root.lookupType("channeld.ListChannelResultMessage.ChannelInfo");
         proto.SubscribedToChannelMessage = root.lookupType("channeld.SubscribedToChannelMessage");
-        proto.UnsubscribedToChannelMessage = root.lookupType("channeld.UnsubscribedToChannelMessage");
+        proto.UnsubscribedFromChannelMessage = root.lookupType("channeld.UnsubscribedFromChannelMessage");
         proto.ChannelDataUpdateMessage = root.lookupType("channeld.ChannelDataUpdateMessage");
         // Use reflection to create the Any type.
         proto.Any = new protobuf.Type("Any").add(new protobuf.Field("type_url", 1, "string")).add(new protobuf.Field("value", 2, "bytes"));
@@ -209,7 +209,7 @@ window.addEventListener("load", function(evt) {
 
             messageHandlers[proto.MessageType.values.AUTH] = {class: proto.AuthResultMessage/* Use RPC callback instead of handler function */};
             messageHandlers[proto.MessageType.values.SUB_TO_CHANNEL] = {class: proto.SubscribedToChannelMessage, handler: handleSubToChannel};
-            messageHandlers[proto.MessageType.values.UNSUB_TO_CHANNEL] = {class: proto.UnsubscribedToChannelMessage, handler: handleUnsubToChannel};
+            messageHandlers[proto.MessageType.values.UNSUB_FROM_CHANNEL] = {class: proto.UnsubscribedFromChannelMessage, handler: handleUnsubToChannel};
             messageHandlers[proto.MessageType.values.CHANNEL_DATA_UPDATE] = {class: proto.ChannelDataUpdateMessage, handler: handleChannelDataUpdate};
             messageHandlers[proto.MessageType.values.LIST_CHANNEL] = {class: proto.ListChannelResultMessage, handler: handleListChannelResult};
  
@@ -233,8 +233,8 @@ window.addEventListener("load", function(evt) {
                     }]
                 },
                 "unsub": {
-                    "msgType": proto.MessageType.values.UNSUB_TO_CHANNEL,
-                    "msgClass": proto.UnsubscribedToChannelMessage,
+                    "msgType": proto.MessageType.values.UNSUB_FROM_CHANNEL,
+                    "msgClass": proto.UnsubscribedFromChannelMessage,
                     "channelId": (args) => {return parseInt(args[0])},
                     "args": ["channelId", (jo, arg) => {
                         jo["connId"] = arg ? parseInt(arg) : connId;

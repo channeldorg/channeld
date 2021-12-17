@@ -146,10 +146,10 @@ var clientActions = []*clientAction{
 				channelIdToUnsub = randUint32(client.subscribedChannels)
 			}
 
-			client.Send(channelIdToUnsub, proto.BroadcastType_NO, uint32(proto.MessageType_UNSUB_TO_CHANNEL), &proto.UnsubscribedToChannelMessage{
+			client.Send(channelIdToUnsub, proto.BroadcastType_NO, uint32(proto.MessageType_UNSUB_FROM_CHANNEL), &proto.UnsubscribedFromChannelMessage{
 				ConnId: client.Id,
 			}, nil)
-			//log.Printf("Client(%d) UNSUB_TO_CHANNEL: %d", client.Id, channelIdToUnsub)
+			//log.Printf("Client(%d) UNSUB_FROM_CHANNEL: %d", client.Id, channelIdToUnsub)
 			return true
 		},
 	},
@@ -229,8 +229,8 @@ func runClient() {
 	c.AddMessageHandler(uint32(proto.MessageType_SUB_TO_CHANNEL), func(client *Client, channelId uint32, m Message) {
 		data.activeChannelId = channelId
 	})
-	c.AddMessageHandler(uint32(proto.MessageType_UNSUB_TO_CHANNEL), func(client *Client, channelId uint32, m Message) {
-		msg := m.(*proto.UnsubscribedToChannelMessage)
+	c.AddMessageHandler(uint32(proto.MessageType_UNSUB_FROM_CHANNEL), func(client *Client, channelId uint32, m Message) {
+		msg := m.(*proto.UnsubscribedFromChannelMessage)
 		if msg.ConnId != client.Id {
 			return
 		}
