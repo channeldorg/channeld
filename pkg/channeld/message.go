@@ -164,6 +164,9 @@ func handleCreateChannel(ctx MessageContext) {
 		}
 	}
 
+	// Make sure the response message has the channelId = newChannel.id, not always 0.
+	ctx.ChannelId = uint32(newChannel.id)
+
 	// Subscribe to channel after creation
 	ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
 	// Also send the Sub message to the creator (no need to broadcast as there's only 1 subscriber)
@@ -187,8 +190,8 @@ func handleRemoveChannel(ctx MessageContext) {
 		ctx.Connection.Logger().Error("invalid channelId for removing", zap.Uint32("channelId", msg.ChannelId))
 		return
 	}
-	// Only the owner can remove the channel
-	if channelToRemove.ownerConnection != ctx.Connection {
+	// Only the channel owner or GLOBAL owner can remove the channel
+	if !ctx.Connection.HasAuthorityOver(channelToRemove) {
 		ownerConnId := uint32(0)
 		if channelToRemove.ownerConnection != nil {
 			ownerConnId = uint32(channelToRemove.ownerConnection.id)
@@ -274,8 +277,8 @@ func handleSubToChannel(ctx MessageContext) {
 		return
 	}
 
-	if connToSub.id != ctx.Connection.id && ctx.Connection != ctx.Channel.ownerConnection {
-		ctx.Connection.Logger().Error("illegal attemp to sub another connection as the sender is not the channel owener",
+	if connToSub.id != ctx.Connection.id && !connToSub.HasAuthorityOver(ctx.Channel) {
+		ctx.Connection.Logger().Error("illegal attemp to sub another connection as the sender has no authority",
 			zap.Uint32("subConnId", msg.ConnId),
 			zap.String("channelType", ctx.Channel.channelType.String()),
 			zap.Uint32("channelId", uint32(ctx.Channel.id)),
@@ -293,8 +296,15 @@ func handleSubToChannel(ctx MessageContext) {
 		return
 	}
 
-	connToSub.sendSubscribed(ctx, ctx.Channel, ctx.StubId)
-	if ctx.Channel.ownerConnection != nil {
+	// Notify the sender.
+	ctx.Connection.sendSubscribed(ctx, ctx.Channel, ctx.StubId)
+
+	// Notify the subscribed.
+	if connToSub != ctx.Connection {
+		connToSub.sendSubscribed(ctx, ctx.Channel, 0)
+	}
+	// Notify the channel owner.
+	if ctx.Channel.ownerConnection != ctx.Connection && ctx.Channel.ownerConnection != nil {
 		ctx.Channel.ownerConnection.sendSubscribed(ctx, ctx.Channel, 0)
 	}
 }
@@ -306,12 +316,22 @@ func handleUnsubFromChannel(ctx MessageContext) {
 		return
 	}
 
-	// The connection that unsubscribes. Could be different to c which sends the message.
+	// The connection that unsubscribes. Could be different to the connection that sends the message.
 	connToUnsub := GetConnection(ConnectionId(msg.ConnId))
 	if connToUnsub == nil {
 		ctx.Connection.Logger().Error("invalid ConnectionId for unsub", zap.Uint32("connId", msg.ConnId))
 		return
 	}
+
+	if connToUnsub.id != ctx.Connection.id && !connToUnsub.HasAuthorityOver(ctx.Channel) {
+		ctx.Connection.Logger().Error("illegal attemp to unsub another connection as the sender has no authority",
+			zap.Uint32("unsubConnId", msg.ConnId),
+			zap.String("channelType", ctx.Channel.channelType.String()),
+			zap.Uint32("channelId", uint32(ctx.Channel.id)),
+		)
+		return
+	}
+
 	err := connToUnsub.UnsubscribeFromChannel(ctx.Channel)
 	if err != nil {
 		ctx.Connection.Logger().Error("failed to unsub from channel",
@@ -322,13 +342,20 @@ func handleUnsubFromChannel(ctx MessageContext) {
 		return
 	}
 
-	connToUnsub.sendUnsubscribed(ctx, ctx.Channel, ctx.StubId)
+	// Notify the sender.
+	ctx.Connection.sendUnsubscribed(ctx, ctx.Channel, ctx.StubId)
+
+	// Notify the unsubscribed.
+	if connToUnsub != ctx.Connection {
+		connToUnsub.sendUnsubscribed(ctx, ctx.Channel, 0)
+	}
+	// Notify the channel owner.
 	if ctx.Channel.ownerConnection != nil {
-		if ctx.Channel.ownerConnection == connToUnsub {
+		if ctx.Channel.ownerConnection != ctx.Connection {
+			ctx.Channel.ownerConnection.sendUnsubscribed(ctx, ctx.Channel, 0)
+		} else {
 			// Reset the owner if it unsubscribed
 			ctx.Channel.ownerConnection = nil
-		} else {
-			ctx.Channel.ownerConnection.sendUnsubscribed(ctx, ctx.Channel, 0)
 		}
 	}
 }

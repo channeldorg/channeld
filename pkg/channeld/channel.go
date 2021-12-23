@@ -193,6 +193,18 @@ func (ch *Channel) Broadcast(ctx MessageContext) {
 	}
 }
 
+// Return true if the connection can 1)remove; 2)sub/unsub another connection to/from; the channel.
+func (c *Connection) HasAuthorityOver(ch *Channel) bool {
+	// The global owner has authority over everything.
+	if globalChannel.ownerConnection == c {
+		return true
+	}
+	if ch.ownerConnection == c {
+		return true
+	}
+	return false
+}
+
 func (ch *Channel) String() string {
 	return fmt.Sprintf("Channel(%s %d)", ch.channelType.String(), ch.id)
 }

@@ -28,7 +28,7 @@ message MessagePack {
     // The MessageType either defined in @MessageType enum, or defined in user space.
     uint32 msgType = 4;
 
-    // Protobuf-marshalled message body.
+    // The serialized message. It's Protobuf-marshalled byte array if the message is defined in @MessageType.
     bytes msgBody = 5;
 }
 
@@ -103,7 +103,7 @@ message ChannelSubscriptionOptions {
 }
 
 // The packet should have channelId = 0 in order to be handled.
-// Response: @SubscribedToChannelsMessage
+// Response: @SubscribedToChannelsMessage. The channelId in the response MessagePack corresponds to the created channel.
 message CreateChannelMessage {
     ChannelType channelType = 1;
     string metadata = 2;
@@ -133,14 +133,14 @@ message ListChannelResultMessage {
     repeated ChannelInfo channels = 1;
 }
 
-// Response: @SubscribedToChannelMessage. The channel owner will receive the same message.
+// Response: @SubscribedToChannelResultMessage. The message sender, the subscribed connection, and the channel owner will receive the message respectively.
 message SubscribedToChannelMessage {
     // The connection to be added to the channel is not necessarily the one sends the message 
     uint32 connId = 1;
     ChannelSubscriptionOptions subOptions = 2;
 }
 
-// Response: @UnsubscribedFromChannelMessage. The channel owner will receive the same message.
+// Response: @UnsubscribedFromChannelMessage. The message sender, the subscribed connection, and the channel owner will receive the message respectively.
 message UnsubscribedFromChannelMessage {
     uint32 connId = 1;
 }
