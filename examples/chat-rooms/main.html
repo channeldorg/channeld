@@ -158,6 +158,10 @@ window.addEventListener("load", function(evt) {
         }
     };
 
+    var handleCreateChannel = function(msg, channelId) {
+        appendLog("Created channel(" + proto.ChannelType.valuesById[msg.channelType] + " " + channelId + "), owner: " + msg.ownerConnId);
+    };
+
 
     var protobufRoot;
     var proto = {};
@@ -178,11 +182,13 @@ window.addEventListener("load", function(evt) {
         proto.AuthResultMessage = root.lookupType("channeld.AuthResultMessage");
         proto.ChannelSubscriptionOptions = root.lookupType("channeld.ChannelSubscriptionOptions");
         proto.CreateChannelMessage = root.lookupType("channeld.CreateChannelMessage");
+        proto.CreateChannelResultMessage = root.lookupType("channeld.CreateChannelResultMessage");
         proto.RemoveChannelMessage = root.lookupType("channeld.RemoveChannelMessage");
         proto.ListChannelMessage = root.lookupType("channeld.ListChannelMessage");
         proto.ListChannelResultMessage = root.lookupType("channeld.ListChannelResultMessage");
         proto.ChannelInfo = root.lookupType("channeld.ListChannelResultMessage.ChannelInfo");
         proto.SubscribedToChannelMessage = root.lookupType("channeld.SubscribedToChannelMessage");
+        proto.SubscribedToChannelResultMessage = root.lookupType("channeld.SubscribedToChannelResultMessage");
         proto.UnsubscribedFromChannelMessage = root.lookupType("channeld.UnsubscribedFromChannelMessage");
         proto.ChannelDataUpdateMessage = root.lookupType("channeld.ChannelDataUpdateMessage");
         // Use reflection to create the Any type.
@@ -208,10 +214,11 @@ window.addEventListener("load", function(evt) {
             }
 
             messageHandlers[proto.MessageType.values.AUTH] = {class: proto.AuthResultMessage/* Use RPC callback instead of handler function */};
-            messageHandlers[proto.MessageType.values.SUB_TO_CHANNEL] = {class: proto.SubscribedToChannelMessage, handler: handleSubToChannel};
+            messageHandlers[proto.MessageType.values.SUB_TO_CHANNEL] = {class: proto.SubscribedToChannelResultMessage, handler: handleSubToChannel};
             messageHandlers[proto.MessageType.values.UNSUB_FROM_CHANNEL] = {class: proto.UnsubscribedFromChannelMessage, handler: handleUnsubToChannel};
             messageHandlers[proto.MessageType.values.CHANNEL_DATA_UPDATE] = {class: proto.ChannelDataUpdateMessage, handler: handleChannelDataUpdate};
             messageHandlers[proto.MessageType.values.LIST_CHANNEL] = {class: proto.ListChannelResultMessage, handler: handleListChannelResult};
+            messageHandlers[proto.MessageType.values.CREATE_CHANNEL] = {class: proto.CreateChannelResultMessage, handler: handleCreateChannel};
  
             commands = {
                 "create": {

@@ -103,7 +103,7 @@ message ChannelSubscriptionOptions {
 }
 
 // The packet should have channelId = 0 in order to be handled.
-// Response: @SubscribedToChannelsMessage. The channelId in the response MessagePack corresponds to the created channel.
+// Response: @CreateChannelResultMessage. The channelId in the response MessagePack corresponds to the created channel. The GLOBAL channel owner will also receive this message.
 message CreateChannelMessage {
     ChannelType channelType = 1;
     string metadata = 2;
@@ -111,8 +111,13 @@ message CreateChannelMessage {
     google.protobuf.Any data = 4;
 }
 
+message CreateChannelResultMessage {
+    ChannelType channelType = 1;
+    uint32 ownerConnId = 2;
+}
+
 // The packet should have channelId = 0 in order to be handled.
-// Response: all connections in the channel will receive @RemoveChannelMessage
+// Response: all connections in the channel will receive @RemoveChannelMessage. The GLOBAL channel owner will also receive this message.
 message RemoveChannelMessage {
     uint32 channelId = 1;
 }
@@ -138,6 +143,12 @@ message SubscribedToChannelMessage {
     // The connection to be added to the channel is not necessarily the one sends the message 
     uint32 connId = 1;
     ChannelSubscriptionOptions subOptions = 2;
+}
+
+message SubscribedToChannelResultMessage {
+    // The connection that subsribed.
+    uint32 connId = 1;
+    ChannelType channelType = 2;
 }
 
 // Response: @UnsubscribedFromChannelMessage. The message sender, the subscribed connection, and the channel owner will receive the message respectively.

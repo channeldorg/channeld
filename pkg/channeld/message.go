@@ -169,8 +169,17 @@ func handleCreateChannel(ctx MessageContext) {
 
 	// Subscribe to channel after creation
 	ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
-	// Also send the Sub message to the creator (no need to broadcast as there's only 1 subscriber)
-	ctx.Connection.sendSubscribed(ctx, newChannel, ctx.StubId)
+
+	ctx.Msg = &proto.CreateChannelResultMessage{
+		ChannelType: newChannel.channelType,
+		OwnerConnId: uint32(ctx.Connection.id),
+	}
+	ctx.Connection.Send(ctx)
+	// Also send the response to the GLOBAL channel owner.
+	if globalChannel.ownerConnection != ctx.Connection && globalChannel.ownerConnection != nil {
+		ctx.StubId = 0
+		globalChannel.ownerConnection.Send(ctx)
+	}
 }
 
 func handleRemoveChannel(ctx MessageContext) {
@@ -297,15 +306,15 @@ func handleSubToChannel(ctx MessageContext) {
 	}
 
 	// Notify the sender.
-	ctx.Connection.sendSubscribed(ctx, ctx.Channel, ctx.StubId)
+	ctx.Connection.sendSubscribed(ctx, ctx.Channel, connToSub.id, ctx.StubId)
 
 	// Notify the subscribed.
 	if connToSub != ctx.Connection {
-		connToSub.sendSubscribed(ctx, ctx.Channel, 0)
+		connToSub.sendSubscribed(ctx, ctx.Channel, connToSub.id, 0)
 	}
 	// Notify the channel owner.
 	if ctx.Channel.ownerConnection != ctx.Connection && ctx.Channel.ownerConnection != nil {
-		ctx.Channel.ownerConnection.sendSubscribed(ctx, ctx.Channel, 0)
+		ctx.Channel.ownerConnection.sendSubscribed(ctx, ctx.Channel, connToSub.id, 0)
 	}
 }
 
