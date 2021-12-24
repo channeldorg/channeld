@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package tanks;
+
+option go_package = "/proto";
+option csharp_namespace = "Channeld.Examples.Tanks";
+
+message Vector3f {
+    float x = 1;
+    float y = 2;
+    float z = 3;
+}
+
+message Vector4f {
+    float x = 1;
+    float y = 2;
+    float z = 3;
+    float w = 4;
+}
+
+message TransformState {
+    Vector3f position = 1;
+    Vector4f rotation = 2;
+    Vector3f scale = 3; 
+}
+
+message TankState {
+    int32 health = 1;
+}
+
+message TankGameChannelData {
+    map<uint32, TransformState> transformStates = 1;
+    map<uint32, TankState> tankStates = 2;
+}

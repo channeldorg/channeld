@@ -37,12 +37,12 @@
         "program": "examples/chat-rooms/main.go"
     },
     {
-        "name": "Launch KCP",
+        "name": "Launch tank server",
         "type": "go",
         "request": "launch",
         "mode": "debug",
         "program": "cmd/main.go",
-        "args": ["-sn", "kcp", "-cn", "kcp"]
+        "args": ["-cfsm", "../config/client_authoratative_fsm.json"]
     }
     ]
 }
