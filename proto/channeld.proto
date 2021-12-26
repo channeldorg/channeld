@@ -113,7 +113,8 @@ message CreateChannelMessage {
 
 message CreateChannelResultMessage {
     ChannelType channelType = 1;
-    uint32 ownerConnId = 2;
+    string metadata = 2;
+    uint32 ownerConnId = 3;
 }
 
 // The packet should have channelId = 0 in order to be handled.

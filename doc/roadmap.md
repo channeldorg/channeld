@@ -38,10 +38,13 @@
     - [x] Implement the commands
     - [ ] Scale test with 10K connections
     - [ ] Complete the UI
-- [ ] Unity relay server
-    - [ ] Implement the C# client library
-    - [ ] Implement the reflection-based schema
-    - [ ] Implement the network replication
+- [ ] Unity tank game
+    - [x] Implement the C# client library
+    - [ ] Mirror Integration
+        - [x] Transport
+        - [x] SyncVar and NetworkTransform
+        - [ ] Observers and Interest Management
+    - [ ] Multi-server support
 - [ ] Unreal seamless world travelling
     - [ ] Implement the C++ client library
     - [ ] Integrate with Unreal's networking stack

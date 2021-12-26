@@ -78,8 +78,11 @@ func handleUserSpaceMessage(ctx MessageContext) {
 			ctx.Channel.Broadcast(ctx)
 
 		case proto.BroadcastType_SINGLE_CONNECTION:
+			// In this case, the channelId in the packet means the target connectionId!
 			conn := GetConnection(ConnectionId(ctx.ChannelId))
 			if conn != nil {
+				// Replace it with the correct channelId before we forward the message.
+				ctx.ChannelId = uint32(ctx.Channel.id)
 				conn.Send(ctx)
 			} else {
 				ctx.Connection.Logger().Error("cannot forward the message as the target connection does not exist",
@@ -172,6 +175,7 @@ func handleCreateChannel(ctx MessageContext) {
 
 	ctx.Msg = &proto.CreateChannelResultMessage{
 		ChannelType: newChannel.channelType,
+		Metadata:    newChannel.metadata,
 		OwnerConnId: uint32(ctx.Connection.id),
 	}
 	ctx.Connection.Send(ctx)
