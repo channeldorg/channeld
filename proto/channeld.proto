@@ -76,7 +76,7 @@ enum MessageType {
 message ServerForwardMessage {
     // The client that sends the user-space message to server or server sends the user-space message to.
     uint32 clientConnId = 1;
-    // The original user-space message. channeld leaves it as it is.
+    // The user-space message. channeld leaves it as the original binary format.
     bytes payload = 2;
 }
 
@@ -103,6 +103,15 @@ message ChannelSubscriptionOptions {
 	uint32 FanOutIntervalMs = 3;
 }
 
+message ChannelDataMergeOptions {
+    // By default, Protobuf appends the src list to the dst list. Setting this option to true will replace the dst list with the src list.
+	bool shouldReplaceRepeated = 1;
+	// By default, Protobuf ignores the nil value when merging the map. Setting this option to true will delete the key-value pair when merging.
+	bool shouldDeleteNilMapValue = 2;
+	// If the value is greater than 0, truncate the top elements of the list when oversized.
+	uint32 listSizeLimit = 3;
+}
+
 // The packet should have channelId = 0 in order to be handled.
 // Response: @CreateChannelResultMessage. The channelId in the response MessagePack corresponds to the created channel. The GLOBAL channel owner will also receive this message.
 message CreateChannelMessage {
@@ -110,6 +119,7 @@ message CreateChannelMessage {
     string metadata = 2;
     ChannelSubscriptionOptions subOptions = 3;
     google.protobuf.Any data = 4;
+    ChannelDataMergeOptions mergeOptions = 5;
 }
 
 message CreateChannelResultMessage {

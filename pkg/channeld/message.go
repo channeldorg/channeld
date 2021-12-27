@@ -165,7 +165,7 @@ func handleCreateChannel(ctx MessageContext) {
 			newChannel.Logger().Error("failed to unmarshal data message for the new channel", zap.Error(err))
 			return
 		} else {
-			newChannel.InitData(dataMsg, nil)
+			newChannel.InitData(dataMsg, msg.MergeOptions)
 		}
 	}
 

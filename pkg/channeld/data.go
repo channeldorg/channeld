@@ -17,17 +17,8 @@ import (
 
 type ChannelDataMessage = Message //protoreflect.Message
 
-type DataMergeOptions struct {
-	// By default, Protobuf appends the src list to the dst list. Setting this option to true will replace the dst list with the src list.
-	ShouldReplaceRepeated bool
-	// By default, Protobuf ignores the nil value when merging the map. Setting this option to true will delete the key-value pair when merging.
-	ShouldDeleteNilMapValue bool
-	// If the value is greater than 0, truncate the top elements of the list when oversized.
-	ListSizeLimit int
-}
-
 type ChannelData struct {
-	mergeOptions *DataMergeOptions
+	mergeOptions *proto.ChannelDataMergeOptions
 	msg          ChannelDataMessage
 	//updateMsg       ChannelDataMessage
 	updateMsgBuffer     *list.List
@@ -48,7 +39,7 @@ const (
 	MaxUpdateMsgBufferSize = 512
 )
 
-func ReflectChannelData(channelType proto.ChannelType, mergeOptions *DataMergeOptions) (*ChannelData, error) {
+func ReflectChannelData(channelType proto.ChannelType, mergeOptions *proto.ChannelDataMergeOptions) (*ChannelData, error) {
 	channelTypeName := channelType.String()
 	dataTypeName := fmt.Sprintf("channeld.%sChannelDataMessage",
 		strcase.ToCamel(strings.ToLower(channelTypeName)))
@@ -64,7 +55,7 @@ func ReflectChannelData(channelType proto.ChannelType, mergeOptions *DataMergeOp
 	}, nil
 }
 
-func (ch *Channel) InitData(dataMsg Message, mergeOptions *DataMergeOptions) {
+func (ch *Channel) InitData(dataMsg Message, mergeOptions *proto.ChannelDataMergeOptions) {
 	ch.data = &ChannelData{
 		msg:             dataMsg,
 		updateMsgBuffer: list.New(),
@@ -213,7 +204,7 @@ func (ch *Channel) fanOutDataUpdate(c *Connection, cs *ChannelSubscription, upda
 	// cs.fanOutDataMsg = nil
 }
 
-func mergeWithOptions(dst Message, src Message, options *DataMergeOptions) {
+func mergeWithOptions(dst Message, src Message, options *proto.ChannelDataMergeOptions) {
 	protobuf.Merge(dst, src)
 	if options != nil {
 		dst.ProtoReflect().Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
@@ -222,12 +213,12 @@ func mergeWithOptions(dst Message, src Message, options *DataMergeOptions) {
 					dst.ProtoReflect().Set(fd, src.ProtoReflect().Get(fd))
 				}
 				list := v.List()
-				offset := list.Len() - options.ListSizeLimit
+				offset := list.Len() - int(options.ListSizeLimit)
 				if options.ListSizeLimit > 0 && offset > 0 {
-					for i := 0; i < options.ListSizeLimit; i++ {
+					for i := 0; i < int(options.ListSizeLimit); i++ {
 						list.Set(i, list.Get(i+offset))
 					}
-					list.Truncate(options.ListSizeLimit)
+					list.Truncate(int(options.ListSizeLimit))
 				}
 			} else if fd.IsMap() {
 				if options.ShouldDeleteNilMapValue {

@@ -183,7 +183,7 @@ func TestDataMergeOptions(t *testing.T) {
 	}
 
 	mergedMsg1 := protobuf.Clone(dstMsg).(*proto.TestMergeMessage)
-	mergeOptions1 := &DataMergeOptions{
+	mergeOptions1 := &proto.ChannelDataMergeOptions{
 		ShouldReplaceRepeated: true,
 	}
 	mergeWithOptions(mergedMsg1, srcMsg, mergeOptions1)
@@ -191,7 +191,7 @@ func TestDataMergeOptions(t *testing.T) {
 	assert.Equal(t, "e", mergedMsg1.List[1])
 
 	mergedMsg2 := protobuf.Clone(dstMsg).(*proto.TestMergeMessage)
-	mergeOptions2 := &DataMergeOptions{
+	mergeOptions2 := &proto.ChannelDataMergeOptions{
 		ListSizeLimit: 4,
 	}
 	mergeWithOptions(mergedMsg2, srcMsg, mergeOptions2)
@@ -199,7 +199,7 @@ func TestDataMergeOptions(t *testing.T) {
 	assert.Equal(t, "b", mergedMsg2.List[0])
 
 	mergedMsg3 := protobuf.Clone(dstMsg).(*proto.TestMergeMessage)
-	mergeOptions3 := &DataMergeOptions{
+	mergeOptions3 := &proto.ChannelDataMergeOptions{
 		ShouldDeleteNilMapValue: true,
 	}
 	mergeWithOptions(mergedMsg3, srcMsg, mergeOptions3)
