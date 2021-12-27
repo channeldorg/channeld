@@ -40,56 +40,58 @@ func RegisterMessageHandler(msgType uint32, msg Message, handler MessageHandlerF
 	MessageMap[proto.MessageType(msgType)] = &messageMapEntry{msg, handler}
 }
 
-// Forward or broadcast user-space messages
-func handleUserSpaceMessage(ctx MessageContext) {
-	if ctx.Connection.connectionType == CLIENT {
-		if ctx.Channel.ownerConnection != nil {
-			ctx.Channel.ownerConnection.Send(ctx)
-		} else if ctx.Broadcast != proto.BroadcastType_NO {
-			if ctx.Channel.enableClientBroadcast {
-				ctx.Channel.Broadcast(ctx)
-			} else {
-				ctx.Connection.Logger().Error("illegal attempt to broadcast message as the channel's client broadcasting is disabled",
-					zap.Uint32("msgType", uint32(ctx.MsgType)),
-					zap.String("channelType", ctx.Channel.channelType.String()),
-					zap.Uint32("channelId", uint32(ctx.Channel.id)),
-				)
-			}
+func handleClientToServerUserMessage(ctx MessageContext) {
+	if ctx.Channel.ownerConnection != nil {
+		ctx.Channel.ownerConnection.Send(ctx)
+	} else if ctx.Broadcast != proto.BroadcastType_NO {
+		if ctx.Channel.enableClientBroadcast {
+			ctx.Channel.Broadcast(ctx)
 		} else {
-			ctx.Channel.Logger().Error("channel has no owner to forward the user-space messaged",
+			ctx.Connection.Logger().Error("illegal attempt to broadcast message as the channel's client broadcasting is disabled",
 				zap.Uint32("msgType", uint32(ctx.MsgType)),
-				zap.Uint32("connId", uint32(ctx.Connection.id)),
+				zap.String("channelType", ctx.Channel.channelType.String()),
+				zap.Uint32("channelId", uint32(ctx.Channel.id)),
 			)
 		}
 	} else {
-		switch ctx.Broadcast {
-		case proto.BroadcastType_NO:
-			if ctx.Channel.ownerConnection != nil {
-				ctx.Channel.ownerConnection.Send(ctx)
-			} else {
-				ctx.Connection.Logger().Error("cannot forward the message as the channel has no owner",
-					zap.Uint32("msgType", uint32(ctx.MsgType)),
-					zap.String("channelType", ctx.Channel.channelType.String()),
-					zap.Uint32("channelId", uint32(ctx.Channel.id)),
-				)
-			}
+		ctx.Channel.Logger().Error("channel has no owner to forward the user-space messaged",
+			zap.Uint32("msgType", uint32(ctx.MsgType)),
+			zap.Uint32("connId", uint32(ctx.Connection.id)),
+		)
+	}
+}
 
-		case proto.BroadcastType_ALL, proto.BroadcastType_ALL_BUT_SENDER:
-			ctx.Channel.Broadcast(ctx)
+func handleServerToClientUserMessage(ctx MessageContext) {
+	msg, ok := ctx.Msg.(*proto.ServerForwardMessage)
+	if !ok {
+		ctx.Connection.Logger().Error("message is not a ServerForwardMessage, will not be handled.")
+		return
+	}
 
-		case proto.BroadcastType_SINGLE_CONNECTION:
-			// In this case, the channelId in the packet means the target connectionId!
-			conn := GetConnection(ConnectionId(ctx.ChannelId))
-			if conn != nil {
-				// Replace it with the correct channelId before we forward the message.
-				ctx.ChannelId = uint32(ctx.Channel.id)
-				conn.Send(ctx)
-			} else {
-				ctx.Connection.Logger().Error("cannot forward the message as the target connection does not exist",
-					zap.Uint32("msgType", uint32(ctx.MsgType)),
-					zap.Uint32("targetConnId", ctx.ChannelId),
-				)
-			}
+	switch ctx.Broadcast {
+	case proto.BroadcastType_NO:
+		if ctx.Channel.ownerConnection != nil {
+			ctx.Channel.ownerConnection.Send(ctx)
+		} else {
+			ctx.Connection.Logger().Error("cannot forward the message as the channel has no owner",
+				zap.Uint32("msgType", uint32(ctx.MsgType)),
+				zap.String("channelType", ctx.Channel.channelType.String()),
+				zap.Uint32("channelId", uint32(ctx.Channel.id)),
+			)
+		}
+
+	case proto.BroadcastType_ALL, proto.BroadcastType_ALL_BUT_SENDER:
+		ctx.Channel.Broadcast(ctx)
+
+	case proto.BroadcastType_SINGLE_CONNECTION:
+		clientConn := GetConnection(ConnectionId(msg.ClientConnId))
+		if clientConn != nil {
+			clientConn.Send(ctx)
+		} else {
+			ctx.Connection.Logger().Error("cannot forward the message as the target connection does not exist",
+				zap.Uint32("msgType", uint32(ctx.MsgType)),
+				zap.Uint32("targetConnId", msg.ClientConnId),
+			)
 		}
 	}
 }

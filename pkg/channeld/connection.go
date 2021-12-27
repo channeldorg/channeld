@@ -326,19 +326,13 @@ func (c *Connection) ReceivePacket() {
 }
 
 func (c *Connection) receiveMessage(mp *proto.MessagePack) {
-	var channel *Channel
-	if mp.Broadcast == proto.BroadcastType_SINGLE_CONNECTION {
-		// Single connection forwarding will be handled in the GLOBAL channel, as the channelId will be used as the target connId.
-		channel = globalChannel
-	} else {
-		channel = GetChannel(ChannelId(mp.ChannelId))
-		if channel == nil {
-			c.Logger().Warn("can't find channel",
-				zap.Uint32("channelId", mp.ChannelId),
-				zap.Uint32("msgType", mp.MsgType),
-			)
-			return
-		}
+	channel := GetChannel(ChannelId(mp.ChannelId))
+	if channel == nil {
+		c.Logger().Warn("can't find channel",
+			zap.Uint32("channelId", mp.ChannelId),
+			zap.Uint32("msgType", mp.MsgType),
+		)
+		return
 	}
 
 	entry := MessageMap[proto.MessageType(mp.MsgType)]
@@ -355,9 +349,17 @@ func (c *Connection) receiveMessage(mp *proto.MessagePack) {
 	var msg Message
 	var handler MessageHandlerFunc
 	if mp.MsgType >= uint32(proto.MessageType_USER_SPACE_START) && entry == nil {
-		// User-space message without handler won't be deserialized.
-		msg = &proto.UserSpaceMessage{SourceConnId: uint32(c.id), Payload: mp.MsgBody}
-		handler = handleUserSpaceMessage
+		// client -> channeld -> server
+		if c.connectionType == CLIENT {
+			// User-space message without handler won't be deserialized.
+			msg = &proto.ServerForwardMessage{ClientConnId: uint32(c.id), Payload: mp.MsgBody}
+			handler = handleClientToServerUserMessage
+		} else {
+			// server -> channeld -> client
+			msg = &proto.ServerForwardMessage{}
+			protobuf.Unmarshal(mp.MsgBody, msg)
+			handler = handleServerToClientUserMessage
+		}
 	} else {
 		handler = entry.handler
 		// Always make a clone!

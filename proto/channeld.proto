@@ -39,8 +39,8 @@ enum BroadcastType {
     ALL = 1;
     // Broadcast the message to all the connections in the channel, the sender excluded.
     ALL_BUT_SENDER = 2;
-    // Forward the packet to the connection. Can only be used by the backend server. The channelId in the packet will then be used as the target connectionId.
-    // This has the same behavior as sending the packet to the PRIVATE channel owned by the target connection with BroadcastType = NO, but is less efficient as the message will be handled in the global channel.
+    // Forward the packet to the connection. Can only be used by the backend server.
+    // This has the same behavior as sending the packet to the PRIVATE channel owned by the target connection with BroadcastType = NO.
     SINGLE_CONNECTION = 3; 
 }
 
@@ -71,11 +71,12 @@ enum MessageType {
     USER_SPACE_START = 100;
 }
 
-// Messages that are not handled in channeld. DO NOT send this message directly to channeld, as channeld uses it to wrap the payload and forward it to the target endpoint(s).
-message UserSpaceMessage {
-    // The backend server generally needs the client connId to identify the sender.
-    uint32 sourceConnId = 1;
-    // The user (client/server) decides to how serialize/deserialize the message.
+// The message that is used to carries user-space message and communicate between channeld and backend servers.
+// Users don't have to have this message if they are using a client library.
+message ServerForwardMessage {
+    // The client that sends the user-space message to server or server sends the user-space message to.
+    uint32 clientConnId = 1;
+    // The original user-space message. channeld leaves it as it is.
     bytes payload = 2;
 }
 
