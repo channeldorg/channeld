@@ -106,8 +106,8 @@ message ChannelSubscriptionOptions {
 message ChannelDataMergeOptions {
     // By default, Protobuf appends the src list to the dst list. Setting this option to true will replace the dst list with the src list.
 	bool shouldReplaceRepeated = 1;
-	// By default, Protobuf ignores the nil value when merging the map. Setting this option to true will delete the key-value pair when merging.
-	bool shouldDeleteNilMapValue = 2;
+	// If true, the merge method will remove any map entry that has removed=true in its value.
+	bool shouldCheckRemovableMapField = 2;
 	// If the value is greater than 0, truncate the top elements of the list when oversized.
 	uint32 listSizeLimit = 3;
 }

@@ -167,6 +167,9 @@ func handleCreateChannel(ctx MessageContext) {
 		} else {
 			newChannel.InitData(dataMsg, msg.MergeOptions)
 		}
+	} else {
+		// Channel data should always be initialized
+		newChannel.InitData(nil, msg.MergeOptions)
 	}
 
 	// Make sure the response message has the channelId = newChannel.id, not always 0.
@@ -358,16 +361,16 @@ func handleUnsubFromChannel(ctx MessageContext) {
 	}
 
 	// Notify the sender.
-	ctx.Connection.sendUnsubscribed(ctx, ctx.Channel, ctx.StubId)
+	ctx.Connection.sendUnsubscribed(ctx, ctx.Channel, connToUnsub.id, ctx.StubId)
 
 	// Notify the unsubscribed.
 	if connToUnsub != ctx.Connection {
-		connToUnsub.sendUnsubscribed(ctx, ctx.Channel, 0)
+		connToUnsub.sendUnsubscribed(ctx, ctx.Channel, connToUnsub.id, 0)
 	}
 	// Notify the channel owner.
 	if ctx.Channel.ownerConnection != nil {
 		if ctx.Channel.ownerConnection != ctx.Connection {
-			ctx.Channel.ownerConnection.sendUnsubscribed(ctx, ctx.Channel, 0)
+			ctx.Channel.ownerConnection.sendUnsubscribed(ctx, ctx.Channel, connToUnsub.id, 0)
 		} else {
 			// Reset the owner if it unsubscribed
 			ctx.Channel.ownerConnection = nil
@@ -388,6 +391,12 @@ func handleChannelDataUpdate(ctx MessageContext) {
 		}
 	}
 
+	if ctx.Channel.Data() == nil {
+		ctx.Channel.Logger().Info("channel data is not initialized - should send CreateChannelMessage before ChannelDataUpdateMessage",
+			zap.Uint32("connId", uint32(ctx.Connection.id)))
+		return
+	}
+
 	msg, ok := ctx.Msg.(*proto.ChannelDataUpdateMessage)
 	if !ok {
 		ctx.Connection.Logger().Error("message is not a ChannelDataUpdateMessage, will not be handled.")
@@ -399,12 +408,7 @@ func handleChannelDataUpdate(ctx MessageContext) {
 		return
 	}
 
-	if ctx.Channel.Data() == nil {
-		ctx.Channel.InitData(updateMsg, nil)
-		ctx.Channel.Logger().Info("initialized channel data from update msg", zap.Any("msg", updateMsg))
-	} else {
-		ctx.Channel.Data().OnUpdate(updateMsg, ctx.Channel.GetTime())
-	}
+	ctx.Channel.Data().OnUpdate(updateMsg, ctx.Channel.GetTime())
 }
 
 func handleDisconnect(ctx MessageContext) {

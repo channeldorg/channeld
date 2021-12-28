@@ -26,7 +26,8 @@ message TestMergeMessage {
     repeated string list = 1;
 
     message StringWrapper {
-        string content = 1;
+        bool removed = 1;
+        string content = 2;
     }
    map<int64, StringWrapper> kv = 2;
 }

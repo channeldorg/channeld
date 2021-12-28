@@ -104,12 +104,12 @@ func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel, connId Conn
 	// }
 	c.Send(ctx)
 }
-func (c *Connection) sendUnsubscribed(ctx MessageContext, ch *Channel, stubId uint32) {
+func (c *Connection) sendUnsubscribed(ctx MessageContext, ch *Channel, connId ConnectionId, stubId uint32) {
 	ctx.Channel = ch
 	ctx.StubId = stubId
 	ctx.MsgType = proto.MessageType_UNSUB_FROM_CHANNEL
 	ctx.Msg = &proto.UnsubscribedFromChannelMessage{
-		ConnId: uint32(c.id),
+		ConnId: uint32(connId),
 	}
 	c.Send(ctx)
 }

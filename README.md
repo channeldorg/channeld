@@ -28,13 +28,13 @@ The ultimate purpose of channeld is to enable distributed composition of dedicat
 * Fanout-based data pub/sub of any type defined with Protobuf
 * Area of interest management based on channel and data pub/sub
 * [WIP] Backend servers load-balancing with auto-scaling
-* [WIP] Integration with the mainstream game engines (Unity, Unreal Engine)
+* [WIP] Integration with the mainstream game engines ([Unity](https://github.com/indiest/channeld-unity-mirror), Unreal Engine)
 
 ## Performance
-channeld is aimmed to support 10Ks connections and 100Ks pps(packets per second) on a single node (uplink + downlink), and 10Ms pps in a distributed system.
+channeld is aimmed to support 10Ks connections and 100Ks mps(messages per second) on a single node (uplink + downlink), and 10Ms mps in a distributed system.
 
 ## Roadmap
-Currently, the completeness of the project is 20%.
+Currently, the completeness of the project is 30%.
 
 There is a [dedicated roadmap documentation](doc/roadmap.md).
 

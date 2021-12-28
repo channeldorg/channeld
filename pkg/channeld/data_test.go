@@ -166,6 +166,7 @@ func TestListMoveElement(t *testing.T) {
 }
 
 func TestDataMergeOptions(t *testing.T) {
+	InitLogsAndMetrics()
 	dstMsg := &proto.TestMergeMessage{
 		List: []string{"a", "b", "c"},
 		Kv: map[int64]*proto.TestMergeMessage_StringWrapper{
@@ -177,7 +178,7 @@ func TestDataMergeOptions(t *testing.T) {
 	srcMsg := &proto.TestMergeMessage{
 		List: []string{"d", "e"},
 		Kv: map[int64]*proto.TestMergeMessage_StringWrapper{
-			1: nil,
+			1: {Removed: true},
 			2: {Content: "bbb"},
 		},
 	}
@@ -200,11 +201,14 @@ func TestDataMergeOptions(t *testing.T) {
 
 	mergedMsg3 := protobuf.Clone(dstMsg).(*proto.TestMergeMessage)
 	mergeOptions3 := &proto.ChannelDataMergeOptions{
-		ShouldDeleteNilMapValue: true,
+		ShouldCheckRemovableMapField: true,
 	}
+	srcBytes, _ := protobuf.Marshal(srcMsg)
+	protobuf.Unmarshal(srcBytes, srcMsg)
 	mergeWithOptions(mergedMsg3, srcMsg, mergeOptions3)
 	assert.Equal(t, 1, len(mergedMsg3.Kv))
-	assert.Nil(t, mergedMsg3.Kv[1])
+	_, exists := mergedMsg3.Kv[1]
+	assert.False(t, exists)
 	assert.Equal(t, "bbb", mergedMsg3.Kv[2].Content)
 }
 

@@ -25,6 +25,10 @@ type ChannelData struct {
 	maxFanOutIntervalMs uint32
 }
 
+type removableMapField interface {
+	GetRemoved() bool
+}
+
 type fanOutConnection struct {
 	connId         ConnectionId
 	lastFanOutTime ChannelTime
@@ -68,14 +72,11 @@ func (ch *Channel) Data() *ChannelData {
 }
 
 func (d *ChannelData) OnUpdate(updateMsg Message, t ChannelTime) {
-	mergeWithOptions(d.msg, updateMsg, d.mergeOptions)
-	/*
-		if d.updateMsg == nil {
-			d.updateMsg = updateMsg
-		} else {
-			mergeWithOptions(d.updateMsg, updateMsg, d.mergeOptions)
-		}
-	*/
+	if d.msg == nil {
+		d.msg = updateMsg
+	} else {
+		mergeWithOptions(d.msg, updateMsg, d.mergeOptions)
+	}
 
 	d.updateMsgBuffer.PushBack(&updateMsgBufferElement{
 		updateMsg:   updateMsg,
@@ -118,7 +119,7 @@ func (ch *Channel) tickData(t ChannelTime) {
 					// Reset the owner if it unsubscribed
 					ch.ownerConnection = nil
 				} else {
-					ch.ownerConnection.sendUnsubscribed(MessageContext{}, ch, 0)
+					ch.ownerConnection.sendUnsubscribed(MessageContext{}, ch, foc.connId, 0)
 				}
 			}
 
@@ -207,6 +208,11 @@ func (ch *Channel) fanOutDataUpdate(c *Connection, cs *ChannelSubscription, upda
 func mergeWithOptions(dst Message, src Message, options *proto.ChannelDataMergeOptions) {
 	protobuf.Merge(dst, src)
 	if options != nil {
+		//logger.Debug("merged with options", zap.Any("src", src), zap.Any("dst", dst))
+		defer func() {
+			recover()
+		}()
+
 		dst.ProtoReflect().Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
 			if fd.IsList() {
 				if options.ShouldReplaceRepeated {
@@ -221,12 +227,12 @@ func mergeWithOptions(dst Message, src Message, options *proto.ChannelDataMergeO
 					list.Truncate(int(options.ListSizeLimit))
 				}
 			} else if fd.IsMap() {
-				if options.ShouldDeleteNilMapValue {
+				if options.ShouldCheckRemovableMapField {
 					dstMap := v.Map()
-					srcMap := src.ProtoReflect().Get(fd).Map()
-					srcMap.Range(func(k protoreflect.MapKey, v protoreflect.Value) bool {
-						if !v.Message().IsValid() {
-							dstMap.Clear(k)
+					dstMap.Range(func(mk protoreflect.MapKey, mv protoreflect.Value) bool {
+						removable, ok := mv.Message().Interface().(removableMapField)
+						if ok && removable.GetRemoved() {
+							dstMap.Clear(mk)
 						}
 						return true
 					})

@@ -19,13 +19,17 @@ message Vector4f {
 }
 
 message TransformState {
-    Vector3f position = 1;
-    Vector4f rotation = 2;
-    Vector3f scale = 3; 
+    // Marks that the state should be removed from transformStates map
+    bool removed = 1;
+    Vector3f position = 2;
+    Vector4f rotation = 3;
+    Vector3f scale = 4; 
 }
 
 message TankState {
-    int32 health = 1;
+    // Marks that the state should be removed from tankStates map
+    bool removed = 1;
+    int32 health = 2;
 }
 
 message TankGameChannelData {
