@@ -48,6 +48,7 @@ The fastest way to run the server is with [Docker Compose](https://docs.docker.c
 There's a [docker-compose file](docker-compose.yml) set up for running the chat rooms demo. Navigate to the root of the repo and run the command:
 
 `docker-compose up -d`
+
 ## 3. The chat rooms demo
 After starting the server, browse to http://localhost:8080.
 
@@ -60,6 +61,12 @@ Use the input box at the bottom to send messages, to the GLOBAL channel by defau
 * `unsub <channelId>` // unsubscribe from the channel
 * `switch <channelId>` // switch the active channel. Only the active channel displays the new chat messages.
 
+## 4. The Unity tank demo
+To run the Unity tanks demo with Docker, stop the chat service, and then start channeld and tanks services sequentially. 
 
-
+Follow these steps if the docker image has not been built for the tanks service yet:
+1. Check out the [unity-mirror-channeld](https://github.com/indiest/channeld-unity-mirror) repo
+2. Create the Unity project following the [instruction](https://github.com/indiest/channeld-unity-mirror#how-to-run-the-tank-demo)
+3. Either build the Linux player from Unity Editor (Build -> Linux Server), or via the command: `Unity -batchmode -nographics -projectPath <PATH_TO_YOUR_UNITY_PROJECT> -executeMethod BuildScript.BuildLinuxServer -logFile build.log -quit`. The path to the Unity Editor needs to added to the PATH environment argument in order to run the command.
+4. Build the docker image: `docker build -t channeld/tanks .`
 

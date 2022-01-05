@@ -1,9 +1,14 @@
 FROM golang:1.16
 
-WORKDIR /app
-COPY . .
+COPY . /channeld/
+WORKDIR /channeld/cmd
 
+RUN go env -w GO111MODULE=on
+RUN go env -w GOPROXY=https://goproxy.cn,direct
 RUN go get -d -v ./...
 RUN go install -v ./...
+RUN go build -o app
 
-CMD ["app"]
+EXPOSE 11288
+
+CMD ["./app"]

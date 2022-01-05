@@ -1,9 +1,31 @@
 version: '3'
 services:
+  channeld:
+    profiles:
+      - donotstart
+    build:
+      dockerfile: Dockerfile
+    image: channeld/channeld
+    depends_on:
+      - prometheus
+    ports:
+      - "12108:12108"
+    expose:
+      - "11288"
+    entrypoint: ["./app", "-cfsm", "../config/client_authoratative_fsm.json"]
+  tanks:
+    profiles:
+      - donotstart
+    image: channeld/tanks
+    depends_on:
+      - channeld
+    environment:
+      - CHANNELD_IP=channeld
   chat:
     build:
       context: .
       dockerfile: examples/chat-rooms/Dockerfile
+    image: channeld/chat
     depends_on:
       - prometheus
     deploy:
