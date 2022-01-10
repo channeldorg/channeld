@@ -1,33 +1,32 @@
 version: '3'
 services:
   channeld:
-    profiles:
-      - donotstart
     build:
       dockerfile: Dockerfile
     image: channeld/channeld
     depends_on:
-      - prometheus
+      - grafana
     ports:
       - "12108:12108"
     expose:
+      - "8080"
       - "11288"
-    entrypoint: ["./app", "-cfsm", "../config/client_authoratative_fsm.json"]
+    entrypoint: ["./app", "-cfsm", "../config/client_authoratative_fsm.json", "-ct", "1"]
   tanks:
-    profiles:
-      - donotstart
     image: channeld/tanks
     depends_on:
       - channeld
     environment:
       - CHANNELD_IP=channeld
   chat:
+    profiles:
+      - donotstart
     build:
       context: .
       dockerfile: examples/chat-rooms/Dockerfile
     image: channeld/chat
     depends_on:
-      - prometheus
+      - grafana
     deploy:
       resources:
         limits:
@@ -40,8 +39,11 @@ services:
     expose:
       - "8080"
       - "12108"
+    entrypoint: ["./app", "-ct", "0"]
   grafana:
     image: grafana/grafana
+    depends_on:
+      - prometheus
     ports:
       - "3000:3000"
     expose:
@@ -58,9 +60,9 @@ services:
       scrape_configs:
         - job_name: channeld
           static_configs:
-          - targets: ['chat:8080']
+          - targets: ['channeld:8080', 'chat:8080']
       EON
       prometheus --config.file=./prometheus.yml
       EOF'
     ports:
-      - '9090:9090'
+      - "9090:9090"

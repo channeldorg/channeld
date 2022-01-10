@@ -34,7 +34,8 @@
         "type": "go",
         "request": "launch",
         "mode": "debug",
-        "program": "examples/chat-rooms/main.go"
+        "program": "examples/chat-rooms/main.go",
+        "args": ["-ct", "1"]
     },
     {
         "name": "Launch tank server",
@@ -42,7 +43,7 @@
         "request": "launch",
         "mode": "debug",
         "program": "cmd/main.go",
-        "args": ["-cfsm", "../config/client_authoratative_fsm.json"]
+        "args": ["-cfsm", "../config/client_authoratative_fsm.json", "-ct", "1"]
     }
     ]
 }

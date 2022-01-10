@@ -13,7 +13,7 @@
 - [x] Stub(RPC) support
 - [x] WebSocket support
 - [x] KCP support
-- [ ] [Snappy](https://github.com/golang/snappy) compression
+- [x] [Snappy](https://github.com/golang/snappy) compression
 - [ ] [Markov-chain](https://en.wikipedia.org/wiki/Markov_chain) compression
 - [ ] Encryption
 - [x] Prometheus integration

@@ -43,7 +43,7 @@ func RegisterMessageHandler(msgType uint32, msg Message, handler MessageHandlerF
 func handleClientToServerUserMessage(ctx MessageContext) {
 	if ctx.Channel.ownerConnection != nil {
 		ctx.Channel.ownerConnection.Send(ctx)
-	} else if ctx.Broadcast != proto.BroadcastType_NO {
+	} else if ctx.Broadcast != proto.BroadcastType_NO_BROADCAST {
 		if ctx.Channel.enableClientBroadcast {
 			ctx.Channel.Broadcast(ctx)
 		} else {
@@ -69,7 +69,7 @@ func handleServerToClientUserMessage(ctx MessageContext) {
 	}
 
 	switch ctx.Broadcast {
-	case proto.BroadcastType_NO:
+	case proto.BroadcastType_NO_BROADCAST:
 		if ctx.Channel.ownerConnection != nil {
 			ctx.Channel.ownerConnection.Send(ctx)
 		} else {
@@ -113,8 +113,9 @@ func handleAuth(ctx MessageContext) {
 	ctx.Connection.fsm.MoveToNextState()
 
 	ctx.Msg = &proto.AuthResultMessage{
-		Result: proto.AuthResultMessage_SUCCESSFUL,
-		ConnId: uint32(ctx.Connection.id),
+		Result:          proto.AuthResultMessage_SUCCESSFUL,
+		ConnId:          uint32(ctx.Connection.id),
+		CompressionType: GlobalSettings.CompressionType,
 	}
 	ctx.Connection.Send(ctx)
 }

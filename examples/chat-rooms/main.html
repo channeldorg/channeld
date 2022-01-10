@@ -3,14 +3,16 @@
 <head>
 <meta charset="utf-8">
 <script src="//cdn.rawgit.com/dcodeIO/protobuf.js/6.X.X/dist/protobuf.min.js"></script>
+<script src="//cdn.rawgit.com/zhipeng-jia/snappyjs/0.6.1/dist/snappyjs.min.js"></script>
 <script>  
 window.addEventListener("load", function(evt) {
 
     var output = document.getElementById("output");
     var input = document.getElementById("input");
-    var connId = 0
-    var joinedChannels = {}
-    var curChannelId = 0
+    var connId = 0;
+    var joinedChannels = {};
+    var curChannelId = 0;
+    var compressionType = 0;
 
     var appendMessage = function(message) {
         var d = document.createElement("div");
@@ -86,7 +88,7 @@ window.addEventListener("load", function(evt) {
         
         var mp = proto.MessagePack.create({
             channelId: channelId,
-            broadcast: false,
+            broadcast: 0,
             stubId: stubId,
             msgType: msgType,
             msgBody: msgBody
@@ -95,15 +97,21 @@ window.addEventListener("load", function(evt) {
             messages: [mp]
         });
         var bytes = proto.Packet.encode(packet).finish();
-        var data = new Uint8Array(new ArrayBuffer(bytes.length + 4));
-        var tag = [67,72,78,76];
+
+        if (compressionType == proto.CompressionType.values.SNAPPY) {
+            bytes = SnappyJS.compress(bytes)
+        }
+
+        var data = new Uint8Array(new ArrayBuffer(bytes.length + 5));
+        // The 5th byte marks the compression type
+        var tag = [67,72,78,76,compressionType];
         tag[3] = bytes.length & 0xff;
         if (bytes.length > 0xff)
             tag[2] = (bytes.length>>8) & 0xff;
         if (bytes.length > 0xffff)
             tag[1] = (bytes.length>>16) & 0xff;
         data.set(tag, 0);
-        data.set(bytes, 4);
+        data.set(bytes, 5);
         ws.send(data);
     };
 
@@ -114,7 +122,13 @@ window.addEventListener("load", function(evt) {
         else if (uint8Arr[2] != 78)
             packetSize = packetSize | uint8Arr[2]<<8;
 
-        var bytes = uint8Arr.subarray(4, 4 + packetSize);
+        var bytes = uint8Arr.subarray(5, 5 + packetSize);
+
+        // uint8Arr[4] marks the compression type
+        if (uint8Arr[4] == proto.CompressionType.values.SNAPPY) {
+            bytes = SnappyJS.uncompress(bytes);
+        }
+
         return proto.Packet.decode(bytes);
     };
 
@@ -178,6 +192,7 @@ window.addEventListener("load", function(evt) {
         proto.MessagePack = root.lookupType("channeld.MessagePack");
         proto.ChannelType = root.lookupEnum("channeld.ChannelType");
         proto.MessageType = root.lookupEnum("channeld.MessageType");
+        proto.CompressionType = root.lookupEnum("channeld.CompressionType");
         proto.AuthMessage = root.lookupType("channeld.AuthMessage");
         proto.AuthResultMessage = root.lookupType("channeld.AuthResultMessage");
         proto.ChannelSubscriptionOptions = root.lookupType("channeld.ChannelSubscriptionOptions");
@@ -264,7 +279,7 @@ window.addEventListener("load", function(evt) {
 
             
 
-            ws = new WebSocket("ws://{{.}}");
+            ws = new WebSocket("ws://{{.ServerAddress}}");
             ws.binaryType = "arraybuffer";
             ws.onopen = function(evt) {
                 appendLog("Server connected.");
@@ -274,7 +289,8 @@ window.addEventListener("load", function(evt) {
                     loginToken: "test"
                 }, function(msg, channelId) {
                     connId = msg.connId;
-                    appendLog("Auth result: " + msg.result + ", connId: " + connId)
+                    compressionType = msg.compressionType;
+                    appendLog("Auth result: " + msg.result + ", connId: " + connId, + ", compressionType: " + compressionType);
 
                     sendPacket(0, proto.MessageType.values.SUB_TO_CHANNEL, proto.SubscribedToChannelMessage, {
                         connId: connId

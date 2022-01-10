@@ -14,6 +14,7 @@ import (
 
 	"channeld.clewcat.com/channeld/pkg/fsm"
 	"channeld.clewcat.com/channeld/proto"
+	"github.com/golang/snappy"
 	"github.com/gorilla/websocket"
 	"github.com/xtaci/kcp-go"
 	"go.uber.org/zap"
@@ -53,15 +54,16 @@ func (s *queuedMessageSender) Send(c *Connection, ctx MessageContext) {
 }
 
 type Connection struct {
-	id             ConnectionId
-	connectionType ConnectionType
-	conn           net.Conn
-	reader         *bufio.Reader
-	writer         *bufio.Writer
-	sender         MessageSender
-	sendQueue      chan MessageContext
-	fsm            *fsm.FiniteStateMachine
-	removing       int32 // Don't put the removing state into the FSM as 1) the FSM's states are user-defined. 2) the FSM doesn't have the race condition.
+	id              ConnectionId
+	connectionType  ConnectionType
+	compressionType proto.CompressionType
+	conn            net.Conn
+	reader          *bufio.Reader
+	writer          *bufio.Writer
+	sender          MessageSender
+	sendQueue       chan MessageContext
+	fsm             *fsm.FiniteStateMachine
+	removing        int32 // Don't put the removing state into the FSM as 1) the FSM's states are user-defined. 2) the FSM doesn't have the race condition.
 }
 
 var allConnections sync.Map // map[ConnectionId]*Connection
@@ -182,14 +184,15 @@ func StartListening(t ConnectionType, network string, address string) {
 func AddConnection(c net.Conn, t ConnectionType) *Connection {
 	atomic.AddUint64(&nextConnectionId, 1)
 	connection := &Connection{
-		id:             ConnectionId(nextConnectionId),
-		connectionType: t,
-		conn:           c,
-		reader:         bufio.NewReader(c),
-		writer:         bufio.NewWriter(c),
-		sender:         &queuedMessageSender{},
-		sendQueue:      make(chan MessageContext, 128),
-		removing:       0,
+		id:              ConnectionId(nextConnectionId),
+		connectionType:  t,
+		compressionType: proto.CompressionType_NO_COMPRESSION,
+		conn:            c,
+		reader:          bufio.NewReader(c),
+		writer:          bufio.NewWriter(c),
+		sender:          &queuedMessageSender{},
+		sendQueue:       make(chan MessageContext, 128),
+		removing:        0,
 	}
 	// IMPORTANT: always make a value copy
 	var fsm fsm.FiniteStateMachine
@@ -279,7 +282,7 @@ func _(c *Connection) (uint32, error) {
 
 func (c *Connection) ReceivePacket() {
 	// FIXME: read all bytes once into a buffer
-	tag, err := readBytes(c, 4)
+	tag, err := readBytes(c, 5)
 	if err != nil {
 		return
 	}
@@ -310,6 +313,26 @@ func (c *Connection) ReceivePacket() {
 	}
 
 	bytesReceived.WithLabelValues(c.connectionType.String()).Add(float64(packetSize + 4))
+
+	// Apply the decompression from the 5th byte in the header
+	ct := tag[4]
+	_, valid := proto.CompressionType_name[int32(ct)]
+	if valid && ct != 0 {
+		c.compressionType = proto.CompressionType(ct)
+		if c.compressionType == proto.CompressionType_SNAPPY {
+			len, err := snappy.DecodedLen(bytes)
+			if err != nil {
+				c.Logger().Error("snappy.DecodedLen", zap.Error(err))
+				return
+			}
+			dst := make([]byte, len)
+			bytes, err = snappy.Decode(dst, bytes)
+			if err != nil {
+				c.Logger().Error("snappy.Decode", zap.Error(err))
+				return
+			}
+		}
+	}
 
 	var p proto.Packet
 	if err := protobuf.Unmarshal(bytes, &p); err != nil {
@@ -391,6 +414,7 @@ func (c *Connection) Send(ctx MessageContext) {
 	c.sender.Send(c, ctx)
 }
 
+// Should NOT be called outside the flush goroutine!
 func (c *Connection) Flush() {
 	if len(c.sendQueue) == 0 {
 		return
@@ -435,8 +459,14 @@ func (c *Connection) Flush() {
 		return
 	}
 
+	// Apply the compression
+	if c.compressionType == proto.CompressionType_SNAPPY {
+		dst := make([]byte, snappy.MaxEncodedLen(len(bytes)))
+		bytes = snappy.Encode(dst, bytes)
+	}
+
 	// 'CHNL' in ASCII
-	tag := []byte{67, 72, 78, 76}
+	tag := []byte{67, 72, 78, 76, byte(c.compressionType)}
 	len := len(bytes)
 	tag[3] = byte(len & 0xff)
 	if len > 0xff {

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"channeld.clewcat.com/channeld/proto"
+	"github.com/golang/snappy"
 	"github.com/gorilla/websocket"
 	protobuf "google.golang.org/protobuf/proto"
 )
@@ -29,6 +30,7 @@ type messageQueueEntry struct {
 
 type Client struct {
 	Id                 uint32
+	CompressionType    proto.CompressionType
 	subscribedChannels map[uint32]struct{}
 	conn               net.Conn
 	incomingQueue      chan messageQueueEntry
@@ -55,6 +57,7 @@ func NewClient(addr string) (*Client, error) {
 		}
 	}
 	c := &Client{
+		CompressionType:    proto.CompressionType_NO_COMPRESSION,
 		subscribedChannels: make(map[uint32]struct{}),
 		conn:               conn,
 		incomingQueue:      make(chan messageQueueEntry, 128),
@@ -101,15 +104,16 @@ func (client *Client) AddMessageHandler(msgType uint32, handlers ...MessageHandl
 
 func (client *Client) Auth(lt string, pit string) {
 	//result := make(chan *proto.AuthResultMessage)
-	client.Send(0, proto.BroadcastType_NO, uint32(proto.MessageType_AUTH), &proto.AuthMessage{
+	client.Send(0, proto.BroadcastType_NO_BROADCAST, uint32(proto.MessageType_AUTH), &proto.AuthMessage{
 		LoginToken:            lt,
 		PlayerIdentifierToken: pit,
 	}, func(_ *Client, channelId uint32, m Message) {
 		msg := m.(*proto.AuthResultMessage)
 		client.Id = msg.ConnId
+		client.CompressionType = msg.CompressionType
 		//result <- msg
 		if msg.Result == proto.AuthResultMessage_SUCCESSFUL {
-			client.Send(0, proto.BroadcastType_NO, uint32(proto.MessageType_SUB_TO_CHANNEL), &proto.SubscribedToChannelMessage{
+			client.Send(0, proto.BroadcastType_NO_BROADCAST, uint32(proto.MessageType_SUB_TO_CHANNEL), &proto.SubscribedToChannelMessage{
 				ConnId: client.Id,
 			}, nil)
 		}
@@ -153,7 +157,7 @@ func readBytes(conn net.Conn, len uint) ([]byte, error) {
 
 func (client *Client) Receive() error {
 
-	tag, err := readBytes(client.conn, 4)
+	tag, err := readBytes(client.conn, 5)
 	if err != nil || tag[0] != 67 {
 		return fmt.Errorf("invalid tag: %s, the packet will be dropped: %w", tag, err)
 	}
@@ -168,6 +172,19 @@ func (client *Client) Receive() error {
 	bytes := make([]byte, packetSize)
 	if _, err := io.ReadFull(client.conn, bytes); err != nil {
 		return fmt.Errorf("error reading packet: %w", err)
+	}
+
+	// Apply the decompression from the 5th byte in the header
+	if tag[4] == byte(proto.CompressionType_SNAPPY) {
+		len, err := snappy.DecodedLen(bytes)
+		if err != nil {
+			return fmt.Errorf("snappy.DecodedLen: %w", err)
+		}
+		dst := make([]byte, len)
+		bytes, err = snappy.Decode(dst, bytes)
+		if err != nil {
+			return fmt.Errorf("snappy.Decode: %w", err)
+		}
 	}
 
 	var p proto.Packet
@@ -256,8 +273,14 @@ func (client *Client) writePacket(p *proto.Packet) error {
 		return fmt.Errorf("error marshalling packet: %w", err)
 	}
 
+	// Apply the compression
+	if client.CompressionType == proto.CompressionType_SNAPPY {
+		dst := make([]byte, snappy.MaxEncodedLen(len(bytes)))
+		bytes = snappy.Encode(dst, bytes)
+	}
+
 	// 'CHNL' in ASCII
-	tag := []byte{67, 72, 78, 76}
+	tag := []byte{67, 72, 78, 76, byte(client.CompressionType)}
 	len := len(bytes)
 	tag[3] = byte(len & 0xff)
 	if len > 0xff {

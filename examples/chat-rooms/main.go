@@ -42,10 +42,22 @@ func handleMain(w http.ResponseWriter, r *http.Request) {
 
 	localAddr := r.Host[:strings.Index(r.Host, ":")]
 	//log.Println(localAddr)
-	homeTemplate.Execute(w, localAddr+*wsAddr)
+	templateData.ServerAddress = localAddr + *wsAddr
+	homeTemplate.Execute(w, templateData)
 }
 
+type TemplateData struct {
+	ServerAddress   string
+	CompressionType uint
+}
+
+var templateData TemplateData
+
 func main() {
+
+	flag.UintVar(&templateData.CompressionType, "ct", 0, "The compression type, 0 = No, 1 = Snappy")
+	flag.Parse()
+	channeld.GlobalSettings.CompressionType = proto.CompressionType(templateData.CompressionType)
 
 	http.HandleFunc("/", handleMain)
 	http.HandleFunc("/proto", handleChanneldProto)

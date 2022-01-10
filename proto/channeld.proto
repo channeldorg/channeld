@@ -34,7 +34,7 @@ message MessagePack {
 
 enum BroadcastType {
     // No broadcast. All internal messages should use this type, and other types are ignored.
-    NO = 0;
+    NO_BROADCAST = 0;
     // Broadcast the message to all the connections in the channel, the sender included.
     ALL = 1;
     // Broadcast the message to all the connections in the channel, the sender excluded.
@@ -87,6 +87,12 @@ message AuthMessage {
     string loginToken = 2;
 }
 
+enum CompressionType {
+    NO_COMPRESSION = 0;
+    // https://github.com/google/snappy
+    SNAPPY = 1;
+}
+
 message AuthResultMessage {
     enum AuthResult {
         SUCCESSFUL = 0;
@@ -95,6 +101,11 @@ message AuthResultMessage {
     }
     AuthResult result = 1;
     uint32 connId = 2;
+    
+    // The compression type should be used for future communication.
+    // However, because the compression type is specified per packet, the client has its freedom to control which compression type to use.
+    // It's useful when the client has too much CPU load for the compression, or the network debug is needed.
+    CompressionType compressionType = 3;
 }
 
 message ChannelSubscriptionOptions {

@@ -22,14 +22,25 @@ Channel可以理解为一个兴趣组，聚合了多个连接的订阅。channel
 
 每个连接可以设置自己扇出的最小间隔时间。通过这种方式，开发者可以控制现客户端对不同的兴趣数据的订阅频率。如：组队和聊天数据的同步频率较低，玩家位置的同步频率较高。
 
+## 和其它类似技术的对比
+|         | BigWorld     | Skynet    | Photon       | SpatialOS        | channeld（目标）           |
+| ------- | ------------ | --------- | ------------ | ---------------- | ------------------------- |
+| 引擎集成    | 自有引擎         | 无         | Unity        | UE, Unity        | Unity, UE                 |
+| 上手难度    | 高            | 中         | 低            | 高                | 低                         |
+| 无缝大世界支持 | 支持           | 无         | 无            | 支持               | 支持                        |
+| 兴趣管理    | Cell周边       | 无         | 无            | 跨Worker          | 基于频道                      |
+| 持久化     | XML；MySQL    | 内置主流数据库模块 | 无            | 二进制快照            | 快照+自定义存储                  |
+| 开发运维一体  | 私有化部署        | 无         | 公有云          | 公有云              | 公有云+私有化部署                 |
+| 负载均衡能力  | 支持动态         | 单节点，多进程   | 多节点，房间制      | 尚不支持动态           | 前端（客户端连接）+后端（模拟服务器）动态负载均衡 |
+| 开源      | 闭源           | 开源        | 闭源           | 闭源               | 开源                        |
+| 开发语言支持  | Python       | Lua       | C#           | C, C++, C#, Java | Go, C#, C++, Javascript   |
+| 支持传输协议  | Reliable UDP | TCP, UDP  | TCP, UDP,WSS | TCP, KCP         | TCP, KCP, WSS             |
+| 费用      | 高授权费         | 免费        | 按连接数收费       | 按计算量收费           | 免费                        |
+
 # Why
 ## 网游的架构演进
 (TODO)
 
-## 和其它类似技术的对比
-(TODO)
-
-BigWorld, Skynet, Photon, SpatialOS
 
 ## 将网络层作为独立的服务 vs. 整合进开发框架
 整合进开发框架的缺点：
@@ -53,17 +64,19 @@ BigWorld, Skynet, Photon, SpatialOS
 
 # How
 ## Binary protocol:
-[TAG] [[MessagePack0 [ChannelID | BroadcastType | StubID | MessageType | MessageBody] | MessagePack1 | MessagePack2 ...]
+[TAG] [CT] [[MessagePack0 [ChannelID | BroadcastType | StubID | MessageType | MessageBody] | MessagePack1 | MessagePack2 ...]
 1. A packet consists of a TAG, and a serial of MessagePacks (see the definition in [channeld.proto](../proto/channeld.proto))
 2. The tag has 4 bytes. The first byte must be 67 which is the ASCII of 'C' character. The 2-4 bytes are the "dynamic" size of the packet, which means if the size is less than 65536(2^16), the second byte is 72('H' in ASCII), otherwise the byte is used for the size; if the size is less than 256(2^8), the third byte is 78('L' in ASCII), otherwise the byte is used for the size; the fourth and last byte is always used for the size. So, if the packet size is less than 256, which is most of the case, the TAG bytes are: [67 72 78 SIZE]
-3. Each MessagePack consists of a header and a body. The header includes an uint32 ChannelID, an enum BroadcastType, an uint32 StubId, and an uint32 MessageType. Because it utilizes [Protobuf's encoding](https://developers.google.com/protocol-buffers/docs/encoding), in most cases the header only has 4 bytes (see *BenchmarkProtobufMessageBase* in [message_test.go](../pkg/channeld/message_test.go))
-4. The message body is the marshalled bytes of the actual message that channeld will proceed or forward.
+3. Followed by the CT byte which marks the compression type to use to decode the MessagePacks. 0x0 = No compression, 0x1 = [Snappy](https://github.com/google/snappy)
+4. Each MessagePack consists of a header and a body. The header includes an uint32 ChannelID, an enum BroadcastType, an uint32 StubId, and an uint32 MessageType. Because it utilizes [Protobuf's encoding](https://developers.google.com/protocol-buffers/docs/encoding), in most cases the header only has 4 bytes (see *BenchmarkProtobufMessageBase* in [message_test.go](../pkg/channeld/message_test.go))
+5. The message body is the marshalled bytes of the actual message that channeld will proceed or forward.
 
 ## 竞态和权限问题：
 1. 连接列表可能被各个连接和频道goroutine写，需要加锁；
 2. 每个频道跑在不同的goroutine上；频道之间是隔离的，除了：
-- 创建和删除频道；设置频道状态和所属连接。只能在主频道上处理。任何一个连接收取消息时都需要查询频道，所以需要对总频道列表加读写锁
-- 频道的订阅回调消息会导致跨频道数据操作，需要对订阅列表加锁
+- 创建和删除频道；设置频道状态和所属连接。只能在主频道上处理
+- 任何一个连接收取消息时都需要查询频道，所以需要对总频道列表加读写锁
+- 原则上，每个频道内的订阅列表和数据都只能通过频率消息处理进行操作，不存在竞态问题，所以不需要加锁
 3. channeld不假设客户端或服务端连接拥有不同的权限。这样是为了实现例如转发服务器这样没有游戏服务器的应用。
 如果要控制客户端的访问权限，请使用连接的有限状态机来过滤消息。
 例如：客户端在未验证时只能发送验证消息；在验证后只能发送用户自定义的消息（类型100以上）。通过这种方式，channeld就不会处理客户端发送的订阅和退订等消息。

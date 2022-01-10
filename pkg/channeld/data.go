@@ -197,7 +197,7 @@ func (ch *Channel) fanOutDataUpdate(c *Connection, cs *ChannelSubscription, upda
 		Msg:        &proto.ChannelDataUpdateMessage{Data: any},
 		Connection: nil,
 		Channel:    ch,
-		Broadcast:  proto.BroadcastType_NO,
+		Broadcast:  proto.BroadcastType_NO_BROADCAST,
 		StubId:     0,
 		ChannelId:  uint32(ch.id),
 	})

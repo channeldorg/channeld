@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"channeld.clewcat.com/channeld/pkg/channeld"
+	"channeld.clewcat.com/channeld/proto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -30,10 +31,12 @@ func main() {
 	cn := flag.String("cn", "tcp", "the network type for the client connections")
 	ca := flag.String("ca", ":12108", "the network address for the client connections")
 	cfsm := flag.String("cfsm", "../config/client_non_authoratative_fsm.json", "the path to the client FSM config")
-	// cs := flag.Int("cs", 1024, "the connection map buffer size")
+	ct := flag.Uint("ct", 0, "The compression type, 0 = No, 1 = Snappy")
 
 	//getopt.Parse()
 	flag.Parse()
+
+	channeld.GlobalSettings.CompressionType = proto.CompressionType(*ct)
 
 	channeld.InitLogsAndMetrics()
 	channeld.InitConnections(*sfsm, *cfsm)

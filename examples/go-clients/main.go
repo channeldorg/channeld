@@ -44,7 +44,7 @@ var clientActions = []*clientAction{
 		probability: 1,
 		minInterval: time.Millisecond * 20000, //2000
 		perform: func(client *Client, data *clientData) bool {
-			client.Send(0, proto.BroadcastType_NO, uint32(proto.MessageType_LIST_CHANNEL), &proto.ListChannelMessage{},
+			client.Send(0, proto.BroadcastType_NO_BROADCAST, uint32(proto.MessageType_LIST_CHANNEL), &proto.ListChannelMessage{},
 				func(c *Client, channelId uint32, m Message) {
 					data.listedChannels = map[uint32]struct{}{}
 					for _, info := range m.(*proto.ListChannelResultMessage).Channels {
@@ -63,7 +63,7 @@ var clientActions = []*clientAction{
 				return false
 			}
 
-			client.Send(0, proto.BroadcastType_NO, uint32(proto.MessageType_CREATE_CHANNEL), &proto.CreateChannelMessage{
+			client.Send(0, proto.BroadcastType_NO_BROADCAST, uint32(proto.MessageType_CREATE_CHANNEL), &proto.CreateChannelMessage{
 				ChannelType: proto.ChannelType_SUBWORLD,
 				Metadata:    fmt.Sprintf("Room%d", data.rnd.Uint32()),
 				SubOptions: &proto.ChannelSubscriptionOptions{
@@ -88,7 +88,7 @@ var clientActions = []*clientAction{
 			}
 			channelToRemove := randUint32(data.createdChannelIds)
 			client.Send(0,
-				proto.BroadcastType_NO,
+				proto.BroadcastType_NO_BROADCAST,
 				uint32(proto.MessageType_REMOVE_CHANNEL),
 				&proto.RemoveChannelMessage{
 					ChannelId: channelToRemove,
@@ -118,7 +118,7 @@ var clientActions = []*clientAction{
 					return false
 				}
 				channelIdToSub := randUint32(copy)
-				client.Send(channelIdToSub, proto.BroadcastType_NO, uint32(proto.MessageType_SUB_TO_CHANNEL), &proto.SubscribedToChannelMessage{
+				client.Send(channelIdToSub, proto.BroadcastType_NO_BROADCAST, uint32(proto.MessageType_SUB_TO_CHANNEL), &proto.SubscribedToChannelMessage{
 					ConnId: client.Id,
 					SubOptions: &proto.ChannelSubscriptionOptions{
 						CanUpdateData:    true,
@@ -146,7 +146,7 @@ var clientActions = []*clientAction{
 				channelIdToUnsub = randUint32(client.subscribedChannels)
 			}
 
-			client.Send(channelIdToUnsub, proto.BroadcastType_NO, uint32(proto.MessageType_UNSUB_FROM_CHANNEL), &proto.UnsubscribedFromChannelMessage{
+			client.Send(channelIdToUnsub, proto.BroadcastType_NO_BROADCAST, uint32(proto.MessageType_UNSUB_FROM_CHANNEL), &proto.UnsubscribedFromChannelMessage{
 				ConnId: client.Id,
 			}, nil)
 			//log.Printf("Client(%d) UNSUB_FROM_CHANNEL: %d", client.Id, channelIdToUnsub)
@@ -165,7 +165,7 @@ var clientActions = []*clientAction{
 					Content:  "How are you?",
 				}},
 			})
-			client.Send(data.activeChannelId, proto.BroadcastType_NO, uint32(proto.MessageType_CHANNEL_DATA_UPDATE),
+			client.Send(data.activeChannelId, proto.BroadcastType_NO_BROADCAST, uint32(proto.MessageType_CHANNEL_DATA_UPDATE),
 				&proto.ChannelDataUpdateMessage{
 					Data: dataUpdate,
 				}, nil)
