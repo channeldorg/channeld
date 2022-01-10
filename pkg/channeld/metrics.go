@@ -7,47 +7,51 @@ import (
 
 var logger *zap.Logger
 
-var msgReceived = prometheus.NewCounter(
+var msgReceived = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "messages_in",
 		Help: "Received messages",
 	},
-	//[]string{"channel", "msgType"},
+	[]string{"connType" /*, "channel", "msgType"*/},
 )
 
-var msgSent = prometheus.NewCounter(
+var msgSent = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "messages_out",
 		Help: "Sent messages",
 	},
-	//[]string{"channel", "msgType"},
+	[]string{"connType" /*, "channel", "msgType"*/},
 )
-var packetReceived = prometheus.NewCounter(
+var packetReceived = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "packets_in",
 		Help: "Received packets",
 	},
+	[]string{"connType"},
 )
 
-var packetSent = prometheus.NewCounter(
+var packetSent = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "packets_out",
 		Help: "Sent packets",
 	},
+	[]string{"connType"},
 )
 
-var bytesReceived = prometheus.NewCounter(
+var bytesReceived = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "bytes_in",
 		Help: "Received bytes",
 	},
+	[]string{"connType"},
 )
 
-var bytesSent = prometheus.NewCounter(
+var bytesSent = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "bytes_out",
 		Help: "Sent bytes",
 	},
+	[]string{"connType"},
 )
 
 var connectionNum = prometheus.NewGaugeVec(

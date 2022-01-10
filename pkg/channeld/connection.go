@@ -309,7 +309,7 @@ func (c *Connection) ReceivePacket() {
 		return
 	}
 
-	bytesReceived.Add(float64(packetSize + 4))
+	bytesReceived.WithLabelValues(c.connectionType.String()).Add(float64(packetSize + 4))
 
 	var p proto.Packet
 	if err := protobuf.Unmarshal(bytes, &p); err != nil {
@@ -322,7 +322,7 @@ func (c *Connection) ReceivePacket() {
 	}
 
 	//c.Logger().Debug("received packet", zap.Int("size", packetSize))
-	packetReceived.Inc()
+	packetReceived.WithLabelValues(c.connectionType.String()).Inc()
 }
 
 func (c *Connection) receiveMessage(mp *proto.MessagePack) {
@@ -377,7 +377,7 @@ func (c *Connection) receiveMessage(mp *proto.MessagePack) {
 
 	c.Logger().Debug("received message", zap.Uint32("msgType", mp.MsgType), zap.Int("size", len(mp.MsgBody)))
 
-	msgReceived.Inc() /*.WithLabelValues(
+	msgReceived.WithLabelValues(c.connectionType.String()).Inc() /*.WithLabelValues(
 		strconv.FormatUint(uint64(p.ChannelId), 10),
 		strconv.FormatUint(uint64(p.MsgType), 10),
 	)*/
@@ -423,7 +423,7 @@ func (c *Connection) Flush() {
 
 		c.Logger().Debug("sent message", zap.Uint32("msgType", uint32(mc.MsgType)), zap.Int("size", len(msgBody)))
 
-		msgSent.Inc() /*.WithLabelValues(
+		msgSent.WithLabelValues(c.connectionType.String()).Inc() /*.WithLabelValues(
 			strconv.FormatUint(uint64(e.Channel.id), 10),
 			strconv.FormatUint(uint64(e.MsgType), 10),
 		)*/
@@ -457,8 +457,8 @@ func (c *Connection) Flush() {
 
 	c.writer.Flush()
 
-	packetSent.Inc()
-	bytesSent.Add(float64(len))
+	packetSent.WithLabelValues(c.connectionType.String()).Inc()
+	bytesSent.WithLabelValues(c.connectionType.String()).Add(float64(len))
 }
 
 func (c *Connection) Disconnect() error {
