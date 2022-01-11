@@ -1,11 +1,9 @@
 package main
 
 import (
-	"flag"
 	"net/http"
 
 	"channeld.clewcat.com/channeld/pkg/channeld"
-	"channeld.clewcat.com/channeld/proto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -23,31 +21,31 @@ func main() {
 
 			// "cs", "connSize",
 		)
+
+		sn := flag.String("sn", "tcp", "the network type for the server connections")
+		sa := flag.String("sa", ":11288", "the network address for the server connections")
+		sfsm := flag.String("sfsm", "../config/server_authoratative_fsm.json", "the path to the server FSM config")
+		cn := flag.String("cn", "tcp", "the network type for the client connections")
+		ca := flag.String("ca", ":12108", "the network address for the client connections")
+		cfsm := flag.String("cfsm", "../config/client_non_authoratative_fsm.json", "the path to the client FSM config")
+		ct := flag.Uint("ct", 0, "The compression type, 0 = No, 1 = Snappy")
+
+		//getopt.Parse()
+		flag.Parse()
 	*/
 
-	sn := flag.String("sn", "tcp", "the network type for the server connections")
-	sa := flag.String("sa", ":11288", "the network address for the server connections")
-	sfsm := flag.String("sfsm", "../config/server_authoratative_fsm.json", "the path to the server FSM config")
-	cn := flag.String("cn", "tcp", "the network type for the client connections")
-	ca := flag.String("ca", ":12108", "the network address for the client connections")
-	cfsm := flag.String("cfsm", "../config/client_non_authoratative_fsm.json", "the path to the client FSM config")
-	ct := flag.Uint("ct", 0, "The compression type, 0 = No, 1 = Snappy")
-
-	//getopt.Parse()
-	flag.Parse()
-
-	channeld.GlobalSettings.CompressionType = proto.CompressionType(*ct)
+	channeld.GlobalSettings.ParseFlag()
 
 	channeld.InitLogsAndMetrics()
-	channeld.InitConnections(*sfsm, *cfsm)
+	channeld.InitConnections(channeld.GlobalSettings.ServerFSM, channeld.GlobalSettings.ClientFSM)
 	channeld.InitChannels()
 
 	// Setup Prometheus
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(":8080", nil)
 
-	go channeld.StartListening(channeld.SERVER, *sn, *sa)
+	go channeld.StartListening(channeld.SERVER, channeld.GlobalSettings.ServerNetwork, channeld.GlobalSettings.ServerAddress)
 	// FIXME: After all the server connections are established, the client connection should be listened.*/
-	channeld.StartListening(channeld.CLIENT, *cn, *ca)
+	channeld.StartListening(channeld.CLIENT, channeld.GlobalSettings.ClientNetwork, channeld.GlobalSettings.ClientAddress)
 
 }

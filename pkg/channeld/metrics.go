@@ -1,8 +1,12 @@
 package channeld
 
 import (
+	"strings"
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 var logger *zap.Logger
@@ -71,7 +75,19 @@ var channelNum = prometheus.NewGaugeVec(
 )
 
 func InitLogsAndMetrics() {
-	logger, _ = zap.NewDevelopment()
+	var cfg zap.Config
+	if GlobalSettings.Development {
+		cfg = zap.NewDevelopmentConfig()
+	} else {
+		cfg = zap.NewProductionConfig()
+	}
+	if GlobalSettings.LogLevel.HasValue {
+		cfg.Level = zap.NewAtomicLevelAt(zapcore.Level(GlobalSettings.LogLevel.Value))
+	}
+	if GlobalSettings.LogFile.HasValue {
+		cfg.OutputPaths = append(cfg.OutputPaths, strings.ReplaceAll(GlobalSettings.LogFile.Value, "{time}", time.Now().Format("20060102150405")))
+	}
+	logger, _ = cfg.Build()
 	defer logger.Sync()
 
 	prometheus.MustRegister(msgReceived)

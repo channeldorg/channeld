@@ -9,6 +9,7 @@ require (
 	github.com/indiest/fmutils v0.1.2
 	github.com/klauspost/reedsolomon v1.9.14 // indirect
 	github.com/mennanov/fmutils v0.1.1 // indirect
+	github.com/pkg/profile v1.6.0 // indirect
 	github.com/prometheus/client_golang v1.11.0
 	github.com/stretchr/testify v1.7.0
 	github.com/templexxx/cpufeat v0.0.0-20180724012125-cef66df7f161 // indirect

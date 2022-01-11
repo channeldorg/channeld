@@ -11,6 +11,7 @@ import (
 
 	"channeld.clewcat.com/channeld/pkg/channeld"
 	"channeld.clewcat.com/channeld/proto"
+	"github.com/pkg/profile"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -54,10 +55,10 @@ type TemplateData struct {
 var templateData TemplateData
 
 func main() {
+	defer profile.Start(profile.ProfilePath("profiles"), profile.CPUProfile, profile.GoroutineProfile).Stop()
 
-	flag.UintVar(&templateData.CompressionType, "ct", 0, "The compression type, 0 = No, 1 = Snappy")
-	flag.Parse()
-	channeld.GlobalSettings.CompressionType = proto.CompressionType(templateData.CompressionType)
+	channeld.GlobalSettings.ParseFlag()
+	templateData.CompressionType = uint(channeld.GlobalSettings.CompressionType)
 
 	http.HandleFunc("/", handleMain)
 	http.HandleFunc("/proto", handleChanneldProto)
