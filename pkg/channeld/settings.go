@@ -2,15 +2,20 @@ package channeld
 
 import (
 	"flag"
+	"fmt"
 	"strconv"
+	"strings"
 
 	"channeld.clewcat.com/channeld/proto"
+	"github.com/pkg/profile"
 )
 
 type GlobalSettingsType struct {
-	Development bool
-	LogLevel    *NullableInt // zapcore.Level
-	LogFile     *NullableString
+	Development   bool
+	LogLevel      *NullableInt // zapcore.Level
+	LogFile       *NullableString
+	ProfileOption func(*profile.Profile)
+	ProfilePath   string
 
 	ServerNetwork string
 	ServerAddress string
@@ -72,6 +77,20 @@ func (s *GlobalSettingsType) ParseFlag() {
 	flag.Var(s.LogLevel, "loglevel", "the log level, -1 = Debug, 0 = Info, 1= Warn, 2 = Error, 3 = Panic")
 	//flag.Var(stringPtrFlag{s.LogFile, fmt.Sprintf("logs/%s.log", time.Now().Format("20060102150405"))}, "logfile", "file path to store the log")
 	flag.Var(s.LogFile, "logfile", "file path to store the log")
+	flag.Func("profile", "available options: cpu, mem, goroutine", func(str string) error {
+		switch strings.ToLower(str) {
+		case "cpu":
+			s.ProfileOption = profile.CPUProfile
+		case "mem":
+			s.ProfileOption = profile.MemProfile
+		case "goroutine":
+			s.ProfileOption = profile.GoroutineProfile
+		default:
+			return fmt.Errorf("invalid profile type: %s", str)
+		}
+		return nil
+	})
+	flag.StringVar(&s.ProfilePath, "profilepath", "profiles", "the path to store the profile output files")
 
 	flag.StringVar(&s.ServerNetwork, "sn", "tcp", "the network type for the server connections")
 	flag.StringVar(&s.ServerAddress, "sa", ":11288", "the network address for the server connections")

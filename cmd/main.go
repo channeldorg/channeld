@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"channeld.clewcat.com/channeld/pkg/channeld"
+	"github.com/pkg/profile"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -35,6 +36,9 @@ func main() {
 	*/
 
 	channeld.GlobalSettings.ParseFlag()
+	if channeld.GlobalSettings.ProfileOption != nil {
+		defer profile.Start(channeld.GlobalSettings.ProfileOption, profile.ProfilePath(channeld.GlobalSettings.ProfilePath)).Stop()
+	}
 
 	channeld.InitLogsAndMetrics()
 	channeld.InitConnections(channeld.GlobalSettings.ServerFSM, channeld.GlobalSettings.ClientFSM)

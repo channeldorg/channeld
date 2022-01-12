@@ -1,2 +1,4 @@
 *.exe
-/examples/chat-rooms/*.code-workspace
+*.code-workspace
+*.pprof
+*.log

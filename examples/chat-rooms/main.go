@@ -55,9 +55,10 @@ type TemplateData struct {
 var templateData TemplateData
 
 func main() {
-	defer profile.Start(profile.ProfilePath("profiles"), profile.CPUProfile, profile.GoroutineProfile).Stop()
-
 	channeld.GlobalSettings.ParseFlag()
+	if channeld.GlobalSettings.ProfileOption != nil {
+		defer profile.Start(channeld.GlobalSettings.ProfileOption, profile.ProfilePath(channeld.GlobalSettings.ProfilePath)).Stop()
+	}
 	templateData.CompressionType = uint(channeld.GlobalSettings.CompressionType)
 
 	http.HandleFunc("/", handleMain)

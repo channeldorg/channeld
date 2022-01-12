@@ -35,7 +35,7 @@
         "request": "launch",
         "mode": "debug",
         "program": "examples/chat-rooms/main.go",
-        "args": ["-dev=1", "-loglevel=0", "-ct=1"]
+        "args": ["-dev=1", "-loglevel=0", "-profile=cpu", "-ct=1"]
     },
     {
         "name": "Launch tank server",
