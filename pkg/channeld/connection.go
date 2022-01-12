@@ -63,6 +63,7 @@ type Connection struct {
 	sender          MessageSender
 	sendQueue       chan MessageContext
 	fsm             *fsm.FiniteStateMachine
+	logger          *zap.Logger
 	removing        int32 // Don't put the removing state into the FSM as 1) the FSM's states are user-defined. 2) the FSM doesn't have the race condition.
 }
 
@@ -192,7 +193,11 @@ func AddConnection(c net.Conn, t ConnectionType) *Connection {
 		writer:          bufio.NewWriter(c),
 		sender:          &queuedMessageSender{},
 		sendQueue:       make(chan MessageContext, 128),
-		removing:        0,
+		logger: logger.With(
+			zap.String("connType", t.String()),
+			zap.Uint32("connId", uint32(nextConnectionId)),
+		),
+		removing: 0,
 	}
 	// IMPORTANT: always make a value copy
 	var fsm fsm.FiniteStateMachine
@@ -365,7 +370,10 @@ func (c *Connection) receiveMessage(mp *proto.MessagePack) {
 	}
 
 	if !c.fsm.IsAllowed(mp.MsgType) {
-		c.Logger().Warn("message is not allowed for current state", zap.Uint32("msgType", mp.MsgType))
+		c.Logger().Warn("message is not allowed for current state",
+			zap.Uint32("msgType", mp.MsgType),
+			zap.String("connState", c.fsm.CurrentState().Name),
+		)
 		return
 	}
 
@@ -499,11 +507,6 @@ func (c *Connection) String() string {
 	return fmt.Sprintf("Connection(%s %d %s)", c.connectionType, c.id, c.fsm.CurrentState().Name)
 }
 
-// FIXME: every call clones the logger!
 func (c *Connection) Logger() *zap.Logger {
-	return logger.With(
-		zap.String("connType", c.connectionType.String()),
-		zap.Uint32("connId", uint32(c.id)),
-		zap.String("connState", c.fsm.CurrentState().Name),
-	)
+	return c.logger
 }
