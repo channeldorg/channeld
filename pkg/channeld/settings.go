@@ -72,8 +72,7 @@ func (ns *NullableString) Set(s string) error {
 }
 
 func (s *GlobalSettingsType) ParseFlag() {
-
-	flag.BoolVar(&s.Development, "dev", true, "run in development mode?")
+	flag.BoolVar(&s.Development, "dev", false, "run in development mode?")
 	flag.Var(s.LogLevel, "loglevel", "the log level, -1 = Debug, 0 = Info, 1= Warn, 2 = Error, 3 = Panic")
 	//flag.Var(stringPtrFlag{s.LogFile, fmt.Sprintf("logs/%s.log", time.Now().Format("20060102150405"))}, "logfile", "file path to store the log")
 	flag.Var(s.LogFile, "logfile", "file path to store the log")

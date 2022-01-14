@@ -1,2 +1,8 @@
+.devcontainer
 .vscode
 .git*
+docker*
+doc
+*/Dockerfile
+*/*.pprof
+*/*.log
