@@ -53,8 +53,7 @@ type Channel struct {
 }
 
 const (
-	GlobalChannelId     ChannelId     = 0
-	DefaultTickInterval time.Duration = time.Millisecond * 10
+	GlobalChannelId ChannelId = 0
 )
 
 var nextChannelId ChannelId = GlobalChannelId
@@ -91,7 +90,7 @@ func CreateChannel(t proto.ChannelType, owner *Connection) (*Channel, error) {
 		inMsgQueue:   make(chan channelMessage, 1024),
 		fanOutQueue:  list.New(),
 		startTime:    time.Now(),
-		tickInterval: DefaultTickInterval,
+		tickInterval: time.Duration(GlobalSettings.GetChannelSettings(t).DefaultTickIntervalMs) * time.Millisecond,
 		tickFrames:   0,
 		logger: logger.With(
 			zap.String("channelType", t.String()),

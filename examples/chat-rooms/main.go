@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -55,7 +56,9 @@ type TemplateData struct {
 var templateData TemplateData
 
 func main() {
-	channeld.GlobalSettings.ParseFlag()
+	if err := channeld.GlobalSettings.ParseFlag(); err != nil {
+		fmt.Printf("error parsing CLI flag: %v\n", err)
+	}
 	if channeld.GlobalSettings.ProfileOption != nil {
 		defer profile.Start(channeld.GlobalSettings.ProfileOption, profile.ProfilePath(channeld.GlobalSettings.ProfilePath)).Stop()
 	}

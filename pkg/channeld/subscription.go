@@ -9,10 +9,6 @@ import (
 	protobuf "google.golang.org/protobuf/proto"
 )
 
-const (
-	DefaultFanOutIntervalMs uint32 = 20
-)
-
 type ChannelSubscription struct {
 	options proto.ChannelSubscriptionOptions
 	//fanOutDataMsg  Message
@@ -46,7 +42,7 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *proto.ChannelSubsc
 			cs.options = proto.ChannelSubscriptionOptions{
 				CanUpdateData:    true,
 				DataFieldMasks:   make([]string, 0),
-				FanOutIntervalMs: DefaultFanOutIntervalMs,
+				FanOutIntervalMs: GlobalSettings.GetChannelSettings(ch.channelType).DefaultFanOutIntervalMs,
 			}
 		}
 		cs.fanOutElement = ch.fanOutQueue.PushFront(&fanOutConnection{connId: c.id})

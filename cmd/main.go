@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	"channeld.clewcat.com/channeld/pkg/channeld"
@@ -35,7 +36,9 @@ func main() {
 		flag.Parse()
 	*/
 
-	channeld.GlobalSettings.ParseFlag()
+	if err := channeld.GlobalSettings.ParseFlag(); err != nil {
+		fmt.Printf("error parsing CLI flag: %v\n", err)
+	}
 	if channeld.GlobalSettings.ProfileOption != nil {
 		defer profile.Start(channeld.GlobalSettings.ProfileOption, profile.ProfilePath(channeld.GlobalSettings.ProfilePath)).Stop()
 	}

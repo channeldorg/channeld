@@ -1,8 +1,10 @@
 package channeld
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"strconv"
 	"strings"
 
@@ -26,12 +28,25 @@ type GlobalSettingsType struct {
 	ClientFSM     string
 
 	CompressionType proto.CompressionType
+
+	ChannelSettings map[proto.ChannelType]ChannelSettingsType
+}
+
+type ChannelSettingsType struct {
+	DefaultTickIntervalMs   uint
+	DefaultFanOutIntervalMs uint32
 }
 
 var GlobalSettings = GlobalSettingsType{
-	CompressionType: proto.CompressionType_NO_COMPRESSION,
 	LogLevel:        &NullableInt{},
 	LogFile:         &NullableString{},
+	CompressionType: proto.CompressionType_NO_COMPRESSION,
+	ChannelSettings: map[proto.ChannelType]ChannelSettingsType{
+		proto.ChannelType_GLOBAL: {
+			DefaultTickIntervalMs:   10,
+			DefaultFanOutIntervalMs: 20,
+		},
+	},
 }
 
 type NullableInt struct {
@@ -71,7 +86,7 @@ func (ns *NullableString) Set(s string) error {
 	return nil
 }
 
-func (s *GlobalSettingsType) ParseFlag() {
+func (s *GlobalSettingsType) ParseFlag() error {
 	flag.BoolVar(&s.Development, "dev", false, "run in development mode?")
 	flag.Var(s.LogLevel, "loglevel", "the log level, -1 = Debug, 0 = Info, 1= Warn, 2 = Error, 3 = Panic")
 	//flag.Var(stringPtrFlag{s.LogFile, fmt.Sprintf("logs/%s.log", time.Now().Format("20060102150405"))}, "logfile", "file path to store the log")
@@ -101,9 +116,30 @@ func (s *GlobalSettingsType) ParseFlag() {
 
 	ct := flag.Uint("ct", 0, "the compression type, 0 = No, 1 = Snappy")
 
+	chs := flag.String("chs", "../config/channel_settings_hifi.json", "the path to the channel settings file")
+
 	flag.Parse()
 
 	if ct != nil {
 		s.CompressionType = proto.CompressionType(*ct)
 	}
+
+	chsData, err := ioutil.ReadFile(*chs)
+	if err == nil {
+		if err := json.Unmarshal(chsData, &GlobalSettings.ChannelSettings); err != nil {
+			return fmt.Errorf("failed to unmarshall channel settings: %v", err)
+		}
+	} else {
+		return fmt.Errorf("failed to read channel settings: %v", err)
+	}
+
+	return nil
+}
+
+func (s GlobalSettingsType) GetChannelSettings(t proto.ChannelType) ChannelSettingsType {
+	settings, exists := s.ChannelSettings[t]
+	if !exists {
+		settings = s.ChannelSettings[proto.ChannelType_GLOBAL]
+	}
+	return settings
 }
