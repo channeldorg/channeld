@@ -108,15 +108,15 @@ func (s *GlobalSettingsType) ParseFlag() error {
 
 	flag.StringVar(&s.ServerNetwork, "sn", "tcp", "the network type for the server connections")
 	flag.StringVar(&s.ServerAddress, "sa", ":11288", "the network address for the server connections")
-	flag.StringVar(&s.ServerFSM, "sfsm", "../config/server_authoratative_fsm.json", "the path to the server FSM config")
+	flag.StringVar(&s.ServerFSM, "sfsm", "config/server_authoratative_fsm.json", "the path to the server FSM config")
 
 	flag.StringVar(&s.ClientNetwork, "cn", "tcp", "the network type for the client connections")
 	flag.StringVar(&s.ClientAddress, "ca", ":12108", "the network address for the client connections")
-	flag.StringVar(&s.ClientFSM, "cfsm", "../config/client_non_authoratative_fsm.json", "the path to the client FSM config")
+	flag.StringVar(&s.ClientFSM, "cfsm", "config/client_non_authoratative_fsm.json", "the path to the client FSM config")
 
 	ct := flag.Uint("ct", 0, "the compression type, 0 = No, 1 = Snappy")
 
-	chs := flag.String("chs", "../config/channel_settings_hifi.json", "the path to the channel settings file")
+	chs := flag.String("chs", "config/channel_settings_hifi.json", "the path to the channel settings file")
 
 	flag.Parse()
 

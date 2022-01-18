@@ -42,8 +42,9 @@
         "type": "go",
         "request": "launch",
         "mode": "debug",
+        "cwd": "${workspaceFolder}",
         "program": "cmd/main.go",
-        "args": ["-cfsm=../config/client_authoratative_fsm.json", "-dev", "-profile=cpu", "-ct=1"]
+        "args": ["-cfsm=config/client_authoratative_fsm.json", "-dev", "-profile=cpu", "-ct=1"]
     }
     ]
 }

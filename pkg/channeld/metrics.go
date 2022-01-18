@@ -74,6 +74,14 @@ var channelNum = prometheus.NewGaugeVec(
 	[]string{"type"},
 )
 
+var channelTickDuration = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "channel_tick_duration",
+		Help: "How long it takes to Channel.Tick()",
+	},
+	[]string{"type"},
+)
+
 func InitLogsAndMetrics() {
 	var cfg zap.Config
 	if GlobalSettings.Development {
@@ -98,4 +106,5 @@ func InitLogsAndMetrics() {
 	prometheus.MustRegister(bytesSent)
 	prometheus.MustRegister(connectionNum)
 	prometheus.MustRegister(channelNum)
+	prometheus.MustRegister(channelTickDuration)
 }

@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     image: channeld/channeld
     volumes:
-      - /var/log/channeld
+      - channeld-vol:/var/log/channeld
     depends_on:
       - grafana
     ports:
@@ -34,7 +34,7 @@ services:
       dockerfile: examples/chat-rooms/Dockerfile
     image: channeld/chat
     volumes:
-      - /var/log/chat
+      - chat-vol:/var/log/chat
     depends_on:
       - grafana
     deploy:
@@ -49,7 +49,7 @@ services:
     expose:
       - "8080"
       - "12108"
-    entrypoint: ["./app", "-profile=cpu", "-profilepath=/var/log/chat", "-ct=0"]
+    entrypoint: ["./app", "-profile=cpu", "-profilepath=/var/log/chat", "-ct=0", "-chs=../../config/channel_settings_lofi.json"]
   grafana:
     image: grafana/grafana
     depends_on:
@@ -76,3 +76,6 @@ services:
       EOF'
     ports:
       - "9090:9090"
+volumes:
+  channeld-vol:
+  chat-vol:

@@ -175,7 +175,10 @@ func (ch *Channel) Tick() {
 		}
 		ch.tickData(ch.GetTime())
 
-		time.Sleep(ch.tickInterval - time.Since(tickStart))
+		tickDuration := time.Since(tickStart)
+		channelTickDuration.WithLabelValues(ch.channelType.String()).Set(float64(tickDuration) / float64(time.Millisecond))
+
+		time.Sleep(ch.tickInterval - tickDuration)
 	}
 }
 

@@ -12,7 +12,6 @@ import (
 
 	"channeld.clewcat.com/channeld/pkg/channeld"
 	"channeld.clewcat.com/channeld/proto"
-	"github.com/pkg/profile"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -59,9 +58,7 @@ func main() {
 	if err := channeld.GlobalSettings.ParseFlag(); err != nil {
 		fmt.Printf("error parsing CLI flag: %v\n", err)
 	}
-	if channeld.GlobalSettings.ProfileOption != nil {
-		defer profile.Start(channeld.GlobalSettings.ProfileOption, profile.ProfilePath(channeld.GlobalSettings.ProfilePath)).Stop()
-	}
+	channeld.StartProfiling()
 	templateData.CompressionType = uint(channeld.GlobalSettings.CompressionType)
 
 	http.HandleFunc("/", handleMain)
@@ -76,7 +73,7 @@ func main() {
 		&proto.ChatChannelData{ChatMessages: []*proto.ChatMessage{
 			{Sender: "System", SendTime: time.Now().Unix(), Content: "Welcome!"},
 		}},
-		&proto.ChannelDataMergeOptions{ListSizeLimit: 100},
+		nil, //&proto.ChannelDataMergeOptions{ListSizeLimit: 100},
 	)
 	//channeld.SetWebSocketTrustedOrigins(["localhost"])
 	go channeld.StartListening(channeld.CLIENT, "ws", *wsAddr)
