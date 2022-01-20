@@ -33,7 +33,7 @@ type GlobalSettingsType struct {
 }
 
 type ChannelSettingsType struct {
-	DefaultTickIntervalMs   uint
+	TickIntervalMs          uint
 	DefaultFanOutIntervalMs uint32
 }
 
@@ -43,7 +43,7 @@ var GlobalSettings = GlobalSettingsType{
 	CompressionType: proto.CompressionType_NO_COMPRESSION,
 	ChannelSettings: map[proto.ChannelType]ChannelSettingsType{
 		proto.ChannelType_GLOBAL: {
-			DefaultTickIntervalMs:   10,
+			TickIntervalMs:          10,
 			DefaultFanOutIntervalMs: 20,
 		},
 	},

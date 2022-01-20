@@ -22,7 +22,7 @@ func TestSubscribeToChannel(t *testing.T) {
 	assert.Nil(t, globalChannel.ownerConnection)
 
 	globalChannel.ownerConnection = c1
-	assert.NoError(t, c1.SubscribeToChannel(globalChannel, nil))
+	c1.SubscribeToChannel(globalChannel, nil)
 	assert.Contains(t, globalChannel.subscribedConnections, c1.id)
 
 }

@@ -305,15 +305,20 @@ func handleSubToChannel(ctx MessageContext) {
 		return
 	}
 
-	err := connToSub.SubscribeToChannel(ctx.Channel, msg.SubOptions)
-	if err != nil {
-		ctx.Connection.Logger().Error("failed to sub to channel",
+	cs, exists := ctx.Channel.subscribedConnections[ctx.Connection.id]
+	if exists {
+		ctx.Connection.Logger().Info("already subscribed to channel, the subscription options will be merged",
 			zap.String("channelType", ctx.Channel.channelType.String()),
 			zap.Uint32("channelId", uint32(ctx.Channel.id)),
-			zap.Error(err),
 		)
+		if msg.SubOptions != nil {
+			protobuf.Merge(&cs.options, msg.SubOptions)
+		}
+		// Do not send the SubscribedToChannelResultMessage if already subed.
 		return
 	}
+
+	connToSub.SubscribeToChannel(ctx.Channel, msg.SubOptions)
 
 	// Notify the sender.
 	ctx.Connection.sendSubscribed(ctx, ctx.Channel, connToSub.id, ctx.StubId)

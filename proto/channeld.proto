@@ -114,6 +114,9 @@ message ChannelSubscriptionOptions {
 	uint32 FanOutIntervalMs = 3;
 }
 
+// The extra process after two @ChannelDataUpdateMessage.data have been merge.
+// Setting the ChannelDataMergeOptions via @CreateChannelMessage will siginificantly impact the performance,
+// as the post process will iterate the user-space message via Protobuf's reflection. Use it with caution.
 message ChannelDataMergeOptions {
     // By default, Protobuf appends the src list to the dst list. Setting this option to true will replace the dst list with the src list.
 	bool shouldReplaceRepeated = 1;
@@ -162,6 +165,7 @@ message ListChannelResultMessage {
 }
 
 // Response: @SubscribedToChannelResultMessage. The message sender, the subscribed connection, and the channel owner will receive the message respectively.
+// If the connection has already been subscripbed to the channel, the subOptions will be merged, but no response message will be sent.
 message SubscribedToChannelMessage {
     // The connection to be added to the channel is not necessarily the one sends the message 
     uint32 connId = 1;

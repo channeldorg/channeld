@@ -5,8 +5,6 @@ import (
 	"errors"
 
 	"channeld.clewcat.com/channeld/proto"
-	"go.uber.org/zap"
-	protobuf "google.golang.org/protobuf/proto"
 )
 
 type ChannelSubscription struct {
@@ -16,43 +14,30 @@ type ChannelSubscription struct {
 	fanOutElement *list.Element
 }
 
-func (c *Connection) SubscribeToChannel(ch *Channel, options *proto.ChannelSubscriptionOptions) error {
-	cs, exists := ch.subscribedConnections[c.id]
-	if exists {
-		c.Logger().Info("already subscribed to channel, the subscription options will be merged",
-			zap.String("channelType", ch.channelType.String()),
-			zap.Uint32("channelId", uint32(ch.id)),
-		)
-		if options != nil {
-			protobuf.Merge(&cs.options, options)
+func (c *Connection) SubscribeToChannel(ch *Channel, options *proto.ChannelSubscriptionOptions) {
+	cs := &ChannelSubscription{
+		// Send the whole data to the connection when subscribed
+		//fanOutDataMsg: ch.Data().msg,
+	}
+	if options != nil {
+		cs.options = proto.ChannelSubscriptionOptions{
+			CanUpdateData:    options.CanUpdateData,
+			DataFieldMasks:   options.DataFieldMasks,
+			FanOutIntervalMs: options.FanOutIntervalMs,
 		}
 	} else {
-
-		cs = &ChannelSubscription{
-			// Send the whole data to the connection when subscribed
-			//fanOutDataMsg: ch.Data().msg,
+		cs.options = proto.ChannelSubscriptionOptions{
+			CanUpdateData:    true,
+			DataFieldMasks:   make([]string, 0),
+			FanOutIntervalMs: GlobalSettings.GetChannelSettings(ch.channelType).DefaultFanOutIntervalMs,
 		}
-		if options != nil {
-			cs.options = proto.ChannelSubscriptionOptions{
-				CanUpdateData:    options.CanUpdateData,
-				DataFieldMasks:   options.DataFieldMasks,
-				FanOutIntervalMs: options.FanOutIntervalMs,
-			}
-		} else {
-			cs.options = proto.ChannelSubscriptionOptions{
-				CanUpdateData:    true,
-				DataFieldMasks:   make([]string, 0),
-				FanOutIntervalMs: GlobalSettings.GetChannelSettings(ch.channelType).DefaultFanOutIntervalMs,
-			}
-		}
-		cs.fanOutElement = ch.fanOutQueue.PushFront(&fanOutConnection{connId: c.id})
-		// Records the maximum fan-out interval for checking if the oldest update message is removable when the buffer is overflowed.
-		if ch.data != nil && ch.data.maxFanOutIntervalMs < cs.options.FanOutIntervalMs {
-			ch.data.maxFanOutIntervalMs = cs.options.FanOutIntervalMs
-		}
-		ch.subscribedConnections[c.id] = cs
 	}
-	return nil
+	cs.fanOutElement = ch.fanOutQueue.PushFront(&fanOutConnection{connId: c.id})
+	// Records the maximum fan-out interval for checking if the oldest update message is removable when the buffer is overflowed.
+	if ch.data != nil && ch.data.maxFanOutIntervalMs < cs.options.FanOutIntervalMs {
+		ch.data.maxFanOutIntervalMs = cs.options.FanOutIntervalMs
+	}
+	ch.subscribedConnections[c.id] = cs
 }
 
 func (c *Connection) UnsubscribeFromChannel(ch *Channel) error {

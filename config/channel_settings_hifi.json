@@ -1,6 +1,6 @@
 {
     "0": {
-        "DefaultTickIntervalMs": 10,
+        "TickIntervalMs": 10,
         "DefaultFanOutIntervalMs": 20
     }
 }
