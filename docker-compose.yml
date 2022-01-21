@@ -1,8 +1,7 @@
 version: '3'
 services:
   channeld:
-    build:
-      dockerfile: Dockerfile
+    build: .
     image: channeld/channeld
     volumes:
       - channeld-vol:/var/log/channeld
@@ -20,7 +19,7 @@ services:
       "-logfile=/var/log/channeld/{time}.log",
       "-profile=cpu", 
       "-profilepath=/var/log/channeld", 
-      "-ct=0"]
+      "-ct=1"]
   tanks:
     image: channeld/tanks
     depends_on:
@@ -31,9 +30,7 @@ services:
   chat:
     profiles:
       - donotstart
-    build:
-      context: .
-      dockerfile: examples/chat-rooms/Dockerfile
+    build: ./examples/chat-rooms
     image: channeld/chat
     volumes:
       - chat-vol:/var/log/chat
