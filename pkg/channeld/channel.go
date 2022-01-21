@@ -90,7 +90,7 @@ func CreateChannel(t proto.ChannelType, owner *Connection) (*Channel, error) {
 		inMsgQueue:   make(chan channelMessage, 1024),
 		fanOutQueue:  list.New(),
 		startTime:    time.Now(),
-		tickInterval: time.Duration(GlobalSettings.GetChannelSettings(t).DefaultTickIntervalMs) * time.Millisecond,
+		tickInterval: time.Duration(GlobalSettings.GetChannelSettings(t).TickIntervalMs) * time.Millisecond,
 		tickFrames:   0,
 		logger: logger.With(
 			zap.String("channelType", t.String()),

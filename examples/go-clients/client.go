@@ -33,6 +33,7 @@ type Client struct {
 	CompressionType    proto.CompressionType
 	subscribedChannels map[uint32]struct{}
 	conn               net.Conn
+	connected          bool
 	incomingQueue      chan messageQueueEntry
 	outgoingQueue      chan *proto.MessagePack
 	messageMap         map[uint32]*messageMapEntry
@@ -60,6 +61,7 @@ func NewClient(addr string) (*Client, error) {
 		CompressionType:    proto.CompressionType_NO_COMPRESSION,
 		subscribedChannels: make(map[uint32]struct{}),
 		conn:               conn,
+		connected:          true,
 		incomingQueue:      make(chan messageQueueEntry, 128),
 		outgoingQueue:      make(chan *proto.MessagePack, 32),
 		messageMap:         make(map[uint32]*messageMapEntry),
@@ -138,16 +140,18 @@ func defaultMessageHandler(client *Client, channelId uint32, m Message) {
 	//log.Printf("Client(%d) received message from channel %d: %s", client.Id, channelId, m)
 }
 
-func readBytes(conn net.Conn, len uint) ([]byte, error) {
+func (client *Client) readBytes(conn net.Conn, len uint) ([]byte, error) {
 	bytes := make([]byte, len)
 	if _, err := io.ReadFull(conn, bytes); err != nil {
 		switch err.(type) {
 		case *net.OpError:
 		case *websocket.CloseError:
+			client.connected = false
 			return nil, fmt.Errorf("WebSocket server disconnected: %s", conn.RemoteAddr())
 		}
 
 		if err == io.EOF {
+			client.connected = false
 			return nil, fmt.Errorf("server disconnected: %s", conn.RemoteAddr())
 		}
 		return nil, err
@@ -155,9 +159,12 @@ func readBytes(conn net.Conn, len uint) ([]byte, error) {
 	return bytes, nil
 }
 
-func (client *Client) Receive() error {
+func (client Client) IsConnected() bool {
+	return client.connected
+}
 
-	tag, err := readBytes(client.conn, 5)
+func (client *Client) Receive() error {
+	tag, err := client.readBytes(client.conn, 5)
 	if err != nil || tag[0] != 67 {
 		return fmt.Errorf("invalid tag: %s, the packet will be dropped: %w", tag, err)
 	}

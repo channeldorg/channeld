@@ -16,16 +16,18 @@ services:
     entrypoint: [
       "./app", 
       "-cfsm=config/client_authoratative_fsm.json", 
-      "-sfsm=config/server_authoratative_fsm.json", 
-      # "-profile=cpu", 
-      # "-profilepath=/var/log/channeld", 
-      "-ct=1"]
+      "-sfsm=config/server_authoratative_fsm.json",
+      "-logfile=/var/log/channeld/{time}.log",
+      "-profile=cpu", 
+      "-profilepath=/var/log/channeld", 
+      "-ct=0"]
   tanks:
     image: channeld/tanks
     depends_on:
       - channeld
     environment:
       - CHANNELD_IP=channeld
+    entrypoint: ["./server.x86_64", "-sa", "channeld", "-spawnai", "500"]
   chat:
     profiles:
       - donotstart
