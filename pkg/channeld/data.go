@@ -25,7 +25,7 @@ type ChannelData struct {
 	maxFanOutIntervalMs uint32
 }
 
-type removableMapField interface {
+type RemovableMapField interface {
 	GetRemoved() bool
 }
 
@@ -205,8 +205,43 @@ func (ch *Channel) fanOutDataUpdate(c *Connection, cs *ChannelSubscription, upda
 	// cs.fanOutDataMsg = nil
 }
 
+/* Experiment: extending protobuf to make the merge more efficient
+func postMergeMapKV(dst, src protoreflect.Map, k protoreflect.MapKey, v protoreflect.Value, fd protoreflect.FieldDescriptor) bool {
+	removable, ok := v.Message().Interface().(removableMapField)
+	if ok && removable.GetRemoved() {
+		dst.Clear(k)
+	}
+	return true
+}
+*/
+
+type MergeableChannelData interface {
+	Message
+	Merge(src Message, options *proto.ChannelDataMergeOptions) error
+}
+
 func mergeWithOptions(dst Message, src Message, options *proto.ChannelDataMergeOptions) {
+	mergeable, ok := dst.(MergeableChannelData)
+	if ok {
+		if err := mergeable.Merge(src, options); err != nil {
+			logger.Error("custom merge error", zap.Error(err),
+				zap.String("dstType", string(dst.ProtoReflect().Descriptor().FullName().Name())),
+				zap.String("srcType", string(src.ProtoReflect().Descriptor().FullName().Name())),
+			)
+		}
+	} else {
+		reflectMerge(dst, src, options)
+	}
+}
+
+// Use proto.reflect to merge. No need to write custom merge code but less efficient.
+func reflectMerge(dst Message, src Message, options *proto.ChannelDataMergeOptions) {
+	// if options == nil {
 	protobuf.Merge(dst, src)
+	// } else {
+	// 	protobuf.MergeWithOptions(dst, src, protobuf.MergeOptions{PostMergeMapKV: postMergeMapKV})
+	// }
+
 	if options != nil {
 		//logger.Debug("merged with options", zap.Any("src", src), zap.Any("dst", dst))
 		defer func() {
@@ -221,16 +256,13 @@ func mergeWithOptions(dst Message, src Message, options *proto.ChannelDataMergeO
 				list := v.List()
 				offset := list.Len() - int(options.ListSizeLimit)
 				if options.ListSizeLimit > 0 && offset > 0 {
-					for i := 0; i < int(options.ListSizeLimit); i++ {
-						list.Set(i, list.Get(i+offset))
-					}
 					list.Truncate(int(options.ListSizeLimit))
 				}
 			} else if fd.IsMap() {
 				if options.ShouldCheckRemovableMapField {
 					dstMap := v.Map()
 					dstMap.Range(func(mk protoreflect.MapKey, mv protoreflect.Value) bool {
-						removable, ok := mv.Message().Interface().(removableMapField)
+						removable, ok := mv.Message().Interface().(RemovableMapField)
 						if ok && removable.GetRemoved() {
 							dstMap.Clear(mk)
 						}

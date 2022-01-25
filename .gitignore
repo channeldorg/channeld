@@ -2,3 +2,4 @@
 *.code-workspace
 *.pprof
 *.log
+_data

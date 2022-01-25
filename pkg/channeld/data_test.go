@@ -3,7 +3,9 @@ package channeld
 import (
 	"container/list"
 	"fmt"
+	"math/rand"
 	"net"
+	"strconv"
 	"testing"
 	"time"
 
@@ -127,6 +129,39 @@ func TestFanOutChannelData(t *testing.T) {
 	assert.EqualValues(t, "c", c2.latestMsg().(*proto.TestChannelDataMessage).Text)
 }
 
+func BenchmarkCustomMergeMap(b *testing.B) {
+	dst := &proto.TestMergeMessage{
+		Kv: map[int64]*proto.TestMergeMessage_StringWrapper{},
+	}
+	src := &proto.TestMergeMessage{
+		Kv: map[int64]*proto.TestMergeMessage_StringWrapper{},
+	}
+	for i := 0; i < 100; i++ {
+		dst.Kv[int64(i)] = &proto.TestMergeMessage_StringWrapper{Removed: false, Content: strconv.Itoa(rand.Int())}
+		if rand.Intn(100) < 10 {
+			src.Kv[int64(i)] = &proto.TestMergeMessage_StringWrapper{Removed: true}
+		} else {
+			src.Kv[int64(i)] = &proto.TestMergeMessage_StringWrapper{Removed: false, Content: strconv.Itoa(rand.Int())}
+		}
+	}
+
+	mergeOptions := &proto.ChannelDataMergeOptions{ShouldCheckRemovableMapField: true}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		mergeWithOptions(dst, src, mergeOptions)
+	}
+
+	// Reflect merge:
+	// BenchmarkCustomMergeMap-12    	   26959	     43900 ns/op	    8464 B/op	     316 allocs/op
+	// BenchmarkCustomMergeMap-12    	   27038	     46457 ns/op	    8464 B/op	     316 allocs/op
+	// BenchmarkCustomMergeMap-12    	   24746	     49732 ns/op	    8464 B/op	     316 allocs/op
+
+	// Custom merge: (15x faster!!!)
+	// BenchmarkCustomMergeMap-12    	  353163	      3172 ns/op	       0 B/op	       0 allocs/op
+	// BenchmarkCustomMergeMap-12    	  457196	      2871 ns/op	       0 B/op	       0 allocs/op
+	// BenchmarkCustomMergeMap-12    	  419090	      3004 ns/op	       0 B/op	       0 allocs/op
+}
+
 func TestListRemoveElement(t *testing.T) {
 	list := list.New()
 	list.PushBack("a")
@@ -197,7 +232,7 @@ func TestDataMergeOptions(t *testing.T) {
 	}
 	mergeWithOptions(mergedMsg2, srcMsg, mergeOptions2)
 	assert.Equal(t, 4, len(mergedMsg2.List))
-	assert.Equal(t, "b", mergedMsg2.List[0])
+	assert.Equal(t, "d", mergedMsg2.List[3])
 
 	mergedMsg3 := protobuf.Clone(dstMsg).(*proto.TestMergeMessage)
 	mergeOptions3 := &proto.ChannelDataMergeOptions{
