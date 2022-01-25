@@ -1,0 +1,43 @@
+syntax = "proto2";
+
+package channeldpb;
+
+option go_package = "/pkg/channeldpb";
+
+message TestChannelDataMessage {
+    required string text = 1;
+    required uint32 num = 2;
+}
+
+message TestMergeMessage {
+    repeated string list = 1;
+
+    message StringWrapper {
+        required bool removed = 1;
+        required string content = 2;
+    }
+    map<int64, StringWrapper> kv = 2;
+}
+
+message TestMapMessage {
+    map<uint32, string> kv = 1;
+
+    message StringWrapper {
+        required string content = 1;
+        required int64 num = 2;
+    }
+    map<uint32, StringWrapper> kv2 = 2;
+}
+
+message TestFieldMaskMessage {
+    message NestedMessage {
+        required int64 p1 = 1;
+        required uint32 p2 = 2;
+    }
+
+    required string name = 1;
+    required NestedMessage msg = 2;
+    repeated NestedMessage list = 3;
+    map<int64, NestedMessage> kv1 = 4;
+    map<int64, string> kv2 = 5;
+}
