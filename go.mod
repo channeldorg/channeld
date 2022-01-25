@@ -3,7 +3,6 @@ module channeld.clewcat.com/channeld
 go 1.16
 
 require (
-	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/snappy v0.0.4
 	github.com/gorilla/websocket v1.4.2
 	github.com/iancoleman/strcase v0.2.0

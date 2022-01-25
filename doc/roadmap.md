@@ -20,7 +20,8 @@
 
 # Optimizations
 - [x] Read/write the packet using Protobuf
-- [ ] Use [gogoprotobuf](https://github.com/gogo/protobuf) for faster marshalling/unmarshalling
+- ~~[ ] Use [gogoprotobuf](https://github.com/gogo/protobuf) for faster marshalling/unmarshalling~~
+- [ ] Enable custom merge of channel data messages
 
 # Tests
 - [ ] Unit tests
