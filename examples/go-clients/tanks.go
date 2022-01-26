@@ -50,7 +50,7 @@ var TanksClientActions = []*clientAction{
 
 			netId, ok := data.ctx[ctxKeyClientNetId].(uint32)
 			if !ok {
-				log.Println("netId is not set in the ctx!")
+				log.Printf("netId is not set in the ctx for client %d!\n", client.Id)
 				return true
 			}
 
@@ -138,6 +138,7 @@ func wrapTanksChannelDataUpateHandle(data *clientData) MessageHandlerFunc {
 			if _, ok := tanksNetIdMapping.Load(netId); !ok {
 				tanksNetIdMapping.Store(netId, client.Id)
 				data.ctx[ctxKeyClientNetId] = netId
+				log.Printf("set netId=%d for client %d\n", netId, client.Id)
 				break
 			}
 		}

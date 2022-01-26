@@ -159,7 +159,7 @@ func (client *Client) readBytes(conn net.Conn, len uint) ([]byte, error) {
 	return bytes, nil
 }
 
-func (client Client) IsConnected() bool {
+func (client *Client) IsConnected() bool {
 	return client.connected
 }
 
