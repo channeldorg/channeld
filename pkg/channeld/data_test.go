@@ -151,7 +151,7 @@ func BenchmarkCustomMergeMap(b *testing.B) {
 		mergeWithOptions(dst, src, mergeOptions)
 	}
 
-	// Reflect merge:
+	// Protoreflect merge:
 	// BenchmarkCustomMergeMap-12    	   26959	     43900 ns/op	    8464 B/op	     316 allocs/op
 	// BenchmarkCustomMergeMap-12    	   27038	     46457 ns/op	    8464 B/op	     316 allocs/op
 	// BenchmarkCustomMergeMap-12    	   24746	     49732 ns/op	    8464 B/op	     316 allocs/op
@@ -220,7 +220,7 @@ func TestDataMergeOptions(t *testing.T) {
 
 	mergedMsg1 := protobuf.Clone(dstMsg).(*proto.TestMergeMessage)
 	mergeOptions1 := &proto.ChannelDataMergeOptions{
-		ShouldReplaceRepeated: true,
+		ShouldReplaceList: true,
 	}
 	mergeWithOptions(mergedMsg1, srcMsg, mergeOptions1)
 	assert.Equal(t, 2, len(mergedMsg1.List))
@@ -230,9 +230,13 @@ func TestDataMergeOptions(t *testing.T) {
 	mergeOptions2 := &proto.ChannelDataMergeOptions{
 		ListSizeLimit: 4,
 	}
-	mergeWithOptions(mergedMsg2, srcMsg, mergeOptions2)
+	mergeWithOptions(mergedMsg2, srcMsg, mergeOptions2) // [a,b,c,d]
 	assert.Equal(t, 4, len(mergedMsg2.List))
 	assert.Equal(t, "d", mergedMsg2.List[3])
+	mergeOptions2.TruncateTop = true
+	mergeWithOptions(mergedMsg2, srcMsg, mergeOptions2) // [c,d,d,e]
+	assert.Equal(t, "c", mergedMsg2.List[0])
+	assert.Equal(t, "e", mergedMsg2.List[3])
 
 	mergedMsg3 := protobuf.Clone(dstMsg).(*proto.TestMergeMessage)
 	mergeOptions3 := &proto.ChannelDataMergeOptions{

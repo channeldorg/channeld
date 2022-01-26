@@ -114,16 +114,18 @@ message ChannelSubscriptionOptions {
 	uint32 FanOutIntervalMs = 3;
 }
 
-// The extra process after two @ChannelDataUpdateMessage.data have been merge.
-// Setting the ChannelDataMergeOptions via @CreateChannelMessage will siginificantly impact the performance,
-// as the post process will iterate the user-space message via Protobuf's reflection. Use it with caution.
+// Defines how two @ChannelDataUpdateMessage.data are merged.
+// The custom merge function should always be implemented for the sake of performance. Otherwise, 
+// the default merge that based on Protobuf's reflection will be used, and it's >10 times slower.
 message ChannelDataMergeOptions {
     // By default, Protobuf appends the src list to the dst list. Setting this option to true will replace the dst list with the src list.
-	bool shouldReplaceRepeated = 1;
+	bool shouldReplaceList = 1;
+	// If the value is greater than 0, truncate the the list when oversized.
+	uint32 listSizeLimit = 2;
+    // If true, the top elements of the list will be truncated instead of the end. It's useful for scenarios like chat message list.
+    bool truncateTop = 3;
 	// If true, the merge method will remove any map entry that has removed=true in its value.
-	bool shouldCheckRemovableMapField = 2;
-	// If the value is greater than 0, truncate the top elements of the list when oversized.
-	uint32 listSizeLimit = 3;
+	bool shouldCheckRemovableMapField = 4;
 }
 
 // The packet should have channelId = 0 in order to be handled.

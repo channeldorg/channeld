@@ -12,7 +12,7 @@ func (dst *TestMergeMessage) Merge(src protobuf.Message, options *ChannelDataMer
 		return errors.New("src is not a TestMergeMessage")
 	}
 
-	if options.ShouldReplaceRepeated {
+	if options.ShouldReplaceList {
 		// Make a deep copy
 		dst.List = append([]string{}, srcMsg.List...)
 	} else {
@@ -20,7 +20,15 @@ func (dst *TestMergeMessage) Merge(src protobuf.Message, options *ChannelDataMer
 	}
 
 	if options.ListSizeLimit > 0 {
-		dst.List = dst.List[:options.ListSizeLimit]
+		if options.TruncateTop {
+			start := len(dst.List) - int(options.ListSizeLimit)
+			if start < 0 {
+				start = 0
+			}
+			dst.List = dst.List[start:]
+		} else {
+			dst.List = dst.List[:options.ListSizeLimit]
+		}
 	}
 
 	for k, v := range srcMsg.Kv {

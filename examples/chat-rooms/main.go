@@ -73,7 +73,10 @@ func main() {
 		&proto.ChatChannelData{ChatMessages: []*proto.ChatMessage{
 			{Sender: "System", SendTime: time.Now().Unix(), Content: "Welcome!"},
 		}},
-		nil, //&proto.ChannelDataMergeOptions{ListSizeLimit: 100},
+		&proto.ChannelDataMergeOptions{
+			ListSizeLimit: 10,
+			TruncateTop:   true,
+		},
 	)
 	//channeld.SetWebSocketTrustedOrigins(["localhost"])
 	go channeld.StartListening(channeld.CLIENT, "ws", *wsAddr)

@@ -223,6 +223,14 @@ type MergeableChannelData interface {
 func mergeWithOptions(dst Message, src Message, options *proto.ChannelDataMergeOptions) {
 	mergeable, ok := dst.(MergeableChannelData)
 	if ok {
+		if options == nil {
+			options = &proto.ChannelDataMergeOptions{
+				ShouldReplaceList:            false,
+				ListSizeLimit:                0,
+				TruncateTop:                  false,
+				ShouldCheckRemovableMapField: true,
+			}
+		}
 		if err := mergeable.Merge(src, options); err != nil {
 			logger.Error("custom merge error", zap.Error(err),
 				zap.String("dstType", string(dst.ProtoReflect().Descriptor().FullName().Name())),
@@ -234,7 +242,7 @@ func mergeWithOptions(dst Message, src Message, options *proto.ChannelDataMergeO
 	}
 }
 
-// Use proto.reflect to merge. No need to write custom merge code but less efficient.
+// Use protoreflect to merge. No need to write custom merge code but less efficient.
 func reflectMerge(dst Message, src Message, options *proto.ChannelDataMergeOptions) {
 	// if options == nil {
 	protobuf.Merge(dst, src)
@@ -250,12 +258,17 @@ func reflectMerge(dst Message, src Message, options *proto.ChannelDataMergeOptio
 
 		dst.ProtoReflect().Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
 			if fd.IsList() {
-				if options.ShouldReplaceRepeated {
+				if options.ShouldReplaceList {
 					dst.ProtoReflect().Set(fd, src.ProtoReflect().Get(fd))
 				}
 				list := v.List()
 				offset := list.Len() - int(options.ListSizeLimit)
 				if options.ListSizeLimit > 0 && offset > 0 {
+					if options.TruncateTop {
+						for i := 0; i < int(options.ListSizeLimit); i++ {
+							list.Set(i, list.Get(i+offset))
+						}
+					}
 					list.Truncate(int(options.ListSizeLimit))
 				}
 			} else if fd.IsMap() {
