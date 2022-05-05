@@ -14,7 +14,7 @@ import (
 func TestHandleListChannels(t *testing.T) {
 	InitLogsAndMetrics()
 	InitChannels()
-	c := addTestConnection(SERVER)
+	c := addTestConnection(proto.ConnectionType_SERVER)
 	ch0 := globalChannel
 	ch1, _ := CreateChannel(proto.ChannelType_PRIVATE, c)
 	ch2, _ := CreateChannel(proto.ChannelType_SUBWORLD, c)

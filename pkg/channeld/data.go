@@ -118,8 +118,8 @@ func (ch *Channel) tickData(t ChannelTime) {
 				if ch.ownerConnection == c {
 					// Reset the owner if it unsubscribed
 					ch.ownerConnection = nil
-				} else {
-					ch.ownerConnection.sendUnsubscribed(MessageContext{}, ch, foc.connId, 0)
+				} else if c != nil {
+					ch.ownerConnection.sendUnsubscribed(MessageContext{}, ch, c, 0)
 				}
 			}
 

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"channeld.clewcat.com/channeld/pkg/channeld"
+	"channeld.clewcat.com/channeld/proto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -47,8 +48,8 @@ func main() {
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(":8080", nil)
 
-	go channeld.StartListening(channeld.SERVER, channeld.GlobalSettings.ServerNetwork, channeld.GlobalSettings.ServerAddress)
+	go channeld.StartListening(proto.ConnectionType_SERVER, channeld.GlobalSettings.ServerNetwork, channeld.GlobalSettings.ServerAddress)
 	// FIXME: After all the server connections are established, the client connection should be listened.*/
-	channeld.StartListening(channeld.CLIENT, channeld.GlobalSettings.ClientNetwork, channeld.GlobalSettings.ClientAddress)
+	channeld.StartListening(proto.ConnectionType_CLIENT, channeld.GlobalSettings.ClientNetwork, channeld.GlobalSettings.ClientAddress)
 
 }

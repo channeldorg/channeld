@@ -321,15 +321,15 @@ func handleSubToChannel(ctx MessageContext) {
 	connToSub.SubscribeToChannel(ctx.Channel, msg.SubOptions)
 
 	// Notify the sender.
-	ctx.Connection.sendSubscribed(ctx, ctx.Channel, connToSub.id, ctx.StubId)
+	ctx.Connection.sendSubscribed(ctx, ctx.Channel, connToSub, ctx.StubId)
 
-	// Notify the subscribed.
+	// Notify the subscribed (if not the sender).
 	if connToSub != ctx.Connection {
-		connToSub.sendSubscribed(ctx, ctx.Channel, connToSub.id, 0)
+		connToSub.sendSubscribed(ctx, ctx.Channel, connToSub, 0)
 	}
 	// Notify the channel owner.
 	if ctx.Channel.ownerConnection != ctx.Connection && ctx.Channel.ownerConnection != nil {
-		ctx.Channel.ownerConnection.sendSubscribed(ctx, ctx.Channel, connToSub.id, 0)
+		ctx.Channel.ownerConnection.sendSubscribed(ctx, ctx.Channel, connToSub, 0)
 	}
 }
 
@@ -367,16 +367,16 @@ func handleUnsubFromChannel(ctx MessageContext) {
 	}
 
 	// Notify the sender.
-	ctx.Connection.sendUnsubscribed(ctx, ctx.Channel, connToUnsub.id, ctx.StubId)
+	ctx.Connection.sendUnsubscribed(ctx, ctx.Channel, connToUnsub, ctx.StubId)
 
 	// Notify the unsubscribed.
 	if connToUnsub != ctx.Connection {
-		connToUnsub.sendUnsubscribed(ctx, ctx.Channel, connToUnsub.id, 0)
+		connToUnsub.sendUnsubscribed(ctx, ctx.Channel, connToUnsub, 0)
 	}
 	// Notify the channel owner.
 	if ctx.Channel.ownerConnection != nil {
 		if ctx.Channel.ownerConnection != ctx.Connection {
-			ctx.Channel.ownerConnection.sendUnsubscribed(ctx, ctx.Channel, connToUnsub.id, 0)
+			ctx.Channel.ownerConnection.sendUnsubscribed(ctx, ctx.Channel, connToUnsub, 0)
 		} else {
 			// Reset the owner if it unsubscribed
 			ctx.Channel.ownerConnection = nil

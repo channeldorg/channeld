@@ -44,6 +44,12 @@ enum BroadcastType {
     SINGLE_CONNECTION = 3; 
 }
 
+enum ConnectionType {
+    NO_CONNECTION = 0;
+    SERVER = 1;
+    CLIENT = 2;
+}
+
 enum ChannelType {
     UNKNOWN = 0;
     GLOBAL = 1;   // Default channel. Any message without ChannelId specified will be sent to this channel.
@@ -166,7 +172,7 @@ message ListChannelResultMessage {
     repeated ChannelInfo channels = 1;
 }
 
-// Response: @SubscribedToChannelResultMessage. The message sender, the subscribed connection, and the channel owner will receive the message respectively.
+// Response: @SubscribedToChannelResultMessage. The message sender, the subscribed connection (if not the sender), and the channel owner will receive the message respectively.
 // If the connection has already been subscripbed to the channel, the subOptions will be merged, but no response message will be sent.
 message SubscribedToChannelMessage {
     // The connection to be added to the channel is not necessarily the one sends the message 
@@ -177,12 +183,20 @@ message SubscribedToChannelMessage {
 message SubscribedToChannelResultMessage {
     // The connection that subsribed.
     uint32 connId = 1;
-    ChannelType channelType = 2;
+    ConnectionType connType = 2;
+    ChannelType channelType = 3;
 }
 
-// Response: @UnsubscribedFromChannelMessage. The message sender, the subscribed connection, and the channel owner will receive the message respectively.
+// Response: @UnsubscribedFromChannelResultMessage. The message sender, the subscribed connection, and the channel owner will receive the message respectively.
 message UnsubscribedFromChannelMessage {
     uint32 connId = 1;
+}
+
+message UnsubscribedFromChannelResultMessage {
+    // The connection that unsubsribed.
+    uint32 connId = 1;
+    ConnectionType connType = 2;
+    ChannelType channelType = 3;
 }
 
 // Response: no. Each connection in the channel receives the @ChannelDataUpdateMessage in every @ChannelSubscriptionOptions.FanOutIntervalMs

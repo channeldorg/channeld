@@ -71,12 +71,13 @@ func (c *Connection) sendConnUnsubscribed(connId ConnectionId, ids ...ChannelId)
 }
 */
 
-func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel, connId ConnectionId, stubId uint32) {
+func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel, connToSub *Connection, stubId uint32) {
 	ctx.Channel = ch
 	ctx.StubId = stubId
 	ctx.MsgType = proto.MessageType_SUB_TO_CHANNEL
 	ctx.Msg = &proto.SubscribedToChannelResultMessage{
-		ConnId:      uint32(connId),
+		ConnId:      uint32(connToSub.id),
+		ConnType:    connToSub.connectionType,
 		ChannelType: ch.channelType,
 	}
 	// ctx.Msg = &proto.SubscribedToChannelMessage{
@@ -85,12 +86,15 @@ func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel, connId Conn
 	// }
 	c.Send(ctx)
 }
-func (c *Connection) sendUnsubscribed(ctx MessageContext, ch *Channel, connId ConnectionId, stubId uint32) {
+
+func (c *Connection) sendUnsubscribed(ctx MessageContext, ch *Channel, connToUnsub *Connection, stubId uint32) {
 	ctx.Channel = ch
 	ctx.StubId = stubId
 	ctx.MsgType = proto.MessageType_UNSUB_FROM_CHANNEL
-	ctx.Msg = &proto.UnsubscribedFromChannelMessage{
-		ConnId: uint32(connId),
+	ctx.Msg = &proto.UnsubscribedFromChannelResultMessage{
+		ConnId:      uint32(connToUnsub.id),
+		ConnType:    connToUnsub.connectionType,
+		ChannelType: ch.channelType,
 	}
 	c.Send(ctx)
 }

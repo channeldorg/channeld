@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"sync"
@@ -23,23 +22,6 @@ import (
 
 type ConnectionId uint32
 
-type ConnectionType uint8
-
-const (
-	SERVER ConnectionType = 1
-	CLIENT ConnectionType = 2
-)
-
-func (t ConnectionType) String() string {
-	if t == SERVER {
-		return "SERVER"
-	} else if t == CLIENT {
-		return "CLIENT"
-	} else {
-		return "UNKNOWN"
-	}
-}
-
 // Add an interface before the underlying network layer for the test purpose.
 type MessageSender interface {
 	Send(c *Connection, ctx MessageContext) //(c *Connection, channelId ChannelId, msgType proto.MessageType, msg Message)
@@ -55,7 +37,7 @@ func (s *queuedMessageSender) Send(c *Connection, ctx MessageContext) {
 
 type Connection struct {
 	id              ConnectionId
-	connectionType  ConnectionType
+	connectionType  proto.ConnectionType
 	compressionType proto.CompressionType
 	conn            net.Conn
 	reader          *bufio.Reader
@@ -144,7 +126,7 @@ func startGoroutines(connection *Connection) {
 	}()
 }
 
-func StartListening(t ConnectionType, network string, address string) {
+func StartListening(t proto.ConnectionType, network string, address string) {
 	logger.Info("start listenning",
 		zap.String("connType", t.String()),
 		zap.String("network", network),
@@ -182,7 +164,7 @@ func StartListening(t ConnectionType, network string, address string) {
 	}
 }
 
-func AddConnection(c net.Conn, t ConnectionType) *Connection {
+func AddConnection(c net.Conn, t proto.ConnectionType) *Connection {
 	atomic.AddUint64(&nextConnectionId, 1)
 	connection := &Connection{
 		id:              ConnectionId(nextConnectionId),
@@ -202,9 +184,9 @@ func AddConnection(c net.Conn, t ConnectionType) *Connection {
 	// IMPORTANT: always make a value copy
 	var fsm fsm.FiniteStateMachine
 	switch t {
-	case SERVER:
+	case proto.ConnectionType_SERVER:
 		fsm = serverFsm
-	case CLIENT:
+	case proto.ConnectionType_CLIENT:
 		fsm = clientFsm
 	}
 
@@ -298,8 +280,9 @@ func (c *Connection) ReceivePacket() {
 		)
 		_, isClosed := err.(*closeError)
 		if !isClosed {
-			// Drop the packet
-			ioutil.ReadAll(c.reader)
+			// Drop the packet. Avoid the allocation.
+			//ioutil.ReadAll(c.reader)
+			io.Copy(io.Discard, c.reader)
 		}
 		return
 	}
@@ -381,7 +364,7 @@ func (c *Connection) receiveMessage(mp *proto.MessagePack) {
 	var handler MessageHandlerFunc
 	if mp.MsgType >= uint32(proto.MessageType_USER_SPACE_START) && entry == nil {
 		// client -> channeld -> server
-		if c.connectionType == CLIENT {
+		if c.connectionType == proto.ConnectionType_CLIENT {
 			// User-space message without handler won't be deserialized.
 			msg = &proto.ServerForwardMessage{ClientConnId: uint32(c.id), Payload: mp.MsgBody}
 			handler = handleClientToServerUserMessage

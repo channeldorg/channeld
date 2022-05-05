@@ -9,7 +9,7 @@ import (
 
 func TestSubscribeToChannel(t *testing.T) {
 	InitLogsAndMetrics()
-	c1 := &Connection{id: 1, connectionType: SERVER}
+	c1 := &Connection{id: 1, connectionType: proto.ConnectionType_SERVER}
 	//c2 := &Connection{id: 2, connectionType: SERVER}
 	//c3 := &Connection{id: 3, connectionType: CLIENT}
 

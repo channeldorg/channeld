@@ -33,11 +33,11 @@ func (s *testQueuedMessageSender) Send(c *Connection, ctx MessageContext) {
 	s.msgQueue = append(s.msgQueue, ctx.Msg)
 }
 
-func addTestConnection(t ConnectionType) *Connection {
+func addTestConnection(t proto.ConnectionType) *Connection {
 	return addTestConnectionWithProcessor(t, nil)
 }
 
-func addTestConnectionWithProcessor(t ConnectionType, p func(Message) (Message, error)) *Connection {
+func addTestConnectionWithProcessor(t proto.ConnectionType, p func(Message) (Message, error)) *Connection {
 	conn1, _ := net.Pipe()
 	c := AddConnection(conn1, t)
 	c.sender = &testQueuedMessageSender{msgQueue: make([]Message, 0), msgProcessor: p}
@@ -70,9 +70,9 @@ func TestFanOutChannelData(t *testing.T) {
 	InitLogsAndMetrics()
 	InitChannels()
 
-	c0 := addTestConnectionWithProcessor(SERVER, testChannelDataMessageProcessor)
-	c1 := addTestConnectionWithProcessor(CLIENT, testChannelDataMessageProcessor)
-	c2 := addTestConnectionWithProcessor(CLIENT, testChannelDataMessageProcessor)
+	c0 := addTestConnectionWithProcessor(proto.ConnectionType_SERVER, testChannelDataMessageProcessor)
+	c1 := addTestConnectionWithProcessor(proto.ConnectionType_CLIENT, testChannelDataMessageProcessor)
+	c2 := addTestConnectionWithProcessor(proto.ConnectionType_CLIENT, testChannelDataMessageProcessor)
 
 	testChannel, _ := CreateChannel(proto.ChannelType_TEST, c0)
 	dataMsg := &proto.TestChannelDataMessage{
