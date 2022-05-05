@@ -149,9 +149,20 @@ func (ch *Channel) Tick() {
 			return
 		}
 
-		if ch.ownerConnection != nil {
-			if ch.ownerConnection.IsRemoving() {
-				ch.ownerConnection = nil
+		// Tick connections
+		for connId := range ch.subscribedConnections {
+			conn := GetConnection(connId)
+			if conn == nil || conn.IsRemoving() {
+				// Unsub the connection from the channel
+				delete(ch.subscribedConnections, connId)
+				if ch.ownerConnection != nil {
+					if ch.ownerConnection == conn {
+						// Reset the owner if it unsubscribed
+						ch.ownerConnection = nil
+					} else if conn != nil {
+						ch.ownerConnection.sendUnsubscribed(MessageContext{}, ch, conn, 0)
+					}
+				}
 			}
 		}
 
