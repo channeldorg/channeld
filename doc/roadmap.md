@@ -21,7 +21,7 @@
 # Optimizations
 - [x] Read/write the packet using Protobuf
 - ~~[ ] Use [gogoprotobuf](https://github.com/gogo/protobuf) for faster marshalling/unmarshalling~~
-- [ ] Enable custom merge of channel data messages
+- [x] Enable custom merge of channel data messages
 
 # Tests
 - [ ] Unit tests
@@ -47,7 +47,8 @@
         - [ ] Observers and Interest Management
     - [ ] Multi-server support
 - [ ] Unreal seamless world travelling
-    - [ ] Implement the C++ client library
+    - [x] Implement the C++ client library
     - [ ] Integrate with Unreal's networking stack
-    - [ ] ...
+    - [ ] Integrate with Unreal's Replication system
+    - [ ] Multi-server support
 - [ ] Dynamic region load-balancing

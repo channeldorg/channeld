@@ -34,7 +34,7 @@ The ultimate purpose of channeld is to enable distributed composition of dedicat
 channeld is aimmed to support 10Ks connections and 100Ks mps(messages per second) on a single node (uplink + downlink), and 10Ms mps in a distributed system.
 
 ## Roadmap
-Currently, the completeness of the project is 30%.
+Currently, the completeness of the project is 40%.
 
 There is a [dedicated roadmap documentation](doc/roadmap.md).
 
