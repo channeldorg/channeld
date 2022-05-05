@@ -76,7 +76,7 @@ func NewClient(addr string) (*Client, error) {
 	c.SetMessageEntry(uint32(proto.MessageType_REMOVE_CHANNEL), &proto.RemoveChannelMessage{}, handleRemoveChannel)
 	c.SetMessageEntry(uint32(proto.MessageType_AUTH), &proto.AuthResultMessage{}, defaultMessageHandler)
 	c.SetMessageEntry(uint32(proto.MessageType_SUB_TO_CHANNEL), &proto.SubscribedToChannelResultMessage{}, handleSubToChannel)
-	c.SetMessageEntry(uint32(proto.MessageType_UNSUB_FROM_CHANNEL), &proto.UnsubscribedFromChannelMessage{}, handleUnsubToChannel)
+	c.SetMessageEntry(uint32(proto.MessageType_UNSUB_FROM_CHANNEL), &proto.UnsubscribedFromChannelResultMessage{}, handleUnsubToChannel)
 	c.SetMessageEntry(uint32(proto.MessageType_LIST_CHANNEL), &proto.ListChannelResultMessage{}, defaultMessageHandler)
 	c.SetMessageEntry(uint32(proto.MessageType_CHANNEL_DATA_UPDATE), &proto.ChannelDataUpdateMessage{}, defaultMessageHandler)
 

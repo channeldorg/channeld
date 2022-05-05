@@ -79,7 +79,7 @@ func main() {
 		},
 	)
 	//channeld.SetWebSocketTrustedOrigins(["localhost"])
-	go channeld.StartListening(channeld.CLIENT, "ws", *wsAddr)
+	go channeld.StartListening(proto.ConnectionType_CLIENT, "ws", *wsAddr)
 
 	log.Fatal(http.ListenAndServe(*webAddr, nil))
 

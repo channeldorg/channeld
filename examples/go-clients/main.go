@@ -10,7 +10,7 @@ import (
 	"channeld.clewcat.com/channeld/proto"
 )
 
-var ServerAddr string = ":12108" //"ws://localhost:12108" //"ws://47.103.129.109:12108"
+var ServerAddr string = "ws://localhost:12108" //"49.234.9.192:12108" //"ws://49.234.9.192:12108"
 
 const (
 	ClientNum                int           = 500
@@ -97,7 +97,7 @@ func runClient(clientActions []*clientAction, initFunc func(client *Client, data
 		data.activeChannelId = channelId
 	})
 	c.AddMessageHandler(uint32(proto.MessageType_UNSUB_FROM_CHANNEL), func(client *Client, channelId uint32, m Message) {
-		msg := m.(*proto.UnsubscribedFromChannelMessage)
+		msg := m.(*proto.UnsubscribedFromChannelResultMessage)
 		if msg.ConnId != client.Id {
 			return
 		}
@@ -158,7 +158,11 @@ func runClient(clientActions []*clientAction, initFunc func(client *Client, data
 		time.Sleep(MaxTickInterval - time.Since(tickStartTime))
 	}
 
-	c.Disconnect()
+	if !c.IsConnected() {
+		log.Printf("client %d is disconnected by the server.\n", c.Id)
+	} else {
+		c.Disconnect()
+	}
 }
 
 func randUint32(m map[uint32]struct{}) uint32 {
@@ -178,7 +182,8 @@ func main() {
 	}
 	for i := 0; i < ClientNum; i++ {
 		wg.Add(1)
-		go runClient(TanksClientActions, TanksInitFunc)
+		//go runClient(TanksClientActions, TanksInitFunc)
+		go runClient(ChatClientActions, nil)
 		time.Sleep(ConnectInterval)
 	}
 
