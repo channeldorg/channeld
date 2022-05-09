@@ -118,6 +118,12 @@ func handleAuth(ctx MessageContext) {
 		CompressionType: GlobalSettings.CompressionType,
 	}
 	ctx.Connection.Send(ctx)
+
+	// Also send the respond to The GLOBAL channel owner (to handle the client's subscription if it doesn't have the authority to).
+	if globalChannel.ownerConnection != nil {
+		ctx.StubId = 0
+		globalChannel.ownerConnection.Send(ctx)
+	}
 }
 
 func handleCreateChannel(ctx MessageContext) {

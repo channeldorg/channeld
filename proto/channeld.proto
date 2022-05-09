@@ -87,7 +87,7 @@ message ServerForwardMessage {
 }
 
 // The packet should have channelId = 0 in order to be handled.
-// Response: @AuthResultMessage
+// Response: @AuthResultMessage. The GLOBAL channel owner will also receive this message (to handle the client's subscription if it doesn't have the authority to).
 message AuthMessage {
     string playerIdentifierToken = 1;
     string loginToken = 2;
