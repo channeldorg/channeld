@@ -183,8 +183,9 @@ message SubscribedToChannelMessage {
 message SubscribedToChannelResultMessage {
     // The connection that subsribed.
     uint32 connId = 1;
-    ConnectionType connType = 2;
-    ChannelType channelType = 3;
+    ChannelSubscriptionOptions subOptions = 2;
+    ConnectionType connType = 3;
+    ChannelType channelType = 4;
 }
 
 // Response: @UnsubscribedFromChannelResultMessage. The message sender, the subscribed connection, and the channel owner will receive the message respectively.

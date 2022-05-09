@@ -149,6 +149,7 @@ func handleCreateChannel(ctx MessageContext) {
 		newChannel = globalChannel
 		if globalChannel.ownerConnection == nil {
 			globalChannel.ownerConnection = ctx.Connection
+			ctx.Connection.Logger().Info("owned the GLOBAL channel")
 		} else {
 			ctx.Connection.Logger().Error("illegal attemp to create the GLOBAL channel")
 			return
@@ -162,8 +163,8 @@ func handleCreateChannel(ctx MessageContext) {
 			)
 			return
 		}
+		newChannel.Logger().Info("created channel with owner", zap.Uint32("ownerConnId", uint32(newChannel.ownerConnection.id)))
 	}
-	newChannel.Logger().Info("created channel with owner", zap.Uint32("ownerConnId", uint32(newChannel.ownerConnection.id)))
 
 	newChannel.metadata = msg.Metadata
 	if msg.Data != nil {
@@ -327,15 +328,15 @@ func handleSubToChannel(ctx MessageContext) {
 	connToSub.SubscribeToChannel(ctx.Channel, msg.SubOptions)
 
 	// Notify the sender.
-	ctx.Connection.sendSubscribed(ctx, ctx.Channel, connToSub, ctx.StubId)
+	ctx.Connection.sendSubscribed(ctx, ctx.Channel, connToSub, ctx.StubId, msg.SubOptions)
 
 	// Notify the subscribed (if not the sender).
 	if connToSub != ctx.Connection {
-		connToSub.sendSubscribed(ctx, ctx.Channel, connToSub, 0)
+		connToSub.sendSubscribed(ctx, ctx.Channel, connToSub, 0, msg.SubOptions)
 	}
 	// Notify the channel owner.
 	if ctx.Channel.ownerConnection != ctx.Connection && ctx.Channel.ownerConnection != nil {
-		ctx.Channel.ownerConnection.sendSubscribed(ctx, ctx.Channel, connToSub, 0)
+		ctx.Channel.ownerConnection.sendSubscribed(ctx, ctx.Channel, connToSub, 0, msg.SubOptions)
 	}
 }
 

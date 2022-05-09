@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"channeld.clewcat.com/channeld/proto"
+	"go.uber.org/zap"
 )
 
 type ChannelSubscription struct {
@@ -15,6 +16,11 @@ type ChannelSubscription struct {
 }
 
 func (c *Connection) SubscribeToChannel(ch *Channel, options *proto.ChannelSubscriptionOptions) {
+	if ch.subscribedConnections[c.id] != nil {
+		c.Logger().Info("already subscribed", zap.String("channel", ch.String()))
+		return
+	}
+
 	cs := &ChannelSubscription{
 		// Send the whole data to the connection when subscribed
 		//fanOutDataMsg: ch.Data().msg,
@@ -71,12 +77,13 @@ func (c *Connection) sendConnUnsubscribed(connId ConnectionId, ids ...ChannelId)
 }
 */
 
-func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel, connToSub *Connection, stubId uint32) {
+func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel, connToSub *Connection, stubId uint32, subOptions *proto.ChannelSubscriptionOptions) {
 	ctx.Channel = ch
 	ctx.StubId = stubId
 	ctx.MsgType = proto.MessageType_SUB_TO_CHANNEL
 	ctx.Msg = &proto.SubscribedToChannelResultMessage{
 		ConnId:      uint32(connToSub.id),
+		SubOptions:  subOptions,
 		ConnType:    connToSub.connectionType,
 		ChannelType: ch.channelType,
 	}
