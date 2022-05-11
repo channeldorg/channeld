@@ -150,6 +150,11 @@ func (ch *Channel) Tick() {
 		}
 
 		// Tick connections
+		if ch.ownerConnection != nil {
+			if ch.ownerConnection.IsRemoving() {
+				ch.ownerConnection = nil
+			}
+		}
 		for connId := range ch.subscribedConnections {
 			conn := GetConnection(connId)
 			if conn == nil || conn.IsRemoving() {
