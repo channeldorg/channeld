@@ -183,9 +183,6 @@ func handleCreateChannel(ctx MessageContext) {
 	// Make sure the response message has the channelId = newChannel.id, not always 0.
 	ctx.ChannelId = uint32(newChannel.id)
 
-	// Subscribe to channel after creation
-	ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
-
 	ctx.Msg = &proto.CreateChannelResultMessage{
 		ChannelType: newChannel.channelType,
 		Metadata:    newChannel.metadata,
@@ -197,6 +194,10 @@ func handleCreateChannel(ctx MessageContext) {
 		ctx.StubId = 0
 		globalChannel.ownerConnection.Send(ctx)
 	}
+
+	// Subscribe to channel after creation
+	ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
+	ctx.Connection.sendSubscribed(ctx, newChannel, ctx.Connection, 0, msg.SubOptions)
 }
 
 func handleRemoveChannel(ctx MessageContext) {
