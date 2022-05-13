@@ -30,7 +30,7 @@ type RemovableMapField interface {
 }
 
 type fanOutConnection struct {
-	connId         ConnectionId
+	conn           ConnectionInChannel
 	lastFanOutTime ChannelTime
 }
 
@@ -110,14 +110,14 @@ func (ch *Channel) tickData(t ChannelTime) {
 
 	for foci := 0; foci < ch.fanOutQueue.Len(); foci++ {
 		foc := focp.Value.(*fanOutConnection)
-		c := GetConnection(foc.connId)
-		if c == nil || c.IsRemoving() {
+		conn := foc.conn
+		if conn == nil || conn.IsRemoving() {
 			tmp := focp.Next()
 			ch.fanOutQueue.Remove(focp)
 			focp = tmp
 			continue
 		}
-		cs := ch.subscribedConnections[foc.connId]
+		cs := ch.subscribedConnections[conn]
 		if cs == nil {
 			focp = focp.Next()
 			continue
@@ -132,7 +132,7 @@ func (ch *Channel) tickData(t ChannelTime) {
 
 			if foc.lastFanOutTime == 0 {
 				// Send the whole data for the first time
-				ch.fanOutDataUpdate(c, cs, ch.data.msg)
+				ch.fanOutDataUpdate(conn, cs, ch.data.msg)
 			} else if bufp != nil {
 				if foc.lastFanOutTime >= lastUpdateTime {
 					lastUpdateTime = foc.lastFanOutTime
@@ -153,7 +153,7 @@ func (ch *Channel) tickData(t ChannelTime) {
 				}
 
 				if accumulatedUpdateMsg != nil {
-					ch.fanOutDataUpdate(c, cs, accumulatedUpdateMsg)
+					ch.fanOutDataUpdate(conn, cs, accumulatedUpdateMsg)
 				}
 			}
 
@@ -174,14 +174,14 @@ func (ch *Channel) tickData(t ChannelTime) {
 	}
 }
 
-func (ch *Channel) fanOutDataUpdate(c *Connection, cs *ChannelSubscription, updateMsg ChannelDataMessage) {
+func (ch *Channel) fanOutDataUpdate(conn ConnectionInChannel, cs *ChannelSubscription, updateMsg ChannelDataMessage) {
 	fmutils.Filter(updateMsg, cs.options.DataFieldMasks)
 	any, err := anypb.New(updateMsg)
 	if err != nil {
 		ch.Logger().Error("failed to marshal channel update data", zap.Error(err))
 		return
 	}
-	c.Send(MessageContext{
+	conn.Send(MessageContext{
 		MsgType:    proto.MessageType_CHANNEL_DATA_UPDATE,
 		Msg:        &proto.ChannelDataUpdateMessage{Data: any},
 		Connection: nil,

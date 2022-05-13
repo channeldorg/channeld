@@ -41,7 +41,7 @@ func RegisterMessageHandler(msgType uint32, msg Message, handler MessageHandlerF
 }
 
 func handleClientToServerUserMessage(ctx MessageContext) {
-	if ctx.Channel.ownerConnection != nil {
+	if !ctx.Channel.ownerConnection.IsNil() {
 		ctx.Channel.ownerConnection.Send(ctx)
 	} else if ctx.Broadcast != proto.BroadcastType_NO_BROADCAST {
 		if ctx.Channel.enableClientBroadcast {
@@ -70,7 +70,7 @@ func handleServerToClientUserMessage(ctx MessageContext) {
 
 	switch ctx.Broadcast {
 	case proto.BroadcastType_NO_BROADCAST:
-		if ctx.Channel.ownerConnection != nil {
+		if !ctx.Channel.ownerConnection.IsNil() {
 			ctx.Channel.ownerConnection.Send(ctx)
 		} else {
 			ctx.Connection.Logger().Error("cannot forward the message as the channel has no owner",
@@ -120,7 +120,7 @@ func handleAuth(ctx MessageContext) {
 	ctx.Connection.Send(ctx)
 
 	// Also send the respond to The GLOBAL channel owner (to handle the client's subscription if it doesn't have the authority to).
-	if globalChannel.ownerConnection != nil {
+	if !globalChannel.ownerConnection.IsNil() {
 		ctx.StubId = 0
 		globalChannel.ownerConnection.Send(ctx)
 	}
@@ -147,7 +147,7 @@ func handleCreateChannel(ctx MessageContext) {
 	} else if msg.ChannelType == proto.ChannelType_GLOBAL {
 		// Global channel is initially created by the system. Creating the channel will attempt to own it.
 		newChannel = globalChannel
-		if globalChannel.ownerConnection == nil {
+		if globalChannel.ownerConnection.IsNil() {
 			globalChannel.ownerConnection = ctx.Connection
 			ctx.Connection.Logger().Info("owned the GLOBAL channel")
 		} else {
@@ -163,7 +163,7 @@ func handleCreateChannel(ctx MessageContext) {
 			)
 			return
 		}
-		newChannel.Logger().Info("created channel with owner", zap.Uint32("ownerConnId", uint32(newChannel.ownerConnection.id)))
+		newChannel.Logger().Info("created channel with owner", zap.Uint32("ownerConnId", uint32(newChannel.ownerConnection.Id())))
 	}
 
 	newChannel.metadata = msg.Metadata
@@ -190,7 +190,7 @@ func handleCreateChannel(ctx MessageContext) {
 	}
 	ctx.Connection.Send(ctx)
 	// Also send the response to the GLOBAL channel owner.
-	if globalChannel.ownerConnection != ctx.Connection && globalChannel.ownerConnection != nil {
+	if globalChannel.ownerConnection != ctx.Connection && !globalChannel.ownerConnection.IsNil() {
 		ctx.StubId = 0
 		globalChannel.ownerConnection.Send(ctx)
 	}
@@ -220,8 +220,8 @@ func handleRemoveChannel(ctx MessageContext) {
 	// Only the channel owner or GLOBAL owner can remove the channel
 	if !ctx.Connection.HasAuthorityOver(channelToRemove) {
 		ownerConnId := uint32(0)
-		if channelToRemove.ownerConnection != nil {
-			ownerConnId = uint32(channelToRemove.ownerConnection.id)
+		if !channelToRemove.ownerConnection.IsNil() {
+			ownerConnId = uint32(channelToRemove.ownerConnection.Id())
 		}
 		ctx.Connection.Logger().Error("illegal attemp to remove channel as the connection is not the channel owner",
 			zap.String("channelType", channelToRemove.channelType.String()),
@@ -231,8 +231,7 @@ func handleRemoveChannel(ctx MessageContext) {
 		return
 	}
 
-	for connId := range channelToRemove.subscribedConnections {
-		sc := GetConnection(connId)
+	for sc := range channelToRemove.subscribedConnections {
 		if sc != nil {
 			//sc.sendUnsubscribed(ctx, channelToRemove, 0)
 			respond := ctx
@@ -313,7 +312,7 @@ func handleSubToChannel(ctx MessageContext) {
 		return
 	}
 
-	cs, exists := ctx.Channel.subscribedConnections[ctx.Connection.id]
+	cs, exists := ctx.Channel.subscribedConnections[ctx.Connection]
 	if exists {
 		ctx.Connection.Logger().Info("already subscribed to channel, the subscription options will be merged",
 			zap.String("channelType", ctx.Channel.channelType.String()),
@@ -336,7 +335,7 @@ func handleSubToChannel(ctx MessageContext) {
 		connToSub.sendSubscribed(ctx, ctx.Channel, connToSub, 0, msg.SubOptions)
 	}
 	// Notify the channel owner.
-	if ctx.Channel.ownerConnection != ctx.Connection && ctx.Channel.ownerConnection != nil {
+	if ctx.Channel.ownerConnection != ctx.Connection && !ctx.Channel.ownerConnection.IsNil() {
 		ctx.Channel.ownerConnection.sendSubscribed(ctx, ctx.Channel, connToSub, 0, msg.SubOptions)
 	}
 }
@@ -382,7 +381,7 @@ func handleUnsubFromChannel(ctx MessageContext) {
 		connToUnsub.sendUnsubscribed(ctx, ctx.Channel, connToUnsub, 0)
 	}
 	// Notify the channel owner.
-	if ctx.Channel.ownerConnection != nil {
+	if !ctx.Channel.ownerConnection.IsNil() {
 		if ctx.Channel.ownerConnection != ctx.Connection {
 			ctx.Channel.ownerConnection.sendUnsubscribed(ctx, ctx.Channel, connToUnsub, 0)
 		} else {
@@ -395,7 +394,7 @@ func handleUnsubFromChannel(ctx MessageContext) {
 func handleChannelDataUpdate(ctx MessageContext) {
 	// Only channel owner or writable subsciptors can update the data
 	if ctx.Channel.ownerConnection != ctx.Connection {
-		cs := ctx.Channel.subscribedConnections[ctx.Connection.id]
+		cs := ctx.Channel.subscribedConnections[ctx.Connection]
 		if cs == nil || !cs.options.CanUpdateData {
 			ctx.Connection.Logger().Error("attempt to update channel data but has no access",
 				zap.String("channelType", ctx.Channel.channelType.String()),

@@ -34,12 +34,22 @@ type channelMessage struct {
 	handler MessageHandlerFunc
 }
 
+// Use this interface instead of Connection for protecting the connection from writing in the channel goroutine.
+type ConnectionInChannel interface {
+	Id() ConnectionId
+	IsRemoving() bool
+	Send(ctx MessageContext)
+	sendSubscribed(ctx MessageContext, ch *Channel, connToSub *Connection, stubId uint32, subOptions *proto.ChannelSubscriptionOptions)
+	sendUnsubscribed(ctx MessageContext, ch *Channel, connToUnsub *Connection, stubId uint32)
+	IsNil() bool
+}
+
 type Channel struct {
 	id                    ChannelId
 	channelType           proto.ChannelType
 	state                 ChannelState
-	ownerConnection       *Connection
-	subscribedConnections map[ConnectionId]*ChannelSubscription
+	ownerConnection       ConnectionInChannel
+	subscribedConnections map[ConnectionInChannel]*ChannelSubscription
 	metadata              string // Read-only property, e.g. name
 	data                  *ChannelData
 	inMsgQueue            chan channelMessage
@@ -83,7 +93,7 @@ func CreateChannel(t proto.ChannelType, owner *Connection) (*Channel, error) {
 		id:                    nextChannelId,
 		channelType:           t,
 		ownerConnection:       owner,
-		subscribedConnections: make(map[ConnectionId]*ChannelSubscription),
+		subscribedConnections: make(map[ConnectionInChannel]*ChannelSubscription),
 		/* Channel data is not created by default. See handleCreateChannel().
 		data:                  ReflectChannelData(t, nil),
 		*/
@@ -150,22 +160,23 @@ func (ch *Channel) Tick() {
 		}
 
 		// Tick connections
-		if ch.ownerConnection != nil {
-			if ch.ownerConnection.IsRemoving() {
-				ch.ownerConnection = nil
+		/*
+			if ch.ownerConnection != nil {
+				if ch.ownerConnection.IsRemoving() {
+					ch.ownerConnection = nil
+				}
 			}
-		}
-		for connId := range ch.subscribedConnections {
-			conn := GetConnection(connId)
-			if conn == nil || conn.IsRemoving() {
+		*/
+		for conn := range ch.subscribedConnections {
+			if conn.IsRemoving() {
 				// Unsub the connection from the channel
-				delete(ch.subscribedConnections, connId)
-				if ch.ownerConnection != nil {
+				delete(ch.subscribedConnections, conn)
+				if !ch.ownerConnection.IsNil() {
 					if ch.ownerConnection == conn {
 						// Reset the owner if it unsubscribed
 						ch.ownerConnection = nil
 					} else if conn != nil {
-						ch.ownerConnection.sendUnsubscribed(MessageContext{}, ch, conn, 0)
+						ch.ownerConnection.sendUnsubscribed(MessageContext{}, ch, conn.(*Connection), 0)
 					}
 				}
 			}
@@ -199,15 +210,15 @@ func (ch *Channel) Tick() {
 }
 
 func (ch *Channel) Broadcast(ctx MessageContext) {
-	for connId := range ctx.Channel.subscribedConnections {
-		c := GetConnection(connId)
-		if c == nil {
+	for conn := range ctx.Channel.subscribedConnections {
+		//c := GetConnection(connId)
+		if conn == nil {
 			continue
 		}
-		if ctx.Broadcast == proto.BroadcastType_ALL_BUT_SENDER && c == ctx.Connection {
+		if ctx.Broadcast == proto.BroadcastType_ALL_BUT_SENDER && conn == ctx.Connection {
 			continue
 		}
-		c.Send(ctx)
+		conn.Send(ctx)
 	}
 }
 
@@ -229,4 +240,9 @@ func (ch *Channel) String() string {
 
 func (ch *Channel) Logger() *zap.Logger {
 	return ch.logger
+}
+
+// Implementation for ConnectionInChannel interface
+func (c *Connection) IsNil() bool {
+	return c == nil
 }

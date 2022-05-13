@@ -486,6 +486,10 @@ func (c *Connection) Disconnect() error {
 	return c.conn.Close()
 }
 
+func (c *Connection) Id() ConnectionId {
+	return c.id
+}
+
 func (c *Connection) String() string {
 	return fmt.Sprintf("Connection(%s %d %s)", c.connectionType, c.id, c.fsm.CurrentState().Name)
 }

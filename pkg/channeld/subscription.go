@@ -16,7 +16,7 @@ type ChannelSubscription struct {
 }
 
 func (c *Connection) SubscribeToChannel(ch *Channel, options *proto.ChannelSubscriptionOptions) {
-	if ch.subscribedConnections[c.id] != nil {
+	if ch.subscribedConnections[c] != nil {
 		c.Logger().Info("already subscribed", zap.String("channel", ch.String()))
 		return
 	}
@@ -38,21 +38,21 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *proto.ChannelSubsc
 			FanOutIntervalMs: GlobalSettings.GetChannelSettings(ch.channelType).DefaultFanOutIntervalMs,
 		}
 	}
-	cs.fanOutElement = ch.fanOutQueue.PushFront(&fanOutConnection{connId: c.id})
+	cs.fanOutElement = ch.fanOutQueue.PushFront(&fanOutConnection{conn: c})
 	// Records the maximum fan-out interval for checking if the oldest update message is removable when the buffer is overflowed.
 	if ch.data != nil && ch.data.maxFanOutIntervalMs < cs.options.FanOutIntervalMs {
 		ch.data.maxFanOutIntervalMs = cs.options.FanOutIntervalMs
 	}
-	ch.subscribedConnections[c.id] = cs
+	ch.subscribedConnections[c] = cs
 }
 
 func (c *Connection) UnsubscribeFromChannel(ch *Channel) error {
-	cs, exists := ch.subscribedConnections[c.id]
+	cs, exists := ch.subscribedConnections[c]
 	if !exists {
 		return errors.New("subscription does not exist")
 	} else {
 		ch.fanOutQueue.Remove(cs.fanOutElement)
-		delete(ch.subscribedConnections, c.id)
+		delete(ch.subscribedConnections, c)
 	}
 	return nil
 }
