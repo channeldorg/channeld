@@ -38,7 +38,11 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *proto.ChannelSubsc
 			FanOutIntervalMs: GlobalSettings.GetChannelSettings(ch.channelType).DefaultFanOutIntervalMs,
 		}
 	}
-	cs.fanOutElement = ch.fanOutQueue.PushFront(&fanOutConnection{conn: c})
+	cs.fanOutElement = ch.fanOutQueue.PushFront(&fanOutConnection{
+		conn: c,
+		// Make sure the connection won't be fanned-out in 2x FanOutIntervalMs, to solve the spawn & update order issue in Mirror.
+		lastFanOutTime: ch.GetTime().AddMs(cs.options.FanOutIntervalMs)})
+
 	// Records the maximum fan-out interval for checking if the oldest update message is removable when the buffer is overflowed.
 	if ch.data != nil && ch.data.maxFanOutIntervalMs < cs.options.FanOutIntervalMs {
 		ch.data.maxFanOutIntervalMs = cs.options.FanOutIntervalMs
