@@ -206,6 +206,10 @@ func RemoveConnection(c *Connection) {
 	defer func() {
 		recover()
 	}()
+	if c.IsRemoving() {
+		c.Logger().Warn("connection is already removed")
+		return
+	}
 	atomic.AddInt32(&c.removing, 1)
 	c.conn.Close()
 	close(c.sendQueue)

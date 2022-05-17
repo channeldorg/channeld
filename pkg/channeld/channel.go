@@ -41,6 +41,7 @@ type ConnectionInChannel interface {
 	Send(ctx MessageContext)
 	sendSubscribed(ctx MessageContext, ch *Channel, connToSub *Connection, stubId uint32, subOptions *proto.ChannelSubscriptionOptions)
 	sendUnsubscribed(ctx MessageContext, ch *Channel, connToUnsub *Connection, stubId uint32)
+	Logger() *zap.Logger
 	IsNil() bool
 }
 
@@ -173,8 +174,9 @@ func (ch *Channel) Tick() {
 				delete(ch.subscribedConnections, conn)
 				if !ch.ownerConnection.IsNil() {
 					if ch.ownerConnection == conn {
-						// Reset the owner if it unsubscribed
+						// Reset the owner if it's removed
 						ch.ownerConnection = nil
+						conn.Logger().Info("found removed ownner connection of channel", zap.Uint32("channelId", uint32(ch.id)))
 					} else if conn != nil {
 						ch.ownerConnection.sendUnsubscribed(MessageContext{}, ch, conn.(*Connection), 0)
 					}
