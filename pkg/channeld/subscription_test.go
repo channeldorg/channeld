@@ -19,7 +19,7 @@ func TestSubscribeToChannel(t *testing.T) {
 	_, err := CreateChannel(proto.ChannelType_GLOBAL, nil)
 	assert.Error(t, err)
 	// By default, the GLOBAL channel has no owner
-	assert.True(t, globalChannel.ownerConnection.IsNil())
+	assert.True(t, !globalChannel.HasOwner())
 
 	globalChannel.ownerConnection = c1
 	c1.SubscribeToChannel(globalChannel, nil)

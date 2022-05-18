@@ -41,7 +41,7 @@ func RegisterMessageHandler(msgType uint32, msg Message, handler MessageHandlerF
 }
 
 func handleClientToServerUserMessage(ctx MessageContext) {
-	if !ctx.Channel.ownerConnection.IsNil() {
+	if ctx.Channel.HasOwner() {
 		ctx.Channel.ownerConnection.Send(ctx)
 	} else if ctx.Broadcast != proto.BroadcastType_NO_BROADCAST {
 		if ctx.Channel.enableClientBroadcast {
@@ -70,7 +70,7 @@ func handleServerToClientUserMessage(ctx MessageContext) {
 
 	switch ctx.Broadcast {
 	case proto.BroadcastType_NO_BROADCAST:
-		if !ctx.Channel.ownerConnection.IsNil() {
+		if ctx.Channel.HasOwner() {
 			ctx.Channel.ownerConnection.Send(ctx)
 		} else {
 			ctx.Connection.Logger().Error("cannot forward the message as the channel has no owner",
@@ -120,7 +120,7 @@ func handleAuth(ctx MessageContext) {
 	ctx.Connection.Send(ctx)
 
 	// Also send the respond to The GLOBAL channel owner (to handle the client's subscription if it doesn't have the authority to).
-	if !globalChannel.ownerConnection.IsNil() {
+	if globalChannel.HasOwner() {
 		ctx.StubId = 0
 		globalChannel.ownerConnection.Send(ctx)
 	}
@@ -147,7 +147,7 @@ func handleCreateChannel(ctx MessageContext) {
 	} else if msg.ChannelType == proto.ChannelType_GLOBAL {
 		// Global channel is initially created by the system. Creating the channel will attempt to own it.
 		newChannel = globalChannel
-		if globalChannel.ownerConnection.IsNil() {
+		if !globalChannel.HasOwner() {
 			globalChannel.ownerConnection = ctx.Connection
 			ctx.Connection.Logger().Info("owned the GLOBAL channel")
 		} else {
@@ -190,7 +190,7 @@ func handleCreateChannel(ctx MessageContext) {
 	}
 	ctx.Connection.Send(ctx)
 	// Also send the response to the GLOBAL channel owner.
-	if globalChannel.ownerConnection != ctx.Connection && !globalChannel.ownerConnection.IsNil() {
+	if globalChannel.ownerConnection != ctx.Connection && globalChannel.HasOwner() {
 		ctx.StubId = 0
 		globalChannel.ownerConnection.Send(ctx)
 	}
@@ -220,7 +220,7 @@ func handleRemoveChannel(ctx MessageContext) {
 	// Only the channel owner or GLOBAL owner can remove the channel
 	if !ctx.Connection.HasAuthorityOver(channelToRemove) {
 		ownerConnId := uint32(0)
-		if !channelToRemove.ownerConnection.IsNil() {
+		if channelToRemove.HasOwner() {
 			ownerConnId = uint32(channelToRemove.ownerConnection.Id())
 		}
 		ctx.Connection.Logger().Error("illegal attemp to remove channel as the connection is not the channel owner",
@@ -335,7 +335,7 @@ func handleSubToChannel(ctx MessageContext) {
 		connToSub.sendSubscribed(ctx, ctx.Channel, connToSub, 0, msg.SubOptions)
 	}
 	// Notify the channel owner.
-	if ctx.Channel.ownerConnection != ctx.Connection && !ctx.Channel.ownerConnection.IsNil() {
+	if ctx.Channel.HasOwner() && ctx.Channel.ownerConnection != ctx.Connection {
 		ctx.Channel.ownerConnection.sendSubscribed(ctx, ctx.Channel, connToSub, 0, msg.SubOptions)
 	}
 }
@@ -381,7 +381,7 @@ func handleUnsubFromChannel(ctx MessageContext) {
 		connToUnsub.sendUnsubscribed(ctx, ctx.Channel, connToUnsub, 0)
 	}
 	// Notify the channel owner.
-	if !ctx.Channel.ownerConnection.IsNil() {
+	if ctx.Channel.HasOwner() {
 		if ctx.Channel.ownerConnection != ctx.Connection {
 			ctx.Channel.ownerConnection.sendUnsubscribed(ctx, ctx.Channel, connToUnsub, 0)
 		} else {

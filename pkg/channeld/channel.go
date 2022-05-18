@@ -244,6 +244,11 @@ func (ch *Channel) Logger() *zap.Logger {
 	return ch.logger
 }
 
+func (ch *Channel) HasOwner() bool {
+	conn := ch.ownerConnection.(*Connection)
+	return conn != nil && !conn.IsRemoving()
+}
+
 // Implementation for ConnectionInChannel interface
 func (c *Connection) IsNil() bool {
 	return c == nil
