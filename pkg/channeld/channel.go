@@ -172,7 +172,7 @@ func (ch *Channel) Tick() {
 			if conn.IsRemoving() {
 				// Unsub the connection from the channel
 				delete(ch.subscribedConnections, conn)
-				if !ch.ownerConnection.IsNil() {
+				if ch.HasOwner() {
 					if ch.ownerConnection == conn {
 						// Reset the owner if it's removed
 						ch.ownerConnection = nil
@@ -245,8 +245,8 @@ func (ch *Channel) Logger() *zap.Logger {
 }
 
 func (ch *Channel) HasOwner() bool {
-	conn := ch.ownerConnection.(*Connection)
-	return conn != nil && !conn.IsRemoving()
+	conn, ok := ch.ownerConnection.(*Connection)
+	return ok && conn != nil && !conn.IsRemoving()
 }
 
 // Implementation for ConnectionInChannel interface
