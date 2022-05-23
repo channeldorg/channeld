@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -20,6 +21,8 @@ const (
 	HANDOVER ChannelState = 2
 )
 
+// Each channel uses a goroutine and we can have at most millions of goroutines at the same time.
+// So we won't use 64-bit channel ID unless we use a distributed architecture for channeld itself.
 type ChannelId uint32
 
 // ChannelTime is the relative time since the channel created.
@@ -67,11 +70,19 @@ const (
 	GlobalChannelId ChannelId = 0
 )
 
-var nextChannelId ChannelId = GlobalChannelId
+var nextChannelId ChannelId
+var nextSpatialChannelId ChannelId
+
+// Cache the status so we don't have to check all the index in the sync map, until a channel is removed.
+var channelFull bool = false
+var spatialChannelFull bool = false
+
 var allChannels sync.Map //map[ChannelId]*Channel
 var globalChannel *Channel
 
 func InitChannels() {
+	nextChannelId = GlobalChannelId
+	nextSpatialChannelId = GlobalSettings.SpatialChannelIdStart
 	globalChannel, _ = CreateChannel(proto.ChannelType_GLOBAL, nil)
 	allChannels.Store(GlobalChannelId, globalChannel)
 }
@@ -85,13 +96,41 @@ func GetChannel(id ChannelId) *Channel {
 	}
 }
 
+var ErrNonSpatialChannelFull = errors.New("non-spatial channels are full")
+var ErrSpatialChannelFull = errors.New("spatial channels are full")
+
 func CreateChannel(t proto.ChannelType, owner *Connection) (*Channel, error) {
 	if t == proto.ChannelType_GLOBAL && globalChannel != nil {
 		return nil, errors.New("failed to create WORLD channel as it already exists")
 	}
 
+	var channelId ChannelId
+	if t != proto.ChannelType_SPATIAL {
+		if channelFull {
+			return nil, ErrNonSpatialChannelFull
+		}
+		channelId, ok := GetNextIdSync(&allChannels, uint(nextChannelId), 1, uint(GlobalSettings.SpatialChannelIdStart)-1)
+		if ok {
+			nextChannelId = ChannelId(channelId)
+		} else {
+			channelFull = true
+			return nil, ErrNonSpatialChannelFull
+		}
+	} else {
+		if spatialChannelFull {
+			return nil, ErrSpatialChannelFull
+		}
+		channelId, ok := GetNextIdSync(&allChannels, uint(nextSpatialChannelId), uint(GlobalSettings.SpatialChannelIdStart), math.MaxUint32)
+		if ok {
+			nextSpatialChannelId = ChannelId(channelId)
+		} else {
+			spatialChannelFull = true
+			return nil, ErrSpatialChannelFull
+		}
+	}
+
 	ch := &Channel{
-		id:                    nextChannelId,
+		id:                    channelId,
 		channelType:           t,
 		ownerConnection:       owner,
 		subscribedConnections: make(map[ConnectionInChannel]*ChannelSubscription),
@@ -114,8 +153,8 @@ func CreateChannel(t proto.ChannelType, owner *Connection) (*Channel, error) {
 	} else {
 		ch.state = OPEN
 	}
-	allChannels.Store(nextChannelId, ch)
-	nextChannelId += 1
+
+	allChannels.Store(ch.id, ch)
 	go ch.Tick()
 
 	channelNum.WithLabelValues(ch.channelType.String()).Inc()
@@ -127,6 +166,12 @@ func RemoveChannel(ch *Channel) {
 	atomic.AddInt32(&ch.removing, 1)
 	close(ch.inMsgQueue)
 	allChannels.Delete(ch.id)
+	// Reset the channel full status cache
+	if ch.channelType == proto.ChannelType_SPATIAL {
+		spatialChannelFull = false
+	} else {
+		channelFull = false
+	}
 
 	channelNum.WithLabelValues(ch.channelType.String()).Dec()
 }

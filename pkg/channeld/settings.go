@@ -29,6 +29,8 @@ type GlobalSettingsType struct {
 
 	CompressionType proto.CompressionType
 
+	SpatialChannelIdStart ChannelId
+
 	ChannelSettings map[proto.ChannelType]ChannelSettingsType
 }
 
@@ -38,9 +40,10 @@ type ChannelSettingsType struct {
 }
 
 var GlobalSettings = GlobalSettingsType{
-	LogLevel:        &NullableInt{},
-	LogFile:         &NullableString{},
-	CompressionType: proto.CompressionType_NO_COMPRESSION,
+	LogLevel:              &NullableInt{},
+	LogFile:               &NullableString{},
+	CompressionType:       proto.CompressionType_NO_COMPRESSION,
+	SpatialChannelIdStart: 65536,
 	ChannelSettings: map[proto.ChannelType]ChannelSettingsType{
 		proto.ChannelType_GLOBAL: {
 			TickIntervalMs:          10,
