@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"channeld.clewcat.com/channeld/proto"
+	"channeld.clewcat.com/channeld/pkg/channeldpb"
 )
 
 func TestConcurrentAccessChannels(t *testing.T) {
@@ -17,7 +17,7 @@ func TestConcurrentAccessChannels(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		for i := 0; i < 100; i++ {
-			CreateChannel(proto.ChannelType_SUBWORLD, nil)
+			CreateChannel(channeldpb.ChannelType_SUBWORLD, nil)
 			time.Sleep(1 * time.Millisecond)
 		}
 		wg.Done()

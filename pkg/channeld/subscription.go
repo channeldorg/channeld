@@ -4,18 +4,18 @@ import (
 	"container/list"
 	"errors"
 
-	"channeld.clewcat.com/channeld/proto"
+	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"go.uber.org/zap"
 )
 
 type ChannelSubscription struct {
-	options proto.ChannelSubscriptionOptions
+	options channeldpb.ChannelSubscriptionOptions
 	//fanOutDataMsg  Message
 	//lastFanOutTime time.Time
 	fanOutElement *list.Element
 }
 
-func (c *Connection) SubscribeToChannel(ch *Channel, options *proto.ChannelSubscriptionOptions) {
+func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) {
 	if ch.subscribedConnections[c] != nil {
 		c.Logger().Info("already subscribed", zap.String("channel", ch.String()))
 		return
@@ -26,13 +26,13 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *proto.ChannelSubsc
 		//fanOutDataMsg: ch.Data().msg,
 	}
 	if options != nil {
-		cs.options = proto.ChannelSubscriptionOptions{
+		cs.options = channeldpb.ChannelSubscriptionOptions{
 			CanUpdateData:    options.CanUpdateData,
 			DataFieldMasks:   options.DataFieldMasks,
 			FanOutIntervalMs: options.FanOutIntervalMs,
 		}
 	} else {
-		cs.options = proto.ChannelSubscriptionOptions{
+		cs.options = channeldpb.ChannelSubscriptionOptions{
 			CanUpdateData:    true,
 			DataFieldMasks:   make([]string, 0),
 			FanOutIntervalMs: GlobalSettings.GetChannelSettings(ch.channelType).DefaultFanOutIntervalMs,
@@ -67,8 +67,8 @@ func (c *Connection) sendConnSubscribed(connId ConnectionId, ids ...ChannelId) {
 	for i, id := range ids {
 		channelIds[i] = uint32(id)
 	}
-	subMsg := &proto.SubscribedToChannelsMessage{ConnId: uint32(connId), ChannelIds: channelIds}
-	c.SendWithGlobalChannel(proto.MessageType_SUB_TO_CHANNEL, subMsg)
+	subMsg := &channeldpb.SubscribedToChannelsMessage{ConnId: uint32(connId), ChannelIds: channelIds}
+	c.SendWithGlobalChannel(channeldpb.MessageType_SUB_TO_CHANNEL, subMsg)
 }
 
 func (c *Connection) sendConnUnsubscribed(connId ConnectionId, ids ...ChannelId) {
@@ -76,22 +76,22 @@ func (c *Connection) sendConnUnsubscribed(connId ConnectionId, ids ...ChannelId)
 	for i, id := range ids {
 		channelIds[i] = uint32(id)
 	}
-	subMsg := &proto.UnsubscribedToChannelsMessage{ConnId: uint32(connId), ChannelIds: channelIds}
-	c.SendWithGlobalChannel(proto.MessageType_UNSUB_FROM_CHANNEL, subMsg)
+	subMsg := &channeldpb.UnsubscribedToChannelsMessage{ConnId: uint32(connId), ChannelIds: channelIds}
+	c.SendWithGlobalChannel(channeldpb.MessageType_UNSUB_FROM_CHANNEL, subMsg)
 }
 */
 
-func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel, connToSub *Connection, stubId uint32, subOptions *proto.ChannelSubscriptionOptions) {
+func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel, connToSub *Connection, stubId uint32, subOptions *channeldpb.ChannelSubscriptionOptions) {
 	ctx.Channel = ch
 	ctx.StubId = stubId
-	ctx.MsgType = proto.MessageType_SUB_TO_CHANNEL
-	ctx.Msg = &proto.SubscribedToChannelResultMessage{
+	ctx.MsgType = channeldpb.MessageType_SUB_TO_CHANNEL
+	ctx.Msg = &channeldpb.SubscribedToChannelResultMessage{
 		ConnId:      uint32(connToSub.id),
 		SubOptions:  subOptions,
 		ConnType:    connToSub.connectionType,
 		ChannelType: ch.channelType,
 	}
-	// ctx.Msg = &proto.SubscribedToChannelMessage{
+	// ctx.Msg = &channeldpb.SubscribedToChannelMessage{
 	// 	ConnId:     uint32(ctx.Connection.id),
 	// 	SubOptions: &ch.subscribedConnections[c.id].options,
 	// }
@@ -101,8 +101,8 @@ func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel, connToSub *
 func (c *Connection) sendUnsubscribed(ctx MessageContext, ch *Channel, connToUnsub *Connection, stubId uint32) {
 	ctx.Channel = ch
 	ctx.StubId = stubId
-	ctx.MsgType = proto.MessageType_UNSUB_FROM_CHANNEL
-	ctx.Msg = &proto.UnsubscribedFromChannelResultMessage{
+	ctx.MsgType = channeldpb.MessageType_UNSUB_FROM_CHANNEL
+	ctx.Msg = &channeldpb.UnsubscribedFromChannelResultMessage{
 		ConnId:      uint32(connToUnsub.id),
 		ConnType:    connToUnsub.connectionType,
 		ChannelType: ch.channelType,

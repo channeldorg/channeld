@@ -1,12 +1,15 @@
-package proto
+package testpb
 
 import (
 	"errors"
 
-	protobuf "google.golang.org/protobuf/proto"
+	"channeld.clewcat.com/channeld/pkg/channeld"
+	"channeld.clewcat.com/channeld/pkg/channeldpb"
+	"google.golang.org/protobuf/proto"
 )
 
-func (dst *TestMergeMessage) Merge(src protobuf.Message, options *ChannelDataMergeOptions) error {
+// Implement [channeld.MergeableChannelData]
+func (dst *TestMergeMessage) Merge(src proto.Message, options *channeldpb.ChannelDataMergeOptions, spatialNotifier channeld.SpatialInfoChangedNotifier) error {
 	srcMsg, ok := src.(*TestMergeMessage)
 	if !ok {
 		return errors.New("src is not a TestMergeMessage")

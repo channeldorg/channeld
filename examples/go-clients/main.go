@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"channeld.clewcat.com/channeld/proto"
+	"channeld.clewcat.com/channeld/pkg/channeldpb"
 )
 
 var ServerAddr string = "ws://localhost:12108" //"49.234.9.192:12108" //"ws://49.234.9.192:12108"
@@ -93,18 +93,18 @@ func runClient(clientActions []*clientAction, initFunc func(client *Client, data
 		ctx:               make(map[interface{}]interface{}),
 	}
 
-	c.AddMessageHandler(uint32(proto.MessageType_SUB_TO_CHANNEL), func(client *Client, channelId uint32, m Message) {
+	c.AddMessageHandler(uint32(channeldpb.MessageType_SUB_TO_CHANNEL), func(client *Client, channelId uint32, m Message) {
 		data.activeChannelId = channelId
 	})
-	c.AddMessageHandler(uint32(proto.MessageType_UNSUB_FROM_CHANNEL), func(client *Client, channelId uint32, m Message) {
-		msg := m.(*proto.UnsubscribedFromChannelResultMessage)
+	c.AddMessageHandler(uint32(channeldpb.MessageType_UNSUB_FROM_CHANNEL), func(client *Client, channelId uint32, m Message) {
+		msg := m.(*channeldpb.UnsubscribedFromChannelResultMessage)
 		if msg.ConnId != client.Id {
 			return
 		}
 		removeChannelId(client, data, channelId)
 	})
-	c.AddMessageHandler(uint32(proto.MessageType_REMOVE_CHANNEL), func(client *Client, channelId uint32, m Message) {
-		msg := m.(*proto.RemoveChannelMessage)
+	c.AddMessageHandler(uint32(channeldpb.MessageType_REMOVE_CHANNEL), func(client *Client, channelId uint32, m Message) {
+		msg := m.(*channeldpb.RemoveChannelMessage)
 		removeChannelId(client, data, msg.ChannelId)
 	})
 

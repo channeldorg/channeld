@@ -4,12 +4,11 @@ import (
 	"errors"
 
 	"channeld.clewcat.com/channeld/pkg/channeld"
-	"channeld.clewcat.com/channeld/proto"
-
-	protobuf "google.golang.org/protobuf/proto"
+	"channeld.clewcat.com/channeld/pkg/channeldpb"
+	"google.golang.org/protobuf/proto"
 )
 
-func (dst *ChatChannelData) Merge(src protobuf.Message, options *proto.ChannelDataMergeOptions, spatialNotifier channeld.SpatialInfoChangedNotifier) error {
+func (dst *ChatChannelData) Merge(src proto.Message, options *channeldpb.ChannelDataMergeOptions, spatialNotifier channeld.SpatialInfoChangedNotifier) error {
 	srcMsg, ok := src.(*ChatChannelData)
 	if !ok {
 		return errors.New("src is not a ChatChannelData")

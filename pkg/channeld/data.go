@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"strings"
 
-	"channeld.clewcat.com/channeld/proto"
+	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"github.com/iancoleman/strcase"
 	"github.com/indiest/fmutils"
 	"go.uber.org/zap"
-	protobuf "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/proto"
+
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -18,7 +19,7 @@ import (
 type ChannelDataMessage = Message //protoreflect.Message
 
 type ChannelData struct {
-	mergeOptions *proto.ChannelDataMergeOptions
+	mergeOptions *channeldpb.ChannelDataMergeOptions
 	msg          ChannelDataMessage
 	//updateMsg       ChannelDataMessage
 	updateMsgBuffer     *list.List
@@ -43,7 +44,11 @@ const (
 	MaxUpdateMsgBufferSize = 512
 )
 
-func ReflectChannelData(channelType proto.ChannelType, mergeOptions *proto.ChannelDataMergeOptions) (*ChannelData, error) {
+func RegisterChannelDataType(channelType channeldpb.ChannelType, msgTemplate proto.Message) {
+
+}
+
+func ReflectChannelData(channelType channeldpb.ChannelType, mergeOptions *channeldpb.ChannelDataMergeOptions) (*ChannelData, error) {
 	channelTypeName := channelType.String()
 	dataTypeName := fmt.Sprintf("channeld.%sChannelDataMessage",
 		strcase.ToCamel(strings.ToLower(channelTypeName)))
@@ -59,7 +64,7 @@ func ReflectChannelData(channelType proto.ChannelType, mergeOptions *proto.Chann
 	}, nil
 }
 
-func (ch *Channel) InitData(dataMsg Message, mergeOptions *proto.ChannelDataMergeOptions) {
+func (ch *Channel) InitData(dataMsg Message, mergeOptions *channeldpb.ChannelDataMergeOptions) {
 	ch.data = &ChannelData{
 		msg:             dataMsg,
 		updateMsgBuffer: list.New(),
@@ -143,7 +148,7 @@ func (ch *Channel) tickData(t ChannelTime) {
 					be := bufp.Value.(*updateMsgBufferElement)
 					if be.arrivalTime >= lastUpdateTime && be.arrivalTime <= nextFanOutTime {
 						if accumulatedUpdateMsg == nil {
-							accumulatedUpdateMsg = protobuf.Clone(be.updateMsg)
+							accumulatedUpdateMsg = proto.Clone(be.updateMsg)
 						} else {
 							mergeWithOptions(accumulatedUpdateMsg, be.updateMsg, ch.data.mergeOptions, nil)
 						}
@@ -182,11 +187,11 @@ func (ch *Channel) fanOutDataUpdate(conn ConnectionInChannel, cs *ChannelSubscri
 		return
 	}
 	conn.Send(MessageContext{
-		MsgType:    proto.MessageType_CHANNEL_DATA_UPDATE,
-		Msg:        &proto.ChannelDataUpdateMessage{Data: any},
+		MsgType:    channeldpb.MessageType_CHANNEL_DATA_UPDATE,
+		Msg:        &channeldpb.ChannelDataUpdateMessage{Data: any},
 		Connection: nil,
 		Channel:    ch,
-		Broadcast:  proto.BroadcastType_NO_BROADCAST,
+		Broadcast:  channeldpb.BroadcastType_NO_BROADCAST,
 		StubId:     0,
 		ChannelId:  uint32(ch.id),
 	})
@@ -207,14 +212,14 @@ func postMergeMapKV(dst, src protoreflect.Map, k protoreflect.MapKey, v protoref
 // Implement this interface to manually merge the channel data. It will be MUCH more efficient than the default reflection-based merge.
 type MergeableChannelData interface {
 	Message
-	Merge(src Message, options *proto.ChannelDataMergeOptions, spatialNotifier SpatialInfoChangedNotifier) error
+	Merge(src Message, options *channeldpb.ChannelDataMergeOptions, spatialNotifier SpatialInfoChangedNotifier) error
 }
 
-func mergeWithOptions(dst Message, src Message, options *proto.ChannelDataMergeOptions, spatialNotifier SpatialInfoChangedNotifier) {
+func mergeWithOptions(dst Message, src Message, options *channeldpb.ChannelDataMergeOptions, spatialNotifier SpatialInfoChangedNotifier) {
 	mergeable, ok := dst.(MergeableChannelData)
 	if ok {
 		if options == nil {
-			options = &proto.ChannelDataMergeOptions{
+			options = &channeldpb.ChannelDataMergeOptions{
 				ShouldReplaceList:            false,
 				ListSizeLimit:                0,
 				TruncateTop:                  false,
@@ -233,11 +238,11 @@ func mergeWithOptions(dst Message, src Message, options *proto.ChannelDataMergeO
 }
 
 // Use protoreflect to merge. No need to write custom merge code but less efficient.
-func reflectMerge(dst Message, src Message, options *proto.ChannelDataMergeOptions) {
+func reflectMerge(dst Message, src Message, options *channeldpb.ChannelDataMergeOptions) {
 	// if options == nil {
-	protobuf.Merge(dst, src)
+	proto.Merge(dst, src)
 	// } else {
-	// 	protobuf.MergeWithOptions(dst, src, protobuf.MergeOptions{PostMergeMapKV: postMergeMapKV})
+	// 	proto.MergeWithOptions(dst, src, proto.MergeOptions{PostMergeMapKV: postMergeMapKV})
 	// }
 
 	if options != nil {

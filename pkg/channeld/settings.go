@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"channeld.clewcat.com/channeld/proto"
+	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"github.com/pkg/profile"
 )
 
@@ -27,11 +27,11 @@ type GlobalSettingsType struct {
 	ClientAddress string
 	ClientFSM     string
 
-	CompressionType proto.CompressionType
+	CompressionType channeldpb.CompressionType
 
 	SpatialChannelIdStart ChannelId
 
-	ChannelSettings map[proto.ChannelType]ChannelSettingsType
+	ChannelSettings map[channeldpb.ChannelType]ChannelSettingsType
 }
 
 type ChannelSettingsType struct {
@@ -42,10 +42,10 @@ type ChannelSettingsType struct {
 var GlobalSettings = GlobalSettingsType{
 	LogLevel:              &NullableInt{},
 	LogFile:               &NullableString{},
-	CompressionType:       proto.CompressionType_NO_COMPRESSION,
+	CompressionType:       channeldpb.CompressionType_NO_COMPRESSION,
 	SpatialChannelIdStart: 65536,
-	ChannelSettings: map[proto.ChannelType]ChannelSettingsType{
-		proto.ChannelType_GLOBAL: {
+	ChannelSettings: map[channeldpb.ChannelType]ChannelSettingsType{
+		channeldpb.ChannelType_GLOBAL: {
 			TickIntervalMs:          10,
 			DefaultFanOutIntervalMs: 20,
 		},
@@ -124,7 +124,7 @@ func (s *GlobalSettingsType) ParseFlag() error {
 	flag.Parse()
 
 	if ct != nil {
-		s.CompressionType = proto.CompressionType(*ct)
+		s.CompressionType = channeldpb.CompressionType(*ct)
 	}
 
 	chsData, err := ioutil.ReadFile(*chs)
@@ -139,10 +139,10 @@ func (s *GlobalSettingsType) ParseFlag() error {
 	return nil
 }
 
-func (s GlobalSettingsType) GetChannelSettings(t proto.ChannelType) ChannelSettingsType {
+func (s GlobalSettingsType) GetChannelSettings(t channeldpb.ChannelType) ChannelSettingsType {
 	settings, exists := s.ChannelSettings[t]
 	if !exists {
-		settings = s.ChannelSettings[proto.ChannelType_GLOBAL]
+		settings = s.ChannelSettings[channeldpb.ChannelType_GLOBAL]
 	}
 	return settings
 }

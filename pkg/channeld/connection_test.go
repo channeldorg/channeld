@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"channeld.clewcat.com/channeld/proto"
+	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/xtaci/kcp-go"
-	protobuf "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestDropPacket(t *testing.T) {
@@ -33,16 +33,16 @@ func TestDropPacket(t *testing.T) {
 	pipeWriter.Write([]byte{1, 2, 3, 4, 5, 6})
 	time.Sleep(time.Millisecond * 100)
 
-	msg := &proto.TestChannelDataMessage{Text: "abc", Num: 123}
-	msgBody, _ := protobuf.Marshal(msg)
-	p := &proto.Packet{
-		Messages: []*proto.MessagePack{
+	msg := &channeldpb.TestChannelDataMessage{Text: "abc", Num: 123}
+	msgBody, _ := proto.Marshal(msg)
+	p := &channeldpb.Packet{
+		Messages: []*channeldpb.MessagePack{
 			{
 				MsgBody: msgBody,
 			},
 		},
 	}
-	bytes, _ := protobuf.Marshal(p)
+	bytes, _ := proto.Marshal(p)
 	size := byte(len(bytes))
 	pipeWriter.Write(append([]byte{67, 72, 78, size, 0}, bytes...))
 
@@ -54,7 +54,7 @@ func TestKCPConnection(t *testing.T) {
 	InitLogsAndMetrics()
 	const addr string = "localhost:12108"
 	go func() {
-		StartListening(proto.ConnectionType_CLIENT, "kcp", addr)
+		StartListening(channeldpb.ConnectionType_CLIENT, "kcp", addr)
 	}()
 	_, err := kcp.Dial(addr)
 	assert.NoError(t, err)
@@ -64,7 +64,7 @@ func TestWebSocketConnection(t *testing.T) {
 	InitLogsAndMetrics()
 	const addr string = "ws://localhost:8080"
 	go func() {
-		StartListening(proto.ConnectionType_CLIENT, "ws", addr)
+		StartListening(channeldpb.ConnectionType_CLIENT, "ws", addr)
 	}()
 	_, _, err := websocket.DefaultDialer.Dial(addr, nil)
 	assert.NoError(t, err)
@@ -77,7 +77,7 @@ func TestConcurrentAccessConnections(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		for i := 0; i < 100; i++ {
-			AddConnection(nil, proto.ConnectionType_CLIENT)
+			AddConnection(nil, channeldpb.ConnectionType_CLIENT)
 			time.Sleep(1 * time.Millisecond)
 		}
 		wg.Done()

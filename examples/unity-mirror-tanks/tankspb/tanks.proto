@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package tankspb;
 
-import "proto/unity_common.proto";
+import "pkg/channeldpb/unity_common.proto";
 
-option go_package = "/examples/unity-mirror-tanks/tankspb";
+option go_package = "channeld.clewcat.com/examples/unity-mirror-tanks/tankspb";
 option csharp_namespace = "Channeld.Examples.Tanks";
 
 message TankState {
@@ -14,6 +14,6 @@ message TankState {
 }
 
 message TankGameChannelData {
-    map<uint32, channeld.TransformState> transformStates = 1;
+    map<uint32, channeldpb.TransformState> transformStates = 1;
     map<uint32, TankState> tankStates = 2;
 }

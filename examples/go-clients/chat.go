@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"time"
 
-	"channeld.clewcat.com/channeld/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -15,10 +14,10 @@ var ChatClientActions = []*clientAction{
 		probability: 1,
 		minInterval: time.Millisecond * 20000, //2000
 		perform: func(client *Client, data *clientData) bool {
-			client.Send(0, proto.BroadcastType_NO_BROADCAST, uint32(proto.MessageType_LIST_CHANNEL), &proto.ListChannelMessage{},
+			client.Send(0, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_LIST_CHANNEL), &channeldpb.ListChannelMessage{},
 				func(c *Client, channelId uint32, m Message) {
 					data.listedChannels = map[uint32]struct{}{}
-					for _, info := range m.(*proto.ListChannelResultMessage).Channels {
+					for _, info := range m.(*channeldpb.ListChannelResultMessage).Channels {
 						data.listedChannels[info.ChannelId] = struct{}{}
 					}
 				})
@@ -34,10 +33,10 @@ var ChatClientActions = []*clientAction{
 				return false
 			}
 
-			client.Send(0, proto.BroadcastType_NO_BROADCAST, uint32(proto.MessageType_CREATE_CHANNEL), &proto.CreateChannelMessage{
-				ChannelType: proto.ChannelType_SUBWORLD,
+			client.Send(0, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_CREATE_CHANNEL), &channeldpb.CreateChannelMessage{
+				ChannelType: channeldpb.ChannelType_SUBWORLD,
 				Metadata:    fmt.Sprintf("Room%d", data.rnd.Uint32()),
-				SubOptions: &proto.ChannelSubscriptionOptions{
+				SubOptions: &channeldpb.ChannelSubscriptionOptions{
 					CanUpdateData:    true,
 					DataFieldMasks:   make([]string, 0),
 					FanOutIntervalMs: 100,
@@ -59,9 +58,9 @@ var ChatClientActions = []*clientAction{
 			}
 			channelToRemove := randUint32(data.createdChannelIds)
 			client.Send(0,
-				proto.BroadcastType_NO_BROADCAST,
-				uint32(proto.MessageType_REMOVE_CHANNEL),
-				&proto.RemoveChannelMessage{
+				channeldpb.BroadcastType_NO_BROADCAST,
+				uint32(channeldpb.MessageType_REMOVE_CHANNEL),
+				&channeldpb.RemoveChannelMessage{
 					ChannelId: channelToRemove,
 				},
 				nil,
@@ -89,9 +88,9 @@ var ChatClientActions = []*clientAction{
 					return false
 				}
 				channelIdToSub := randUint32(copy)
-				client.Send(channelIdToSub, proto.BroadcastType_NO_BROADCAST, uint32(proto.MessageType_SUB_TO_CHANNEL), &proto.SubscribedToChannelMessage{
+				client.Send(channelIdToSub, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_SUB_TO_CHANNEL), &channeldpb.SubscribedToChannelMessage{
 					ConnId: client.Id,
-					SubOptions: &proto.ChannelSubscriptionOptions{
+					SubOptions: &channeldpb.ChannelSubscriptionOptions{
 						CanUpdateData:    true,
 						FanOutIntervalMs: 200,
 						DataFieldMasks:   []string{},
@@ -117,7 +116,7 @@ var ChatClientActions = []*clientAction{
 				channelIdToUnsub = randUint32(client.subscribedChannels)
 			}
 
-			client.Send(channelIdToUnsub, proto.BroadcastType_NO_BROADCAST, uint32(proto.MessageType_UNSUB_FROM_CHANNEL), &proto.UnsubscribedFromChannelMessage{
+			client.Send(channelIdToUnsub, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_UNSUB_FROM_CHANNEL), &channeldpb.UnsubscribedFromChannelMessage{
 				ConnId: client.Id,
 			}, nil)
 			//log.Printf("Client(%d) UNSUB_FROM_CHANNEL: %d", client.Id, channelIdToUnsub)
@@ -129,15 +128,15 @@ var ChatClientActions = []*clientAction{
 		probability: 1,
 		minInterval: time.Millisecond * 1000,
 		perform: func(client *Client, data *clientData) bool {
-			dataUpdate, _ := anypb.New(&proto.ChatChannelData{
-				ChatMessages: []*proto.ChatMessage{{
+			dataUpdate, _ := anypb.New(&channeldpb.ChatChannelData{
+				ChatMessages: []*channeldpb.ChatMessage{{
 					Sender:   fmt.Sprintf("Client%d", client.Id),
 					SendTime: time.Now().Unix(),
 					Content:  fmt.Sprintf("How are you, User%d?", rand.Intn(ClientNum)),
 				}},
 			})
-			client.Send(data.activeChannelId, proto.BroadcastType_NO_BROADCAST, uint32(proto.MessageType_CHANNEL_DATA_UPDATE),
-				&proto.ChannelDataUpdateMessage{
+			client.Send(data.activeChannelId, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_CHANNEL_DATA_UPDATE),
+				&channeldpb.ChannelDataUpdateMessage{
 					Data: dataUpdate,
 				}, nil)
 			return true

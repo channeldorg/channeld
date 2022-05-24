@@ -3,19 +3,19 @@ package channeld
 import (
 	"strings"
 
-	"channeld.clewcat.com/channeld/proto"
+	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"go.uber.org/zap"
-	protobuf "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 )
 
-type Message = protobuf.Message //protoreflect.ProtoMessage
+type Message = proto.Message //protoreflect.ProtoMessage
 // The context of a message for both sending and receiving
 type MessageContext struct {
-	MsgType    proto.MessageType
+	MsgType    channeldpb.MessageType
 	Msg        Message     // The weak-typed Message object popped from the message queue
 	Connection *Connection // The connection that received the message
 	Channel    *Channel    // The channel that handling the message
-	Broadcast  proto.BroadcastType
+	Broadcast  channeldpb.BroadcastType
 	StubId     uint32
 	ChannelId  uint32 // The original channelId in the Packet, could be different from Channel.id.
 }
@@ -25,25 +25,25 @@ type messageMapEntry struct {
 	handler MessageHandlerFunc
 }
 
-var MessageMap = map[proto.MessageType]*messageMapEntry{
-	proto.MessageType_AUTH:                {&proto.AuthMessage{}, handleAuth},
-	proto.MessageType_CREATE_CHANNEL:      {&proto.CreateChannelMessage{}, handleCreateChannel},
-	proto.MessageType_REMOVE_CHANNEL:      {&proto.RemoveChannelMessage{}, handleRemoveChannel},
-	proto.MessageType_LIST_CHANNEL:        {&proto.ListChannelMessage{}, handleListChannel},
-	proto.MessageType_SUB_TO_CHANNEL:      {&proto.SubscribedToChannelMessage{}, handleSubToChannel},
-	proto.MessageType_UNSUB_FROM_CHANNEL:  {&proto.UnsubscribedFromChannelMessage{}, handleUnsubFromChannel},
-	proto.MessageType_CHANNEL_DATA_UPDATE: {&proto.ChannelDataUpdateMessage{}, handleChannelDataUpdate},
-	proto.MessageType_DISCONNECT:          {&proto.DisconnectMessage{}, handleDisconnect},
+var MessageMap = map[channeldpb.MessageType]*messageMapEntry{
+	channeldpb.MessageType_AUTH:                {&channeldpb.AuthMessage{}, handleAuth},
+	channeldpb.MessageType_CREATE_CHANNEL:      {&channeldpb.CreateChannelMessage{}, handleCreateChannel},
+	channeldpb.MessageType_REMOVE_CHANNEL:      {&channeldpb.RemoveChannelMessage{}, handleRemoveChannel},
+	channeldpb.MessageType_LIST_CHANNEL:        {&channeldpb.ListChannelMessage{}, handleListChannel},
+	channeldpb.MessageType_SUB_TO_CHANNEL:      {&channeldpb.SubscribedToChannelMessage{}, handleSubToChannel},
+	channeldpb.MessageType_UNSUB_FROM_CHANNEL:  {&channeldpb.UnsubscribedFromChannelMessage{}, handleUnsubFromChannel},
+	channeldpb.MessageType_CHANNEL_DATA_UPDATE: {&channeldpb.ChannelDataUpdateMessage{}, handleChannelDataUpdate},
+	channeldpb.MessageType_DISCONNECT:          {&channeldpb.DisconnectMessage{}, handleDisconnect},
 }
 
 func RegisterMessageHandler(msgType uint32, msg Message, handler MessageHandlerFunc) {
-	MessageMap[proto.MessageType(msgType)] = &messageMapEntry{msg, handler}
+	MessageMap[channeldpb.MessageType(msgType)] = &messageMapEntry{msg, handler}
 }
 
 func handleClientToServerUserMessage(ctx MessageContext) {
 	if ctx.Channel.HasOwner() {
 		ctx.Channel.ownerConnection.Send(ctx)
-	} else if ctx.Broadcast != proto.BroadcastType_NO_BROADCAST {
+	} else if ctx.Broadcast != channeldpb.BroadcastType_NO_BROADCAST {
 		if ctx.Channel.enableClientBroadcast {
 			ctx.Channel.Broadcast(ctx)
 		} else {
@@ -62,14 +62,14 @@ func handleClientToServerUserMessage(ctx MessageContext) {
 }
 
 func handleServerToClientUserMessage(ctx MessageContext) {
-	msg, ok := ctx.Msg.(*proto.ServerForwardMessage)
+	msg, ok := ctx.Msg.(*channeldpb.ServerForwardMessage)
 	if !ok {
 		ctx.Connection.Logger().Error("message is not a ServerForwardMessage, will not be handled.")
 		return
 	}
 
 	switch ctx.Broadcast {
-	case proto.BroadcastType_NO_BROADCAST:
+	case channeldpb.BroadcastType_NO_BROADCAST:
 		if ctx.Channel.HasOwner() {
 			ctx.Channel.ownerConnection.Send(ctx)
 		} else {
@@ -80,10 +80,10 @@ func handleServerToClientUserMessage(ctx MessageContext) {
 			)
 		}
 
-	case proto.BroadcastType_ALL, proto.BroadcastType_ALL_BUT_SENDER:
+	case channeldpb.BroadcastType_ALL, channeldpb.BroadcastType_ALL_BUT_SENDER:
 		ctx.Channel.Broadcast(ctx)
 
-	case proto.BroadcastType_SINGLE_CONNECTION:
+	case channeldpb.BroadcastType_SINGLE_CONNECTION:
 		clientConn := GetConnection(ConnectionId(msg.ClientConnId))
 		if clientConn != nil {
 			clientConn.Send(ctx)
@@ -101,7 +101,7 @@ func handleAuth(ctx MessageContext) {
 		ctx.Connection.Logger().Error("illegal attemp to authenticate outside the GLOBAL channel")
 		return
 	}
-	_, ok := ctx.Msg.(*proto.AuthMessage)
+	_, ok := ctx.Msg.(*channeldpb.AuthMessage)
 	if !ok {
 		ctx.Connection.Logger().Error("mssage is not a AuthMessage, will not be handled.")
 		return
@@ -112,8 +112,8 @@ func handleAuth(ctx MessageContext) {
 
 	ctx.Connection.fsm.MoveToNextState()
 
-	ctx.Msg = &proto.AuthResultMessage{
-		Result:          proto.AuthResultMessage_SUCCESSFUL,
+	ctx.Msg = &channeldpb.AuthResultMessage{
+		Result:          channeldpb.AuthResultMessage_SUCCESSFUL,
 		ConnId:          uint32(ctx.Connection.id),
 		CompressionType: GlobalSettings.CompressionType,
 	}
@@ -133,7 +133,7 @@ func handleCreateChannel(ctx MessageContext) {
 		return
 	}
 
-	msg, ok := ctx.Msg.(*proto.CreateChannelMessage)
+	msg, ok := ctx.Msg.(*channeldpb.CreateChannelMessage)
 	if !ok {
 		ctx.Connection.Logger().Error("message is not a CreateChannelMessage, will not be handled.")
 		return
@@ -141,10 +141,10 @@ func handleCreateChannel(ctx MessageContext) {
 
 	var newChannel *Channel
 	var err error
-	if msg.ChannelType == proto.ChannelType_UNKNOWN {
+	if msg.ChannelType == channeldpb.ChannelType_UNKNOWN {
 		ctx.Connection.Logger().Error("illegal attemp to create the UNKNOWN channel")
 		return
-	} else if msg.ChannelType == proto.ChannelType_GLOBAL {
+	} else if msg.ChannelType == channeldpb.ChannelType_GLOBAL {
 		// Global channel is initially created by the system. Creating the channel will attempt to own it.
 		newChannel = globalChannel
 		if !globalChannel.HasOwner() {
@@ -183,7 +183,7 @@ func handleCreateChannel(ctx MessageContext) {
 	// Make sure the response message has the channelId = newChannel.id, not always 0.
 	ctx.ChannelId = uint32(newChannel.id)
 
-	ctx.Msg = &proto.CreateChannelResultMessage{
+	ctx.Msg = &channeldpb.CreateChannelResultMessage{
 		ChannelType: newChannel.channelType,
 		Metadata:    newChannel.metadata,
 		OwnerConnId: uint32(ctx.Connection.id),
@@ -206,7 +206,7 @@ func handleRemoveChannel(ctx MessageContext) {
 		return
 	}
 
-	msg, ok := ctx.Msg.(*proto.RemoveChannelMessage)
+	msg, ok := ctx.Msg.(*channeldpb.RemoveChannelMessage)
 	if !ok {
 		ctx.Connection.Logger().Error("message is not a RemoveChannelMessage, will not be handled.")
 		return
@@ -254,16 +254,16 @@ func handleListChannel(ctx MessageContext) {
 		return
 	}
 
-	msg, ok := ctx.Msg.(*proto.ListChannelMessage)
+	msg, ok := ctx.Msg.(*channeldpb.ListChannelMessage)
 	if !ok {
 		ctx.Connection.Logger().Error("message is not a ListChannelMessage, will not be handled.")
 		return
 	}
 
-	result := make([]*proto.ListChannelResultMessage_ChannelInfo, 0)
+	result := make([]*channeldpb.ListChannelResultMessage_ChannelInfo, 0)
 	allChannels.Range(func(k interface{}, v interface{}) bool {
 		channel := v.(*Channel)
-		if msg.TypeFilter != proto.ChannelType_UNKNOWN && msg.TypeFilter != channel.channelType {
+		if msg.TypeFilter != channeldpb.ChannelType_UNKNOWN && msg.TypeFilter != channel.channelType {
 			return true
 		}
 		matched := len(msg.MetadataFilters) == 0
@@ -274,7 +274,7 @@ func handleListChannel(ctx MessageContext) {
 			}
 		}
 		if matched {
-			result = append(result, &proto.ListChannelResultMessage_ChannelInfo{
+			result = append(result, &channeldpb.ListChannelResultMessage_ChannelInfo{
 				ChannelId:   uint32(channel.id),
 				ChannelType: channel.channelType,
 				Metadata:    channel.metadata,
@@ -283,14 +283,14 @@ func handleListChannel(ctx MessageContext) {
 		return true
 	})
 
-	ctx.Msg = &proto.ListChannelResultMessage{
+	ctx.Msg = &channeldpb.ListChannelResultMessage{
 		Channels: result,
 	}
 	ctx.Connection.Send(ctx)
 }
 
 func handleSubToChannel(ctx MessageContext) {
-	msg, ok := ctx.Msg.(*proto.SubscribedToChannelMessage)
+	msg, ok := ctx.Msg.(*channeldpb.SubscribedToChannelMessage)
 	if !ok {
 		ctx.Connection.Logger().Error("message is not a SubscribedToChannelMessage, will not be handled.")
 		return
@@ -319,7 +319,7 @@ func handleSubToChannel(ctx MessageContext) {
 			zap.Uint32("channelId", uint32(ctx.Channel.id)),
 		)
 		if msg.SubOptions != nil {
-			protobuf.Merge(&cs.options, msg.SubOptions)
+			proto.Merge(&cs.options, msg.SubOptions)
 		}
 		// Do not send the SubscribedToChannelResultMessage if already subed.
 		return
@@ -341,7 +341,7 @@ func handleSubToChannel(ctx MessageContext) {
 }
 
 func handleUnsubFromChannel(ctx MessageContext) {
-	msg, ok := ctx.Msg.(*proto.UnsubscribedFromChannelMessage)
+	msg, ok := ctx.Msg.(*channeldpb.UnsubscribedFromChannelMessage)
 	if !ok {
 		ctx.Connection.Logger().Error("message is not a UnsubscribedFromChannelMessage, will not be handled.")
 		return
@@ -410,7 +410,7 @@ func handleChannelDataUpdate(ctx MessageContext) {
 		return
 	}
 
-	msg, ok := ctx.Msg.(*proto.ChannelDataUpdateMessage)
+	msg, ok := ctx.Msg.(*channeldpb.ChannelDataUpdateMessage)
 	if !ok {
 		ctx.Connection.Logger().Error("message is not a ChannelDataUpdateMessage, will not be handled.")
 		return
@@ -432,7 +432,7 @@ func handleDisconnect(ctx MessageContext) {
 		return
 	}
 
-	msg, ok := ctx.Msg.(*proto.DisconnectMessage)
+	msg, ok := ctx.Msg.(*channeldpb.DisconnectMessage)
 	if !ok {
 		ctx.Connection.Logger().Error("message is not a DisconnectMessage, will not be handled.")
 		return

@@ -11,20 +11,20 @@ import (
 	"sync/atomic"
 	"time"
 
+	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"channeld.clewcat.com/channeld/pkg/fsm"
-	"channeld.clewcat.com/channeld/proto"
 	"github.com/golang/snappy"
 	"github.com/gorilla/websocket"
 	"github.com/xtaci/kcp-go"
 	"go.uber.org/zap"
-	protobuf "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 type ConnectionId uint32
 
 // Add an interface before the underlying network layer for the test purpose.
 type MessageSender interface {
-	Send(c *Connection, ctx MessageContext) //(c *Connection, channelId ChannelId, msgType proto.MessageType, msg Message)
+	Send(c *Connection, ctx MessageContext) //(c *Connection, channelId ChannelId, msgType channeldpb.MessageType, msg Message)
 }
 
 type queuedMessageSender struct {
@@ -37,8 +37,8 @@ func (s *queuedMessageSender) Send(c *Connection, ctx MessageContext) {
 
 type Connection struct {
 	id              ConnectionId
-	connectionType  proto.ConnectionType
-	compressionType proto.CompressionType
+	connectionType  channeldpb.ConnectionType
+	compressionType channeldpb.CompressionType
 	conn            net.Conn
 	reader          *bufio.Reader
 	writer          *bufio.Writer
@@ -126,7 +126,7 @@ func startGoroutines(connection *Connection) {
 	}()
 }
 
-func StartListening(t proto.ConnectionType, network string, address string) {
+func StartListening(t channeldpb.ConnectionType, network string, address string) {
 	logger.Info("start listenning",
 		zap.String("connType", t.String()),
 		zap.String("network", network),
@@ -164,14 +164,14 @@ func StartListening(t proto.ConnectionType, network string, address string) {
 	}
 }
 
-func AddConnection(c net.Conn, t proto.ConnectionType) *Connection {
+func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 	// TODO: check if the connections map is full
 	// Should use mutex to lock the map while checking
 	atomic.AddUint64(&nextConnectionId, 1)
 	connection := &Connection{
 		id:              ConnectionId(nextConnectionId),
 		connectionType:  t,
-		compressionType: proto.CompressionType_NO_COMPRESSION,
+		compressionType: channeldpb.CompressionType_NO_COMPRESSION,
 		conn:            c,
 		reader:          bufio.NewReader(c),
 		writer:          bufio.NewWriter(c),
@@ -186,9 +186,9 @@ func AddConnection(c net.Conn, t proto.ConnectionType) *Connection {
 	// IMPORTANT: always make a value copy
 	var fsm fsm.FiniteStateMachine
 	switch t {
-	case proto.ConnectionType_SERVER:
+	case channeldpb.ConnectionType_SERVER:
 		fsm = serverFsm
-	case proto.ConnectionType_CLIENT:
+	case channeldpb.ConnectionType_CLIENT:
 		fsm = clientFsm
 	}
 
@@ -310,10 +310,10 @@ func (c *Connection) ReceivePacket() {
 
 	// Apply the decompression from the 5th byte in the header
 	ct := tag[4]
-	_, valid := proto.CompressionType_name[int32(ct)]
+	_, valid := channeldpb.CompressionType_name[int32(ct)]
 	if valid && ct != 0 {
-		c.compressionType = proto.CompressionType(ct)
-		if c.compressionType == proto.CompressionType_SNAPPY {
+		c.compressionType = channeldpb.CompressionType(ct)
+		if c.compressionType == channeldpb.CompressionType_SNAPPY {
 			len, err := snappy.DecodedLen(bytes)
 			if err != nil {
 				c.Logger().Error("snappy.DecodedLen", zap.Error(err))
@@ -328,8 +328,8 @@ func (c *Connection) ReceivePacket() {
 		}
 	}
 
-	var p proto.Packet
-	if err := protobuf.Unmarshal(bytes, &p); err != nil {
+	var p channeldpb.Packet
+	if err := proto.Unmarshal(bytes, &p); err != nil {
 		c.Logger().Error("unmarshalling packet", zap.Error(err))
 		return
 	}
@@ -342,7 +342,7 @@ func (c *Connection) ReceivePacket() {
 	packetReceived.WithLabelValues(c.connectionType.String()).Inc()
 }
 
-func (c *Connection) receiveMessage(mp *proto.MessagePack) {
+func (c *Connection) receiveMessage(mp *channeldpb.MessagePack) {
 	channel := GetChannel(ChannelId(mp.ChannelId))
 	if channel == nil {
 		c.Logger().Warn("can't find channel",
@@ -352,8 +352,8 @@ func (c *Connection) receiveMessage(mp *proto.MessagePack) {
 		return
 	}
 
-	entry := MessageMap[proto.MessageType(mp.MsgType)]
-	if entry == nil && mp.MsgType < uint32(proto.MessageType_USER_SPACE_START) {
+	entry := MessageMap[channeldpb.MessageType(mp.MsgType)]
+	if entry == nil && mp.MsgType < uint32(channeldpb.MessageType_USER_SPACE_START) {
 		c.Logger().Error("undefined message type", zap.Uint32("msgType", mp.MsgType))
 		return
 	}
@@ -368,23 +368,23 @@ func (c *Connection) receiveMessage(mp *proto.MessagePack) {
 
 	var msg Message
 	var handler MessageHandlerFunc
-	if mp.MsgType >= uint32(proto.MessageType_USER_SPACE_START) && entry == nil {
+	if mp.MsgType >= uint32(channeldpb.MessageType_USER_SPACE_START) && entry == nil {
 		// client -> channeld -> server
-		if c.connectionType == proto.ConnectionType_CLIENT {
+		if c.connectionType == channeldpb.ConnectionType_CLIENT {
 			// User-space message without handler won't be deserialized.
-			msg = &proto.ServerForwardMessage{ClientConnId: uint32(c.id), Payload: mp.MsgBody}
+			msg = &channeldpb.ServerForwardMessage{ClientConnId: uint32(c.id), Payload: mp.MsgBody}
 			handler = handleClientToServerUserMessage
 		} else {
 			// server -> channeld -> client
-			msg = &proto.ServerForwardMessage{}
-			protobuf.Unmarshal(mp.MsgBody, msg)
+			msg = &channeldpb.ServerForwardMessage{}
+			proto.Unmarshal(mp.MsgBody, msg)
 			handler = handleServerToClientUserMessage
 		}
 	} else {
 		handler = entry.handler
 		// Always make a clone!
-		msg = protobuf.Clone(entry.msg)
-		err := protobuf.Unmarshal(mp.MsgBody, msg)
+		msg = proto.Clone(entry.msg)
+		err := proto.Unmarshal(mp.MsgBody, msg)
 		if err != nil {
 			c.Logger().Error("unmarshalling message", zap.Error(err))
 			return
@@ -417,30 +417,30 @@ func (c *Connection) Flush() {
 		return
 	}
 
-	p := proto.Packet{Messages: make([]*proto.MessagePack, 0, len(c.sendQueue))}
+	p := channeldpb.Packet{Messages: make([]*channeldpb.MessagePack, 0, len(c.sendQueue))}
 	size := 0
 
 	// TODO: should we limit the message numbers per packet?
 	for len(c.sendQueue) > 0 {
 		mc := <-c.sendQueue
 		// The packet size should not exceed the capacity of 3 bytes
-		if size+protobuf.Size(mc.Msg) >= 0xfffff0 {
+		if size+proto.Size(mc.Msg) >= 0xfffff0 {
 			c.Logger().Warn("packet is going to be oversized")
 			break
 		}
-		msgBody, err := protobuf.Marshal(mc.Msg)
+		msgBody, err := proto.Marshal(mc.Msg)
 		if err != nil {
 			c.Logger().Error("error marshalling message", zap.Error(err))
 			continue
 		}
-		p.Messages = append(p.Messages, &proto.MessagePack{
+		p.Messages = append(p.Messages, &channeldpb.MessagePack{
 			ChannelId: mc.ChannelId,
 			Broadcast: mc.Broadcast,
 			StubId:    mc.StubId,
 			MsgType:   uint32(mc.MsgType),
 			MsgBody:   msgBody,
 		})
-		size = protobuf.Size(&p)
+		size = proto.Size(&p)
 
 		c.Logger().Debug("sent message", zap.Uint32("msgType", uint32(mc.MsgType)), zap.Int("size", len(msgBody)))
 
@@ -450,14 +450,14 @@ func (c *Connection) Flush() {
 		)*/
 	}
 
-	bytes, err := protobuf.Marshal(&p)
+	bytes, err := proto.Marshal(&p)
 	if err != nil {
 		c.Logger().Error("error marshalling packet", zap.Error(err))
 		return
 	}
 
 	// Apply the compression
-	if c.compressionType == proto.CompressionType_SNAPPY {
+	if c.compressionType == channeldpb.CompressionType_SNAPPY {
 		dst := make([]byte, snappy.MaxEncodedLen(len(bytes)))
 		bytes = snappy.Encode(dst, bytes)
 	}

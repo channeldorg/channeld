@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"channeld.clewcat.com/channeld/proto"
+	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"go.uber.org/zap"
 )
 
@@ -42,7 +42,7 @@ type ConnectionInChannel interface {
 	Id() ConnectionId
 	IsRemoving() bool
 	Send(ctx MessageContext)
-	sendSubscribed(ctx MessageContext, ch *Channel, connToSub *Connection, stubId uint32, subOptions *proto.ChannelSubscriptionOptions)
+	sendSubscribed(ctx MessageContext, ch *Channel, connToSub *Connection, stubId uint32, subOptions *channeldpb.ChannelSubscriptionOptions)
 	sendUnsubscribed(ctx MessageContext, ch *Channel, connToUnsub *Connection, stubId uint32)
 	Logger() *zap.Logger
 	IsNil() bool
@@ -50,7 +50,7 @@ type ConnectionInChannel interface {
 
 type Channel struct {
 	id                    ChannelId
-	channelType           proto.ChannelType
+	channelType           channeldpb.ChannelType
 	state                 ChannelState
 	ownerConnection       ConnectionInChannel
 	subscribedConnections map[ConnectionInChannel]*ChannelSubscription
@@ -84,7 +84,7 @@ var globalChannel *Channel
 func InitChannels() {
 	nextChannelId = 0
 	nextSpatialChannelId = GlobalSettings.SpatialChannelIdStart
-	globalChannel, _ = CreateChannel(proto.ChannelType_GLOBAL, nil)
+	globalChannel, _ = CreateChannel(channeldpb.ChannelType_GLOBAL, nil)
 }
 
 func GetChannel(id ChannelId) *Channel {
@@ -99,14 +99,14 @@ func GetChannel(id ChannelId) *Channel {
 var ErrNonSpatialChannelFull = errors.New("non-spatial channels are full")
 var ErrSpatialChannelFull = errors.New("spatial channels are full")
 
-func CreateChannel(t proto.ChannelType, owner *Connection) (*Channel, error) {
-	if t == proto.ChannelType_GLOBAL && globalChannel != nil {
+func CreateChannel(t channeldpb.ChannelType, owner *Connection) (*Channel, error) {
+	if t == channeldpb.ChannelType_GLOBAL && globalChannel != nil {
 		return nil, errors.New("failed to create WORLD channel as it already exists")
 	}
 
 	var channelId ChannelId
 	var ok bool
-	if t != proto.ChannelType_SPATIAL {
+	if t != channeldpb.ChannelType_SPATIAL {
 		if nonSpatialchannelFull {
 			return nil, ErrNonSpatialChannelFull
 		}
@@ -149,7 +149,7 @@ func CreateChannel(t proto.ChannelType, owner *Connection) (*Channel, error) {
 		),
 		removing: 0,
 	}
-	if ch.channelType == proto.ChannelType_SPATIAL {
+	if ch.channelType == channeldpb.ChannelType_SPATIAL {
 		ch.spatialNotifier = &StaticGrid2DSpatialController{
 			channel:      ch,
 			WorldOffsetX: -40,
@@ -180,7 +180,7 @@ func RemoveChannel(ch *Channel) {
 	close(ch.inMsgQueue)
 	allChannels.Delete(ch.id)
 	// Reset the channel full status cache
-	if ch.channelType == proto.ChannelType_SPATIAL {
+	if ch.channelType == channeldpb.ChannelType_SPATIAL {
 		spatialChannelFull = false
 		nextSpatialChannelId = ch.id
 	} else {
@@ -195,12 +195,12 @@ func (ch *Channel) IsRemoving() bool {
 	return ch.removing > 0
 }
 
-func (ch *Channel) PutMessage(msg Message, handler MessageHandlerFunc, conn *Connection, pack *proto.MessagePack) {
+func (ch *Channel) PutMessage(msg Message, handler MessageHandlerFunc, conn *Connection, pack *channeldpb.MessagePack) {
 	if ch.IsRemoving() {
 		return
 	}
 	ch.inMsgQueue <- channelMessage{ctx: MessageContext{
-		MsgType:    proto.MessageType(pack.MsgType),
+		MsgType:    channeldpb.MessageType(pack.MsgType),
 		Msg:        msg,
 		Connection: conn,
 		Channel:    ch,
@@ -277,7 +277,7 @@ func (ch *Channel) Broadcast(ctx MessageContext) {
 		if conn == nil {
 			continue
 		}
-		if ctx.Broadcast == proto.BroadcastType_ALL_BUT_SENDER && conn == ctx.Connection {
+		if ctx.Broadcast == channeldpb.BroadcastType_ALL_BUT_SENDER && conn == ctx.Connection {
 			continue
 		}
 		conn.Send(ctx)

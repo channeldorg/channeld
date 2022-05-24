@@ -9,13 +9,13 @@ import (
 	"sync"
 	"time"
 
-	"channeld.clewcat.com/channeld/proto"
+	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"github.com/golang/snappy"
 	"github.com/gorilla/websocket"
-	protobuf "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 )
 
-type Message = protobuf.Message
+type Message = proto.Message
 type MessageHandlerFunc func(client *Client, channelId uint32, m Message)
 type messageMapEntry struct {
 	msg      Message
@@ -30,12 +30,12 @@ type messageQueueEntry struct {
 
 type Client struct {
 	Id                 uint32
-	CompressionType    proto.CompressionType
+	CompressionType    channeldpb.CompressionType
 	subscribedChannels map[uint32]struct{}
 	conn               net.Conn
 	connected          bool
 	incomingQueue      chan messageQueueEntry
-	outgoingQueue      chan *proto.MessagePack
+	outgoingQueue      chan *channeldpb.MessagePack
 	messageMap         map[uint32]*messageMapEntry
 	stubCallbacks      map[uint32]MessageHandlerFunc
 	writeMutex         sync.Mutex
@@ -58,12 +58,12 @@ func NewClient(addr string) (*Client, error) {
 		}
 	}
 	c := &Client{
-		CompressionType:    proto.CompressionType_NO_COMPRESSION,
+		CompressionType:    channeldpb.CompressionType_NO_COMPRESSION,
 		subscribedChannels: make(map[uint32]struct{}),
 		conn:               conn,
 		connected:          true,
 		incomingQueue:      make(chan messageQueueEntry, 128),
-		outgoingQueue:      make(chan *proto.MessagePack, 32),
+		outgoingQueue:      make(chan *channeldpb.MessagePack, 32),
 		messageMap:         make(map[uint32]*messageMapEntry),
 		stubCallbacks: map[uint32]MessageHandlerFunc{
 			// 0 is Reserved
@@ -71,14 +71,14 @@ func NewClient(addr string) (*Client, error) {
 		},
 	}
 
-	c.SetMessageEntry(uint32(proto.MessageType_AUTH), &proto.AuthResultMessage{}, defaultMessageHandler)
-	c.SetMessageEntry(uint32(proto.MessageType_CREATE_CHANNEL), &proto.CreateChannelResultMessage{}, defaultMessageHandler)
-	c.SetMessageEntry(uint32(proto.MessageType_REMOVE_CHANNEL), &proto.RemoveChannelMessage{}, handleRemoveChannel)
-	c.SetMessageEntry(uint32(proto.MessageType_AUTH), &proto.AuthResultMessage{}, defaultMessageHandler)
-	c.SetMessageEntry(uint32(proto.MessageType_SUB_TO_CHANNEL), &proto.SubscribedToChannelResultMessage{}, handleSubToChannel)
-	c.SetMessageEntry(uint32(proto.MessageType_UNSUB_FROM_CHANNEL), &proto.UnsubscribedFromChannelResultMessage{}, handleUnsubToChannel)
-	c.SetMessageEntry(uint32(proto.MessageType_LIST_CHANNEL), &proto.ListChannelResultMessage{}, defaultMessageHandler)
-	c.SetMessageEntry(uint32(proto.MessageType_CHANNEL_DATA_UPDATE), &proto.ChannelDataUpdateMessage{}, defaultMessageHandler)
+	c.SetMessageEntry(uint32(channeldpb.MessageType_AUTH), &channeldpb.AuthResultMessage{}, defaultMessageHandler)
+	c.SetMessageEntry(uint32(channeldpb.MessageType_CREATE_CHANNEL), &channeldpb.CreateChannelResultMessage{}, defaultMessageHandler)
+	c.SetMessageEntry(uint32(channeldpb.MessageType_REMOVE_CHANNEL), &channeldpb.RemoveChannelMessage{}, handleRemoveChannel)
+	c.SetMessageEntry(uint32(channeldpb.MessageType_AUTH), &channeldpb.AuthResultMessage{}, defaultMessageHandler)
+	c.SetMessageEntry(uint32(channeldpb.MessageType_SUB_TO_CHANNEL), &channeldpb.SubscribedToChannelResultMessage{}, handleSubToChannel)
+	c.SetMessageEntry(uint32(channeldpb.MessageType_UNSUB_FROM_CHANNEL), &channeldpb.UnsubscribedFromChannelResultMessage{}, handleUnsubToChannel)
+	c.SetMessageEntry(uint32(channeldpb.MessageType_LIST_CHANNEL), &channeldpb.ListChannelResultMessage{}, defaultMessageHandler)
+	c.SetMessageEntry(uint32(channeldpb.MessageType_CHANNEL_DATA_UPDATE), &channeldpb.ChannelDataUpdateMessage{}, defaultMessageHandler)
 
 	return c, nil
 }
@@ -105,17 +105,17 @@ func (client *Client) AddMessageHandler(msgType uint32, handlers ...MessageHandl
 }
 
 func (client *Client) Auth(lt string, pit string) {
-	//result := make(chan *proto.AuthResultMessage)
-	client.Send(0, proto.BroadcastType_NO_BROADCAST, uint32(proto.MessageType_AUTH), &proto.AuthMessage{
+	//result := make(chan *channeldpb.AuthResultMessage)
+	client.Send(0, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_AUTH), &channeldpb.AuthMessage{
 		LoginToken:            lt,
 		PlayerIdentifierToken: pit,
 	}, func(_ *Client, channelId uint32, m Message) {
-		msg := m.(*proto.AuthResultMessage)
+		msg := m.(*channeldpb.AuthResultMessage)
 		client.Id = msg.ConnId
 		client.CompressionType = msg.CompressionType
 		//result <- msg
-		if msg.Result == proto.AuthResultMessage_SUCCESSFUL {
-			client.Send(0, proto.BroadcastType_NO_BROADCAST, uint32(proto.MessageType_SUB_TO_CHANNEL), &proto.SubscribedToChannelMessage{
+		if msg.Result == channeldpb.AuthResultMessage_SUCCESSFUL {
+			client.Send(0, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_SUB_TO_CHANNEL), &channeldpb.SubscribedToChannelMessage{
 				ConnId: client.Id,
 			}, nil)
 		}
@@ -124,7 +124,7 @@ func (client *Client) Auth(lt string, pit string) {
 }
 
 func handleRemoveChannel(client *Client, channelId uint32, m Message) {
-	msg := m.(*proto.RemoveChannelMessage)
+	msg := m.(*channeldpb.RemoveChannelMessage)
 	delete(client.subscribedChannels, msg.ChannelId)
 }
 
@@ -182,7 +182,7 @@ func (client *Client) Receive() error {
 	}
 
 	// Apply the decompression from the 5th byte in the header
-	if tag[4] == byte(proto.CompressionType_SNAPPY) {
+	if tag[4] == byte(channeldpb.CompressionType_SNAPPY) {
 		len, err := snappy.DecodedLen(bytes)
 		if err != nil {
 			return fmt.Errorf("snappy.DecodedLen: %w", err)
@@ -194,8 +194,8 @@ func (client *Client) Receive() error {
 		}
 	}
 
-	var p proto.Packet
-	if err := protobuf.Unmarshal(bytes, &p); err != nil {
+	var p channeldpb.Packet
+	if err := proto.Unmarshal(bytes, &p); err != nil {
 		return fmt.Errorf("error unmarshalling packet: %w", err)
 	}
 
@@ -206,8 +206,8 @@ func (client *Client) Receive() error {
 		}
 
 		// Always make a clone!
-		msg := protobuf.Clone(entry.msg)
-		err = protobuf.Unmarshal(mp.MsgBody, msg)
+		msg := proto.Clone(entry.msg)
+		err = proto.Unmarshal(mp.MsgBody, msg)
 		if err != nil {
 			return fmt.Errorf("failed to unmarshal message: %w", err)
 		}
@@ -238,11 +238,11 @@ func (client *Client) Tick() error {
 		return nil
 	}
 
-	p := proto.Packet{Messages: make([]*proto.MessagePack, 0, len(client.outgoingQueue))}
+	p := channeldpb.Packet{Messages: make([]*channeldpb.MessagePack, 0, len(client.outgoingQueue))}
 	size := 0
 	for len(client.outgoingQueue) > 0 {
 		mp := <-client.outgoingQueue
-		if size+protobuf.Size(mp) >= 0xfffff0 {
+		if size+proto.Size(mp) >= 0xfffff0 {
 			break
 		}
 		p.Messages = append(p.Messages, mp)
@@ -250,7 +250,7 @@ func (client *Client) Tick() error {
 	return client.writePacket(&p)
 }
 
-func (client *Client) Send(channelId uint32, broadcast proto.BroadcastType, msgType uint32, msg Message, callback MessageHandlerFunc) error {
+func (client *Client) Send(channelId uint32, broadcast channeldpb.BroadcastType, msgType uint32, msg Message, callback MessageHandlerFunc) error {
 	var stubId uint32 = 0
 	if callback != nil {
 		for client.stubCallbacks[stubId] != nil {
@@ -259,12 +259,12 @@ func (client *Client) Send(channelId uint32, broadcast proto.BroadcastType, msgT
 		client.stubCallbacks[stubId] = callback
 	}
 
-	msgBody, err := protobuf.Marshal(msg)
+	msgBody, err := proto.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal message %d: %s. Error: %w", msgType, msg, err)
 	}
 
-	client.outgoingQueue <- &proto.MessagePack{
+	client.outgoingQueue <- &channeldpb.MessagePack{
 		ChannelId: channelId,
 		Broadcast: broadcast,
 		StubId:    stubId,
@@ -274,14 +274,14 @@ func (client *Client) Send(channelId uint32, broadcast proto.BroadcastType, msgT
 	return nil
 }
 
-func (client *Client) writePacket(p *proto.Packet) error {
-	bytes, err := protobuf.Marshal(p)
+func (client *Client) writePacket(p *channeldpb.Packet) error {
+	bytes, err := proto.Marshal(p)
 	if err != nil {
 		return fmt.Errorf("error marshalling packet: %w", err)
 	}
 
 	// Apply the compression
-	if client.CompressionType == proto.CompressionType_SNAPPY {
+	if client.CompressionType == channeldpb.CompressionType_SNAPPY {
 		dst := make([]byte, snappy.MaxEncodedLen(len(bytes)))
 		bytes = snappy.Encode(dst, bytes)
 	}

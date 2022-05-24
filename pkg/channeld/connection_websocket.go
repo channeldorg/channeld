@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"channeld.clewcat.com/channeld/proto"
+	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
 )
@@ -69,7 +69,7 @@ var upgrader websocket.Upgrader = websocket.Upgrader{
 	},
 }
 
-func startWebSocketServer(t proto.ConnectionType, address string) {
+func startWebSocketServer(t channeldpb.ConnectionType, address string) {
 	if protocolIndex := strings.Index(address, "://"); protocolIndex >= 0 {
 		address = address[protocolIndex+3:]
 	}

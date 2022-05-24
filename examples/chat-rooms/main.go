@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"channeld.clewcat.com/channeld/pkg/channeld"
-	"channeld.clewcat.com/channeld/proto"
+	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"channeld.clewcat.com/examples/chat-rooms/chatpb"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -21,7 +21,7 @@ var webAddr = flag.String("web", ":8080", "http service address")
 var wsAddr = flag.String("ws", ":12108", "websocket service address")
 
 func handleChanneldProto(w http.ResponseWriter, r *http.Request) {
-	bytes, err := os.ReadFile("../../proto/channeld.proto")
+	bytes, err := os.ReadFile("../../pkg/channeldpb/channeld.proto")
 	if err != nil {
 		log.Panic(err)
 	}
@@ -74,13 +74,13 @@ func main() {
 		&chatpb.ChatChannelData{ChatMessages: []*chatpb.ChatMessage{
 			{Sender: "System", SendTime: time.Now().Unix(), Content: "Welcome!"},
 		}},
-		&proto.ChannelDataMergeOptions{
+		&channeldpb.ChannelDataMergeOptions{
 			ListSizeLimit: 10,
 			TruncateTop:   true,
 		},
 	)
 	//channeld.SetWebSocketTrustedOrigins(["localhost"])
-	go channeld.StartListening(proto.ConnectionType_CLIENT, "ws", *wsAddr)
+	go channeld.StartListening(channeldpb.ConnectionType_CLIENT, "ws", *wsAddr)
 
 	log.Fatal(http.ListenAndServe(*webAddr, nil))
 

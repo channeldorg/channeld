@@ -3,20 +3,20 @@ package channeld
 import (
 	"testing"
 
-	"channeld.clewcat.com/channeld/proto"
+	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSubscribeToChannel(t *testing.T) {
 	InitLogsAndMetrics()
-	c1 := &Connection{id: 1, connectionType: proto.ConnectionType_SERVER}
+	c1 := &Connection{id: 1, connectionType: channeldpb.ConnectionType_SERVER}
 	//c2 := &Connection{id: 2, connectionType: SERVER}
 	//c3 := &Connection{id: 3, connectionType: CLIENT}
 
 	InitChannels()
 	assert.NotNil(t, globalChannel)
 	// Can't create the GLOBAL channel
-	_, err := CreateChannel(proto.ChannelType_GLOBAL, nil)
+	_, err := CreateChannel(channeldpb.ChannelType_GLOBAL, nil)
 	assert.Error(t, err)
 	// By default, the GLOBAL channel has no owner
 	assert.True(t, !globalChannel.HasOwner())

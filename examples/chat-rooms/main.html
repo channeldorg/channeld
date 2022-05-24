@@ -188,25 +188,25 @@ window.addEventListener("load", function(evt) {
             appendError(err);
             return;
         }
-        proto.Packet = root.lookupType("channeld.Packet");
-        proto.MessagePack = root.lookupType("channeld.MessagePack");
-        proto.ChannelType = root.lookupEnum("channeld.ChannelType");
-        proto.MessageType = root.lookupEnum("channeld.MessageType");
-        proto.CompressionType = root.lookupEnum("channeld.CompressionType");
-        proto.AuthMessage = root.lookupType("channeld.AuthMessage");
-        proto.AuthResultMessage = root.lookupType("channeld.AuthResultMessage");
-        proto.ChannelSubscriptionOptions = root.lookupType("channeld.ChannelSubscriptionOptions");
-        proto.CreateChannelMessage = root.lookupType("channeld.CreateChannelMessage");
-        proto.CreateChannelResultMessage = root.lookupType("channeld.CreateChannelResultMessage");
-        proto.RemoveChannelMessage = root.lookupType("channeld.RemoveChannelMessage");
-        proto.ListChannelMessage = root.lookupType("channeld.ListChannelMessage");
-        proto.ListChannelResultMessage = root.lookupType("channeld.ListChannelResultMessage");
-        proto.ChannelInfo = root.lookupType("channeld.ListChannelResultMessage.ChannelInfo");
-        proto.SubscribedToChannelMessage = root.lookupType("channeld.SubscribedToChannelMessage");
-        proto.SubscribedToChannelResultMessage = root.lookupType("channeld.SubscribedToChannelResultMessage");
-        proto.UnsubscribedFromChannelMessage = root.lookupType("channeld.UnsubscribedFromChannelMessage");
-        proto.UnsubscribedFromChannelResultMessage = root.lookupType("channeld.UnsubscribedFromChannelResultMessage");
-        proto.ChannelDataUpdateMessage = root.lookupType("channeld.ChannelDataUpdateMessage");
+        proto.Packet = root.lookupType("channeldpb.Packet");
+        proto.MessagePack = root.lookupType("channeldpb.MessagePack");
+        proto.ChannelType = root.lookupEnum("channeldpb.ChannelType");
+        proto.MessageType = root.lookupEnum("channeldpb.MessageType");
+        proto.CompressionType = root.lookupEnum("channeldpb.CompressionType");
+        proto.AuthMessage = root.lookupType("channeldpb.AuthMessage");
+        proto.AuthResultMessage = root.lookupType("channeldpb.AuthResultMessage");
+        proto.ChannelSubscriptionOptions = root.lookupType("channeldpb.ChannelSubscriptionOptions");
+        proto.CreateChannelMessage = root.lookupType("channeldpb.CreateChannelMessage");
+        proto.CreateChannelResultMessage = root.lookupType("channeldpb.CreateChannelResultMessage");
+        proto.RemoveChannelMessage = root.lookupType("channeldpb.RemoveChannelMessage");
+        proto.ListChannelMessage = root.lookupType("channeldpb.ListChannelMessage");
+        proto.ListChannelResultMessage = root.lookupType("channeldpb.ListChannelResultMessage");
+        proto.ChannelInfo = root.lookupType("channeldpb.ListChannelResultMessage.ChannelInfo");
+        proto.SubscribedToChannelMessage = root.lookupType("channeldpb.SubscribedToChannelMessage");
+        proto.SubscribedToChannelResultMessage = root.lookupType("channeldpb.SubscribedToChannelResultMessage");
+        proto.UnsubscribedFromChannelMessage = root.lookupType("channeldpb.UnsubscribedFromChannelMessage");
+        proto.UnsubscribedFromChannelResultMessage = root.lookupType("channeldpb.UnsubscribedFromChannelResultMessage");
+        proto.ChannelDataUpdateMessage = root.lookupType("channeldpb.ChannelDataUpdateMessage");
         // Use reflection to create the Any type.
         proto.Any = new protobuf.Type("Any").add(new protobuf.Field("type_url", 1, "string")).add(new protobuf.Field("value", 2, "bytes"));
         root.define("google.protobuf.Any").add(proto.Any);
@@ -216,8 +216,8 @@ window.addEventListener("load", function(evt) {
                 appendError(err);
                 return;
             }
-            proto.ChatMessage = root.lookupType("chat.ChatMessage")
-            proto.ChatChannelData = root.lookupType("chat.ChatChannelData")
+            proto.ChatMessage = root.lookupType("chatpb.ChatMessage")
+            proto.ChatChannelData = root.lookupType("chatpb.ChatChannelData")
 
             for (const key in proto) {
                 var value = proto[key]

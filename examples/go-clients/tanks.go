@@ -5,8 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"channeld.clewcat.com/channeld/proto"
-	protobuf "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -19,14 +18,14 @@ const (
 )
 
 func TanksInitFunc(client *Client, data *clientData) {
-	data.ctx[ctxKeyTanksChannelData] = &proto.TankGameChannelData{}
-	client.AddMessageHandler(uint32(proto.MessageType_AUTH), func(c *Client, channelId uint32, m Message) {
-		resultMsg := m.(*proto.AuthResultMessage)
-		if resultMsg.Result == proto.AuthResultMessage_SUCCESSFUL {
+	data.ctx[ctxKeyTanksChannelData] = &channeldpb.TankGameChannelData{}
+	client.AddMessageHandler(uint32(channeldpb.MessageType_AUTH), func(c *Client, channelId uint32, m Message) {
+		resultMsg := m.(*channeldpb.AuthResultMessage)
+		if resultMsg.Result == channeldpb.AuthResultMessage_SUCCESSFUL {
 			// Re-sub to GLOBAL channel to update the sub options
-			client.Send(0, proto.BroadcastType_NO_BROADCAST, uint32(proto.MessageType_SUB_TO_CHANNEL), &proto.SubscribedToChannelMessage{
+			client.Send(0, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_SUB_TO_CHANNEL), &channeldpb.SubscribedToChannelMessage{
 				ConnId: resultMsg.ConnId,
-				SubOptions: &proto.ChannelSubscriptionOptions{
+				SubOptions: &channeldpb.ChannelSubscriptionOptions{
 					CanUpdateData:    true,
 					FanOutIntervalMs: 10,
 					DataFieldMasks:   []string{},
@@ -34,7 +33,7 @@ func TanksInitFunc(client *Client, data *clientData) {
 			}, nil)
 		}
 	})
-	client.AddMessageHandler(uint32(proto.MessageType_CHANNEL_DATA_UPDATE), wrapTanksChannelDataUpateHandle(data))
+	client.AddMessageHandler(uint32(channeldpb.MessageType_CHANNEL_DATA_UPDATE), wrapTanksChannelDataUpateHandle(data))
 }
 
 var TanksClientActions = []*clientAction{
@@ -43,7 +42,7 @@ var TanksClientActions = []*clientAction{
 		probability: 1,
 		minInterval: time.Millisecond * 200,
 		perform: func(client *Client, data *clientData) bool {
-			tanksChannelData, ok := data.ctx[ctxKeyTanksChannelData].(*proto.TankGameChannelData)
+			tanksChannelData, ok := data.ctx[ctxKeyTanksChannelData].(*channeldpb.TankGameChannelData)
 			if !ok {
 				return false
 			}
@@ -74,8 +73,8 @@ var TanksClientActions = []*clientAction{
 				log.Printf("updating transform (netId=%d) to %s\n", netId, pos.String())
 			*/
 
-			any, err := anypb.New(&proto.TankGameChannelData{
-				TransformStates: map[uint32]*proto.TransformState{
+			any, err := anypb.New(&channeldpb.TankGameChannelData{
+				TransformStates: map[uint32]*channeldpb.TransformState{
 					netId: {
 						//Position: transform.Position,
 						Rotation: transform.Rotation,
@@ -86,7 +85,7 @@ var TanksClientActions = []*clientAction{
 				log.Println(err)
 				return false
 			}
-			client.Send(0, proto.BroadcastType_NO_BROADCAST, uint32(proto.MessageType_CHANNEL_DATA_UPDATE), &proto.ChannelDataUpdateMessage{
+			client.Send(0, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_CHANNEL_DATA_UPDATE), &channeldpb.ChannelDataUpdateMessage{
 				Data: any,
 			}, nil)
 
@@ -118,15 +117,15 @@ var tanksNetIdMapping sync.Map
 
 func wrapTanksChannelDataUpateHandle(data *clientData) MessageHandlerFunc {
 	return func(client *Client, channelId uint32, m Message) {
-		tanksChannelData, ok := data.ctx[ctxKeyTanksChannelData].(*proto.TankGameChannelData)
+		tanksChannelData, ok := data.ctx[ctxKeyTanksChannelData].(*channeldpb.TankGameChannelData)
 		if !ok {
 			log.Println("tanksChannelData is not initialized in the ctx!")
 			return
 		}
-		updateMsg, _ := m.(*proto.ChannelDataUpdateMessage)
-		var channelData proto.TankGameChannelData
+		updateMsg, _ := m.(*channeldpb.ChannelDataUpdateMessage)
+		var channelData channeldpb.TankGameChannelData
 		updateMsg.Data.UnmarshalTo(&channelData)
-		protobuf.Merge(tanksChannelData, &channelData)
+		proto.Merge(tanksChannelData, &channelData)
 
 		if _, exists := data.ctx[ctxKeyClientNetId].(uint32); exists {
 			//log.Printf("received transform (netId=%d): %s\n", netId, tanksChannelData.TransformStates[netId])

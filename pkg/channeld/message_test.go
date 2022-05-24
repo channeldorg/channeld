@@ -6,22 +6,22 @@ import (
 	"testing"
 	"time"
 
-	"channeld.clewcat.com/channeld/proto"
+	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"github.com/stretchr/testify/assert"
-	protobuf "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestHandleListChannels(t *testing.T) {
 	InitLogsAndMetrics()
 	InitChannels()
-	c := addTestConnection(proto.ConnectionType_SERVER)
+	c := addTestConnection(channeldpb.ConnectionType_SERVER)
 	ch0 := globalChannel
-	ch1, _ := CreateChannel(proto.ChannelType_PRIVATE, c)
-	ch2, _ := CreateChannel(proto.ChannelType_SUBWORLD, c)
-	ch3, _ := CreateChannel(proto.ChannelType_SUBWORLD, c)
-	ch4, _ := CreateChannel(proto.ChannelType_TEST, c)
-	ch5, _ := CreateChannel(proto.ChannelType_TEST, c)
-	ch6, _ := CreateChannel(proto.ChannelType_TEST, c)
+	ch1, _ := CreateChannel(channeldpb.ChannelType_PRIVATE, c)
+	ch2, _ := CreateChannel(channeldpb.ChannelType_SUBWORLD, c)
+	ch3, _ := CreateChannel(channeldpb.ChannelType_SUBWORLD, c)
+	ch4, _ := CreateChannel(channeldpb.ChannelType_TEST, c)
+	ch5, _ := CreateChannel(channeldpb.ChannelType_TEST, c)
+	ch6, _ := CreateChannel(channeldpb.ChannelType_TEST, c)
 
 	ch1.metadata = "aaa"
 	ch2.metadata = "bbb"
@@ -31,72 +31,72 @@ func TestHandleListChannels(t *testing.T) {
 	ch6.metadata = "abc"
 
 	handleListChannel(MessageContext{
-		Msg:        &proto.ListChannelMessage{},
+		Msg:        &channeldpb.ListChannelMessage{},
 		Connection: c,
 		Channel:    ch0,
 	})
 	// No filter - all channels match
-	assert.Equal(t, 7, len(c.latestMsg().(*proto.ListChannelResultMessage).Channels))
+	assert.Equal(t, 7, len(c.latestMsg().(*channeldpb.ListChannelResultMessage).Channels))
 
 	handleListChannel(MessageContext{
-		Msg: &proto.ListChannelMessage{
-			TypeFilter: proto.ChannelType_SUBWORLD,
+		Msg: &channeldpb.ListChannelMessage{
+			TypeFilter: channeldpb.ChannelType_SUBWORLD,
 		},
 		Connection: c,
 		Channel:    ch0,
 	})
 	// 2 matches: ch2 and ch3
-	assert.Equal(t, 2, len(c.latestMsg().(*proto.ListChannelResultMessage).Channels))
+	assert.Equal(t, 2, len(c.latestMsg().(*channeldpb.ListChannelResultMessage).Channels))
 
 	handleListChannel(MessageContext{
-		Msg: &proto.ListChannelMessage{
+		Msg: &channeldpb.ListChannelMessage{
 			MetadataFilters: []string{"aa"},
 		},
 		Connection: c,
 		Channel:    ch0,
 	})
 	// 2 matches: ch1 and ch4
-	assert.Equal(t, 2, len(c.latestMsg().(*proto.ListChannelResultMessage).Channels))
+	assert.Equal(t, 2, len(c.latestMsg().(*channeldpb.ListChannelResultMessage).Channels))
 
 	handleListChannel(MessageContext{
-		Msg: &proto.ListChannelMessage{
+		Msg: &channeldpb.ListChannelMessage{
 			MetadataFilters: []string{"bb", "cc"},
 		},
 		Connection: c,
 		Channel:    ch0,
 	})
 	// 3 matches: ch2, ch3, ch5
-	assert.Equal(t, 3, len(c.latestMsg().(*proto.ListChannelResultMessage).Channels))
+	assert.Equal(t, 3, len(c.latestMsg().(*channeldpb.ListChannelResultMessage).Channels))
 
 	handleListChannel(MessageContext{
-		Msg: &proto.ListChannelMessage{
-			TypeFilter:      proto.ChannelType_TEST,
+		Msg: &channeldpb.ListChannelMessage{
+			TypeFilter:      channeldpb.ChannelType_TEST,
 			MetadataFilters: []string{"a", "b", "c"},
 		},
 		Connection: c,
 		Channel:    ch0,
 	})
 	// 3 matches: ch4, ch5, ch6
-	assert.Equal(t, 3, len(c.latestMsg().(*proto.ListChannelResultMessage).Channels))
+	assert.Equal(t, 3, len(c.latestMsg().(*channeldpb.ListChannelResultMessage).Channels))
 
 	handleListChannel(MessageContext{
-		Msg: &proto.ListChannelMessage{
+		Msg: &channeldpb.ListChannelMessage{
 			MetadataFilters: []string{"z"},
 		},
 		Connection: c,
 		Channel:    ch0,
 	})
 	// no match
-	assert.Equal(t, 0, len(c.latestMsg().(*proto.ListChannelResultMessage).Channels))
+	assert.Equal(t, 0, len(c.latestMsg().(*channeldpb.ListChannelResultMessage).Channels))
 }
 
 func TestMessageHandlers(t *testing.T) {
-	for name, value := range proto.MessageType_value {
-		msgType := proto.MessageType(value)
-		if msgType == proto.MessageType_INVALID {
+	for name, value := range channeldpb.MessageType_value {
+		msgType := channeldpb.MessageType(value)
+		if msgType == channeldpb.MessageType_INVALID {
 			continue
 		}
-		if msgType >= proto.MessageType_USER_SPACE_START {
+		if msgType >= channeldpb.MessageType_USER_SPACE_START {
 			continue
 		}
 		assert.NotNil(t, MessageMap[msgType], "Missing handler func for message type %s", name)
@@ -105,17 +105,17 @@ func TestMessageHandlers(t *testing.T) {
 
 func TestMessageTypeConversion(t *testing.T) {
 	var n uint32 = 1
-	msgType1 := proto.MessageType(n)
-	assert.Equal(t, proto.MessageType_AUTH, msgType1)
-	msgType2 := proto.MessageType(uint32(999))
+	msgType1 := channeldpb.MessageType(n)
+	assert.Equal(t, channeldpb.MessageType_AUTH, msgType1)
+	msgType2 := channeldpb.MessageType(uint32(999))
 	t.Log(msgType2)
-	_, exists := proto.MessageType_name[int32(msgType2)]
+	_, exists := channeldpb.MessageType_name[int32(msgType2)]
 	assert.False(t, exists)
 }
 
 func BenchmarkProtobufMessagePack(b *testing.B) {
-	mp := &proto.MessagePack{
-		Broadcast: proto.BroadcastType_ALL,
+	mp := &channeldpb.MessagePack{
+		Broadcast: channeldpb.BroadcastType_ALL,
 		StubId:    0,
 		MsgType:   8,
 		//BodySize:  0,
@@ -126,7 +126,7 @@ func BenchmarkProtobufMessagePack(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// randomize the channel id between [0, 100)
 		mp.ChannelId = uint32(time.Now().Nanosecond() % 100)
-		bytes, _ := protobuf.Marshal(mp)
+		bytes, _ := proto.Marshal(mp)
 		size += len(bytes)
 	}
 	b.Logf("Average packet size: %.2f", float64(size)/float64(b.N))
@@ -161,17 +161,17 @@ func BenchmarkRawMessagePack(b *testing.B) {
 }
 
 func TestMessageCopy(t *testing.T) {
-	msg := MessageMap[proto.MessageType_CREATE_CHANNEL].msg
-	msgCopy := protobuf.Clone(msg).(*proto.CreateChannelMessage)
-	assert.NotEqual(t, MessageMap[proto.MessageType_CREATE_CHANNEL].msg, msgCopy)
+	msg := MessageMap[channeldpb.MessageType_CREATE_CHANNEL].msg
+	msgCopy := proto.Clone(msg).(*channeldpb.CreateChannelMessage)
+	assert.NotEqual(t, MessageMap[channeldpb.MessageType_CREATE_CHANNEL].msg, msgCopy)
 
-	createChannelMsg := &proto.CreateChannelMessage{}
+	createChannelMsg := &channeldpb.CreateChannelMessage{}
 	assert.IsType(t, msg, createChannelMsg)
 	assert.IsType(t, msgCopy, createChannelMsg)
 
-	msgCopy.ChannelType = proto.ChannelType_GLOBAL
-	protobuf.Reset(msg)
-	assert.Equal(t, proto.ChannelType_GLOBAL, msgCopy.ChannelType)
-	protobuf.Reset(msgCopy)
-	assert.Equal(t, proto.ChannelType_UNKNOWN, msgCopy.ChannelType)
+	msgCopy.ChannelType = channeldpb.ChannelType_GLOBAL
+	proto.Reset(msg)
+	assert.Equal(t, channeldpb.ChannelType_GLOBAL, msgCopy.ChannelType)
+	proto.Reset(msgCopy)
+	assert.Equal(t, channeldpb.ChannelType_UNKNOWN, msgCopy.ChannelType)
 }

@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package channeld;
+package channeldpb;
 
-option go_package = "/proto";
+option go_package = "channeld.clewcat.com/channeld/pkg/channeldpb";
 option csharp_namespace = "Channeld";
 
 message Vector3f {
