@@ -106,7 +106,7 @@ func TestFanOutChannelData(t *testing.T) {
 
 	// U1 arrives
 	u1 := &proto.TestChannelDataMessage{Text: "b"}
-	testChannel.Data().OnUpdate(u1, channelStartTime.AddMs(60))
+	testChannel.Data().OnUpdate(u1, channelStartTime.AddMs(60), nil)
 
 	// F2 = U1
 	testChannel.tickData(channelStartTime.AddMs(100))
@@ -119,7 +119,7 @@ func TestFanOutChannelData(t *testing.T) {
 
 	// U2 arrives
 	u2 := &proto.TestChannelDataMessage{Text: "c"}
-	testChannel.Data().OnUpdate(u2, channelStartTime.AddMs(120))
+	testChannel.Data().OnUpdate(u2, channelStartTime.AddMs(120), nil)
 
 	// F8=U1+U2; F3 = U2
 	testChannel.tickData(channelStartTime.AddMs(150))
@@ -148,7 +148,7 @@ func BenchmarkCustomMergeMap(b *testing.B) {
 	mergeOptions := &proto.ChannelDataMergeOptions{ShouldCheckRemovableMapField: true}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		mergeWithOptions(dst, src, mergeOptions)
+		mergeWithOptions(dst, src, mergeOptions, nil)
 	}
 
 	// Protoreflect merge:
@@ -222,7 +222,7 @@ func TestDataMergeOptions(t *testing.T) {
 	mergeOptions1 := &proto.ChannelDataMergeOptions{
 		ShouldReplaceList: true,
 	}
-	mergeWithOptions(mergedMsg1, srcMsg, mergeOptions1)
+	mergeWithOptions(mergedMsg1, srcMsg, mergeOptions1, nil)
 	assert.Equal(t, 2, len(mergedMsg1.List))
 	assert.Equal(t, "e", mergedMsg1.List[1])
 
@@ -230,11 +230,11 @@ func TestDataMergeOptions(t *testing.T) {
 	mergeOptions2 := &proto.ChannelDataMergeOptions{
 		ListSizeLimit: 4,
 	}
-	mergeWithOptions(mergedMsg2, srcMsg, mergeOptions2) // [a,b,c,d]
+	mergeWithOptions(mergedMsg2, srcMsg, mergeOptions2, nil) // [a,b,c,d]
 	assert.Equal(t, 4, len(mergedMsg2.List))
 	assert.Equal(t, "d", mergedMsg2.List[3])
 	mergeOptions2.TruncateTop = true
-	mergeWithOptions(mergedMsg2, srcMsg, mergeOptions2) // [c,d,d,e]
+	mergeWithOptions(mergedMsg2, srcMsg, mergeOptions2, nil) // [c,d,d,e]
 	assert.Equal(t, "c", mergedMsg2.List[0])
 	assert.Equal(t, "e", mergedMsg2.List[3])
 
@@ -244,7 +244,7 @@ func TestDataMergeOptions(t *testing.T) {
 	}
 	srcBytes, _ := protobuf.Marshal(srcMsg)
 	protobuf.Unmarshal(srcBytes, srcMsg)
-	mergeWithOptions(mergedMsg3, srcMsg, mergeOptions3)
+	mergeWithOptions(mergedMsg3, srcMsg, mergeOptions3, nil)
 	assert.Equal(t, 1, len(mergedMsg3.Kv))
 	_, exists := mergedMsg3.Kv[1]
 	assert.False(t, exists)

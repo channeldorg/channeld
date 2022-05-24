@@ -165,6 +165,8 @@ func StartListening(t proto.ConnectionType, network string, address string) {
 }
 
 func AddConnection(c net.Conn, t proto.ConnectionType) *Connection {
+	// TODO: check if the connections map is full
+	// Should use mutex to lock the map while checking
 	atomic.AddUint64(&nextConnectionId, 1)
 	connection := &Connection{
 		id:              ConnectionId(nextConnectionId),

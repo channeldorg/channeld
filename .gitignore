@@ -3,3 +3,6 @@
 *.pprof
 *.log
 _data
+/vendor
+.devcontainer/devcontainer.json
+cmd/gen_proto.sh

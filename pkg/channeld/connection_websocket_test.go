@@ -14,11 +14,19 @@ import (
 )
 
 func getBenchmarkBytes() []byte {
-	bytes, _ := protobuf.Marshal(&proto.ChatMessage{
-		Sender:   "guest12345",
-		SendTime: time.Now().Unix(),
-		Content:  "Mary had a little lamb",
-	})
+	testMsg := &proto.TestMapMessage{
+		Kv:  make(map[uint32]string),
+		Kv2: make(map[uint32]*proto.TestMapMessage_StringWrapper),
+	}
+	testMsg.Kv[1] = "a"
+	testMsg.Kv[2] = "b"
+	testMsg.Kv[3] = "c"
+	testMsg.Kv[4] = "d"
+
+	testMsg.Kv2[1] = &proto.TestMapMessage_StringWrapper{Content: "a"}
+	testMsg.Kv2[2] = &proto.TestMapMessage_StringWrapper{Content: "b", Num: 2}
+
+	bytes, _ := protobuf.Marshal(testMsg)
 	return bytes
 }
 

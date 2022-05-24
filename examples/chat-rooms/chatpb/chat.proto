@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package chat;
+package chatpb;
 
-option go_package = "/proto";
+option go_package = "/examples/chat-rooms/chatpb";
 
 message ChatMessage {
     string sender = 1;

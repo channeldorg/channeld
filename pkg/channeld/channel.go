@@ -56,6 +56,7 @@ type Channel struct {
 	subscribedConnections map[ConnectionInChannel]*ChannelSubscription
 	metadata              string // Read-only property, e.g. name
 	data                  *ChannelData
+	spatialNotifier       SpatialInfoChangedNotifier
 	inMsgQueue            chan channelMessage
 	fanOutQueue           *list.List
 	startTime             time.Time // Time since channel created
@@ -74,17 +75,16 @@ var nextChannelId ChannelId
 var nextSpatialChannelId ChannelId
 
 // Cache the status so we don't have to check all the index in the sync map, until a channel is removed.
-var channelFull bool = false
+var nonSpatialchannelFull bool = false
 var spatialChannelFull bool = false
 
 var allChannels sync.Map //map[ChannelId]*Channel
 var globalChannel *Channel
 
 func InitChannels() {
-	nextChannelId = GlobalChannelId
+	nextChannelId = 0
 	nextSpatialChannelId = GlobalSettings.SpatialChannelIdStart
 	globalChannel, _ = CreateChannel(proto.ChannelType_GLOBAL, nil)
-	allChannels.Store(GlobalChannelId, globalChannel)
 }
 
 func GetChannel(id ChannelId) *Channel {
@@ -105,24 +105,25 @@ func CreateChannel(t proto.ChannelType, owner *Connection) (*Channel, error) {
 	}
 
 	var channelId ChannelId
+	var ok bool
 	if t != proto.ChannelType_SPATIAL {
-		if channelFull {
+		if nonSpatialchannelFull {
 			return nil, ErrNonSpatialChannelFull
 		}
-		channelId, ok := GetNextIdSync(&allChannels, uint(nextChannelId), 1, uint(GlobalSettings.SpatialChannelIdStart)-1)
+		channelId, ok = GetNextIdSync(&allChannels, nextChannelId, 1, GlobalSettings.SpatialChannelIdStart-1)
 		if ok {
-			nextChannelId = ChannelId(channelId)
+			nextChannelId = channelId
 		} else {
-			channelFull = true
+			nonSpatialchannelFull = true
 			return nil, ErrNonSpatialChannelFull
 		}
 	} else {
 		if spatialChannelFull {
 			return nil, ErrSpatialChannelFull
 		}
-		channelId, ok := GetNextIdSync(&allChannels, uint(nextSpatialChannelId), uint(GlobalSettings.SpatialChannelIdStart), math.MaxUint32)
+		channelId, ok = GetNextIdSync(&allChannels, nextSpatialChannelId, GlobalSettings.SpatialChannelIdStart, math.MaxUint32)
 		if ok {
-			nextSpatialChannelId = ChannelId(channelId)
+			nextSpatialChannelId = channelId
 		} else {
 			spatialChannelFull = true
 			return nil, ErrSpatialChannelFull
@@ -148,6 +149,18 @@ func CreateChannel(t proto.ChannelType, owner *Connection) (*Channel, error) {
 		),
 		removing: 0,
 	}
+	if ch.channelType == proto.ChannelType_SPATIAL {
+		ch.spatialNotifier = &StaticGrid2DSpatialController{
+			channel:      ch,
+			WorldOffsetX: -40,
+			WorldOffsetZ: -40,
+			GridWidth:    8,
+			GridHeight:   8,
+			GridCols:     10,
+			GridRows:     10,
+		}
+	}
+
 	if owner == nil {
 		ch.state = INIT
 	} else {
@@ -169,8 +182,10 @@ func RemoveChannel(ch *Channel) {
 	// Reset the channel full status cache
 	if ch.channelType == proto.ChannelType_SPATIAL {
 		spatialChannelFull = false
+		nextSpatialChannelId = ch.id
 	} else {
-		channelFull = false
+		nonSpatialchannelFull = false
+		nextChannelId = ch.id
 	}
 
 	channelNum.WithLabelValues(ch.channelType.String()).Dec()

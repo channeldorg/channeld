@@ -825,6 +825,7 @@ func (x *ChannelDataMergeOptions) GetShouldCheckRemovableMapField() bool {
 
 // The packet should have channelId = 0 in order to be handled.
 // Response: @CreateChannelResultMessage. The channelId in the response MessagePack corresponds to the created channel. The GLOBAL channel owner will also receive this message.
+// Response: @SubscribedToChannelResultMessage. The channel creator will also be subscripbed to the channel immediately after the creation.
 type CreateChannelMessage struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

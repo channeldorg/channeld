@@ -12,6 +12,7 @@ import (
 
 	"channeld.clewcat.com/channeld/pkg/channeld"
 	"channeld.clewcat.com/channeld/proto"
+	"channeld.clewcat.com/examples/chat-rooms/chatpb"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -28,7 +29,7 @@ func handleChanneldProto(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleChatProto(w http.ResponseWriter, r *http.Request) {
-	bytes, err := os.ReadFile("../../proto/example_chat_rooms.proto")
+	bytes, err := os.ReadFile("./chatpb/chat.proto")
 	if err != nil {
 		log.Panic(err)
 	}
@@ -70,7 +71,7 @@ func main() {
 	channeld.InitConnections("../../config/server_authoratative_fsm.json", "../../config/client_authoratative_fsm.json")
 	channeld.InitChannels()
 	channeld.GetChannel(channeld.GlobalChannelId).InitData(
-		&proto.ChatChannelData{ChatMessages: []*proto.ChatMessage{
+		&chatpb.ChatChannelData{ChatMessages: []*chatpb.ChatMessage{
 			{Sender: "System", SendTime: time.Now().Unix(), Content: "Welcome!"},
 		}},
 		&proto.ChannelDataMergeOptions{

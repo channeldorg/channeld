@@ -1,10 +1,10 @@
 syntax = "proto3";
 
-package tanks;
+package tankspb;
 
-import "unity_common.proto";
+import "proto/unity_common.proto";
 
-option go_package = "/proto";
+option go_package = "/examples/unity-mirror-tanks/tankspb";
 option csharp_namespace = "Channeld.Examples.Tanks";
 
 message TankState {

@@ -71,11 +71,11 @@ func (ch *Channel) Data() *ChannelData {
 	return ch.data
 }
 
-func (d *ChannelData) OnUpdate(updateMsg Message, t ChannelTime) {
+func (d *ChannelData) OnUpdate(updateMsg Message, t ChannelTime, spatialNotifier SpatialInfoChangedNotifier) {
 	if d.msg == nil {
 		d.msg = updateMsg
 	} else {
-		mergeWithOptions(d.msg, updateMsg, d.mergeOptions)
+		mergeWithOptions(d.msg, updateMsg, d.mergeOptions, spatialNotifier)
 	}
 
 	d.updateMsgBuffer.PushBack(&updateMsgBufferElement{
@@ -145,7 +145,7 @@ func (ch *Channel) tickData(t ChannelTime) {
 						if accumulatedUpdateMsg == nil {
 							accumulatedUpdateMsg = protobuf.Clone(be.updateMsg)
 						} else {
-							mergeWithOptions(accumulatedUpdateMsg, be.updateMsg, ch.data.mergeOptions)
+							mergeWithOptions(accumulatedUpdateMsg, be.updateMsg, ch.data.mergeOptions, nil)
 						}
 						lastUpdateTime = be.arrivalTime
 					}
@@ -204,12 +204,13 @@ func postMergeMapKV(dst, src protoreflect.Map, k protoreflect.MapKey, v protoref
 }
 */
 
+// Implement this interface to manually merge the channel data. It will be MUCH more efficient than the default reflection-based merge.
 type MergeableChannelData interface {
 	Message
-	Merge(src Message, options *proto.ChannelDataMergeOptions) error
+	Merge(src Message, options *proto.ChannelDataMergeOptions, spatialNotifier SpatialInfoChangedNotifier) error
 }
 
-func mergeWithOptions(dst Message, src Message, options *proto.ChannelDataMergeOptions) {
+func mergeWithOptions(dst Message, src Message, options *proto.ChannelDataMergeOptions, spatialNotifier SpatialInfoChangedNotifier) {
 	mergeable, ok := dst.(MergeableChannelData)
 	if ok {
 		if options == nil {
@@ -220,7 +221,7 @@ func mergeWithOptions(dst Message, src Message, options *proto.ChannelDataMergeO
 				ShouldCheckRemovableMapField: true,
 			}
 		}
-		if err := mergeable.Merge(src, options); err != nil {
+		if err := mergeable.Merge(src, options, spatialNotifier); err != nil {
 			logger.Error("custom merge error", zap.Error(err),
 				zap.String("dstType", string(dst.ProtoReflect().Descriptor().FullName().Name())),
 				zap.String("srcType", string(src.ProtoReflect().Descriptor().FullName().Name())),

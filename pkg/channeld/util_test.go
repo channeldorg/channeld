@@ -8,8 +8,8 @@ import (
 )
 
 func TestGetNextId(t *testing.T) {
-	m := make(map[uint]interface{})
-	var index uint = 1
+	m := make(map[uint32]interface{})
+	var index uint32 = 1
 	var ok bool
 
 	index, _ = GetNextId(&m, index, 1, 3)
@@ -25,12 +25,12 @@ func TestGetNextId(t *testing.T) {
 	m[index] = "ccc"
 
 	_, ok = GetNextId(&m, index, 1, 3)
-	assert.True(t, ok)
+	assert.False(t, ok)
 }
 
 func BenchmarkGetNextId(b *testing.B) {
-	m := make(map[uint]interface{})
-	var index uint = 1
+	m := make(map[uint32]interface{})
+	var index uint32 = 1
 	var ok bool
 
 	for i := 0; i < b.N; i++ {
@@ -45,7 +45,7 @@ func BenchmarkGetNextId(b *testing.B) {
 
 func TestGetNextIdSync(t *testing.T) {
 	m := sync.Map{}
-	var index uint = 1
+	var index ChannelId = 1
 	var ok bool
 
 	index, _ = GetNextIdSync(&m, index, 1, 3)
@@ -61,14 +61,14 @@ func TestGetNextIdSync(t *testing.T) {
 	m.Store(index, "ccc")
 
 	_, ok = GetNextIdSync(&m, index, 1, 3)
-	assert.True(t, ok)
+	assert.False(t, ok)
 
 }
 
 // 3x slower as of BenchmarkGetNextId
 func BenchmarkGetNextIdSync(b *testing.B) {
 	m := sync.Map{}
-	var index uint = 1
+	var index ChannelId = 1
 	var ok bool
 
 	for i := 0; i < b.N; i++ {

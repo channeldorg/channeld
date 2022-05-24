@@ -417,11 +417,13 @@ func handleChannelDataUpdate(ctx MessageContext) {
 	}
 	updateMsg, err := msg.Data.UnmarshalNew()
 	if err != nil {
-		ctx.Connection.Logger().Error("failed to unmarshal channel update data", zap.Error(err))
+		ctx.Connection.Logger().Error("failed to unmarshal channel update data", zap.Error(err),
+			zap.String("channelType", ctx.Channel.channelType.String()),
+			zap.String("typeUrl", msg.Data.TypeUrl))
 		return
 	}
 
-	ctx.Channel.Data().OnUpdate(updateMsg, ctx.Channel.GetTime())
+	ctx.Channel.Data().OnUpdate(updateMsg, ctx.Channel.GetTime(), ctx.Channel.spatialNotifier)
 }
 
 func handleDisconnect(ctx MessageContext) {
