@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"sync"
 
 	"go.uber.org/zap"
 )
@@ -31,6 +32,7 @@ type FiniteStateMachine struct {
 
 	currentState *State
 	stateNameMap map[string]*State
+	lock         *sync.RWMutex
 }
 
 func parseMsgTypes(s string, f func(msgType uint32)) {
@@ -81,6 +83,7 @@ func Load(bytes []byte) (FiniteStateMachine, error) {
 	if err == nil {
 		fsm.currentState = &fsm.States[0]
 		fsm.stateNameMap = make(map[string]*State, len(fsm.States))
+		fsm.lock = &sync.RWMutex{}
 
 		for idx := range fsm.States {
 			state := &fsm.States[idx]
@@ -117,10 +120,20 @@ func Load(bytes []byte) (FiniteStateMachine, error) {
 }
 
 func (fsm *FiniteStateMachine) IsAllowed(msgType uint32) bool {
+	fsm.lock.RLock()
+	defer func() {
+		fsm.lock.RUnlock()
+	}()
+
 	return fsm.currentState.allowedMsgTypes[msgType]
 }
 
 func (fsm *FiniteStateMachine) OnReceived(msgType uint32) {
+	fsm.lock.Lock()
+	defer func() {
+		fsm.lock.Unlock()
+	}()
+
 	newState := fsm.currentState.transitions[msgType]
 	if newState != nil {
 		fsm.currentState = newState
@@ -128,10 +141,19 @@ func (fsm *FiniteStateMachine) OnReceived(msgType uint32) {
 }
 
 func (fsm *FiniteStateMachine) CurrentState() *State {
+	fsm.lock.RLock()
+	defer func() {
+		fsm.lock.RUnlock()
+	}()
 	return fsm.currentState
 }
 
 func (fsm *FiniteStateMachine) ChangeState(name string) error {
+	fsm.lock.Lock()
+	defer func() {
+		fsm.lock.Unlock()
+	}()
+
 	state, exists := fsm.stateNameMap[name]
 	if exists {
 		fsm.currentState = state
@@ -141,6 +163,11 @@ func (fsm *FiniteStateMachine) ChangeState(name string) error {
 }
 
 func (fsm *FiniteStateMachine) MoveToNextState() bool {
+	fsm.lock.Lock()
+	defer func() {
+		fsm.lock.Unlock()
+	}()
+
 	for i := 0; i < len(fsm.States)-1; i++ {
 		if fsm.currentState == &fsm.States[i] {
 			fsm.currentState = &fsm.States[i+1]
