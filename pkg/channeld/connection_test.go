@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"channeld.clewcat.com/channeld/internal/testpb"
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
@@ -33,7 +34,7 @@ func TestDropPacket(t *testing.T) {
 	pipeWriter.Write([]byte{1, 2, 3, 4, 5, 6})
 	time.Sleep(time.Millisecond * 100)
 
-	msg := &channeldpb.TestChannelDataMessage{Text: "abc", Num: 123}
+	msg := &testpb.TestChannelDataMessage{Text: "abc", Num: 123}
 	msgBody, _ := proto.Marshal(msg)
 	p := &channeldpb.Packet{
 		Messages: []*channeldpb.MessagePack{

@@ -52,11 +52,17 @@ enum ConnectionType {
 
 enum ChannelType {
     UNKNOWN = 0;
-    GLOBAL = 1;   // Default channel. Any message without ChannelId specified will be sent to this channel.
-    PRIVATE = 2;  // Per-connection channel. Useful to store the user data and subscribe the client to the data update.
-    SUBWORLD = 3; // A game "room" in a session-based game, or a level in an MMORPG. Subworlds are spatially divided thus the interests are isolated.
-    SPATIAL = 4;  // Spatial channels are spatailly connected. Using this channel to implement a seamless open world.
-    TEST = 100;   // The following are for tests.
+    // Default channel. Any message without ChannelId specified will be sent to this channel.
+    GLOBAL = 1;
+    // Per-connection channel. Useful to store the user data and subscribe the client to the data update.
+    PRIVATE = 2;
+    // A game "room" in a session-based game, or a "dungeon" in an MMORPG. Subworlds are spatially divided thus the interests are isolated.
+    SUBWORLD = 3;
+    // Spatial channels are spatailly connected. Using this type of channel to implement a seamless open world which consists of servers, and each server simulates a part of the world. 
+    // Only server connections can create the spatail channel.
+    SPATIAL = 4;
+    // The following are for tests.
+    TEST = 100;
     TEST1 = 101;
     TEST2 = 102;
     TEST3 = 103;
@@ -74,6 +80,7 @@ enum MessageType {
     UNSUB_FROM_CHANNEL = 7;
     CHANNEL_DATA_UPDATE = 8;
     DISCONNECT = 9;
+    CHANNEL_DATA_HANDOVER = 10;
     USER_SPACE_START = 100;
 }
 
@@ -214,6 +221,19 @@ message DisconnectMessage {
     uint32 connId = 1;
 }
 
+// ----------------- START OF SPATIAL MESSAGES --------------------//
+
+message CreateSpatialChannelsResultMessage {
+    repeated uint32 spatialChannelId = 1;
+    string metadata = 2;
+    uint32 ownerConnId = 3;
+}
+
+message ChannelDataHandoverMessage {
+    uint32 srcChannelId = 1;
+    uint32 dstChannelId = 2;
+    google.protobuf.Any data = 3;
+}
 
 message Location {
     double x = 1;
@@ -228,3 +248,12 @@ message SpatialEntityInfo {
 message SpatialChannelDataMessage {
     map<uint32, SpatialEntityInfo> entities = 1;
 }
+
+// ------------------ END SPATIAL MESSAGES ---------------------//
+
+
+
+// ----------------- START OF INTERNAL MESSAGES --------------------//
+
+
+// ------------------ END INTERNAL MESSAGES ---------------------//

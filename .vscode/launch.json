@@ -43,7 +43,7 @@
         "request": "launch",
         "mode": "debug",
         "cwd": "${workspaceFolder}",
-        "program": "cmd/main.go",
+        "program": "examples/unity-mirror-tanks/main.go",
         "args": ["-cfsm=config/client_authoratative_fsm.json", "-dev", "-loglevel=0", "-profile=cpu", "-ct=0"]
     }
     ]

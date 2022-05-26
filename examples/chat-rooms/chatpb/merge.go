@@ -3,12 +3,12 @@ package chatpb
 import (
 	"errors"
 
-	"channeld.clewcat.com/channeld/pkg/channeld"
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
+	"channeld.clewcat.com/channeld/pkg/common"
 	"google.golang.org/protobuf/proto"
 )
 
-func (dst *ChatChannelData) Merge(src proto.Message, options *channeldpb.ChannelDataMergeOptions, spatialNotifier channeld.SpatialInfoChangedNotifier) error {
+func (dst *ChatChannelData) Merge(src proto.Message, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) error {
 	srcMsg, ok := src.(*ChatChannelData)
 	if !ok {
 		return errors.New("src is not a ChatChannelData")

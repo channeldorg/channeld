@@ -81,14 +81,14 @@ func (c *Connection) sendConnUnsubscribed(connId ConnectionId, ids ...ChannelId)
 }
 */
 
-func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel, connToSub *Connection, stubId uint32, subOptions *channeldpb.ChannelSubscriptionOptions) {
+func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel, connToSub ConnectionInChannel, stubId uint32, subOptions *channeldpb.ChannelSubscriptionOptions) {
 	ctx.Channel = ch
 	ctx.StubId = stubId
 	ctx.MsgType = channeldpb.MessageType_SUB_TO_CHANNEL
 	ctx.Msg = &channeldpb.SubscribedToChannelResultMessage{
-		ConnId:      uint32(connToSub.id),
+		ConnId:      uint32(connToSub.Id()),
 		SubOptions:  subOptions,
-		ConnType:    connToSub.connectionType,
+		ConnType:    connToSub.GetConnectionType(),
 		ChannelType: ch.channelType,
 	}
 	// ctx.Msg = &channeldpb.SubscribedToChannelMessage{

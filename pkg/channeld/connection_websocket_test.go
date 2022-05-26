@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"channeld.clewcat.com/channeld/pkg/channeldpb"
+	"channeld.clewcat.com/channeld/internal/testpb"
 	"github.com/gorilla/websocket"
 	"google.golang.org/protobuf/proto"
 
@@ -15,17 +15,17 @@ import (
 )
 
 func getBenchmarkBytes() []byte {
-	testMsg := &channeldpb.TestMapMessage{
+	testMsg := &testpb.TestMapMessage{
 		Kv:  make(map[uint32]string),
-		Kv2: make(map[uint32]*channeldpb.TestMapMessage_StringWrapper),
+		Kv2: make(map[uint32]*testpb.TestMapMessage_StringWrapper),
 	}
 	testMsg.Kv[1] = "a"
 	testMsg.Kv[2] = "b"
 	testMsg.Kv[3] = "c"
 	testMsg.Kv[4] = "d"
 
-	testMsg.Kv2[1] = &channeldpb.TestMapMessage_StringWrapper{Content: "a"}
-	testMsg.Kv2[2] = &channeldpb.TestMapMessage_StringWrapper{Content: "b", Num: 2}
+	testMsg.Kv2[1] = &testpb.TestMapMessage_StringWrapper{Content: "a"}
+	testMsg.Kv2[2] = &testpb.TestMapMessage_StringWrapper{Content: "b", Num: 2}
 
 	bytes, _ := proto.Marshal(testMsg)
 	return bytes

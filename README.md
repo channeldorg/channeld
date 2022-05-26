@@ -55,7 +55,7 @@ After starting the server, browse to http://localhost:8080.
 Use the input box at the bottom to send messages, to the GLOBAL channel by default. The input box can also be used to send commands, which are started with '/'. The supported commands are:
 
 * `list [typeFilter] [metadataFilter1],[metadataFilter2],...` // the result format is `Channel(<ChannelTypeName> <ChannelId>)`
-* `create <channelType> <metadata>` // the channelType is an integer. See the ChannelType enum value defined in [the proto](proto/channeld.proto) file
+* `create <channelType> <metadata>` // the channelType is an integer. See the ChannelType enum value defined in [the proto](pkg/channeldpb/channeld.proto) file
 * `remove <channelId>` // only the channel creator has the permission to remove the channel.
 * `sub <channelId>` // subscribe to the channel
 * `unsub <channelId>` // unsubscribe from the channel

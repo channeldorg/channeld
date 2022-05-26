@@ -496,6 +496,14 @@ func (c *Connection) Id() ConnectionId {
 	return c.id
 }
 
+func (c *Connection) GetConnectionType() channeldpb.ConnectionType {
+	return c.connectionType
+}
+
+func (c *Connection) OnAuthenticated() {
+	c.fsm.MoveToNextState()
+}
+
 func (c *Connection) String() string {
 	return fmt.Sprintf("Connection(%s %d %s)", c.connectionType, c.id, c.fsm.CurrentState().Name)
 }

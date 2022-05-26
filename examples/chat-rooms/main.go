@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"channeld.clewcat.com/channeld/examples/chat-rooms/chatpb"
 	"channeld.clewcat.com/channeld/pkg/channeld"
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
-	"channeld.clewcat.com/examples/chat-rooms/chatpb"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 

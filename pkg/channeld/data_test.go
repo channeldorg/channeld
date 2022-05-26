@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"channeld.clewcat.com/channeld/internal/testpb"
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"github.com/indiest/fmutils"
 	"github.com/stretchr/testify/assert"
@@ -76,7 +77,7 @@ func TestFanOutChannelData(t *testing.T) {
 	c2 := addTestConnectionWithProcessor(channeldpb.ConnectionType_CLIENT, testChannelDataMessageProcessor)
 
 	testChannel, _ := CreateChannel(channeldpb.ChannelType_TEST, c0)
-	dataMsg := &channeldpb.TestChannelDataMessage{
+	dataMsg := &testpb.TestChannelDataMessage{
 		Text: "a",
 		Num:  1,
 	}
@@ -94,7 +95,7 @@ func TestFanOutChannelData(t *testing.T) {
 	testChannel.tickData(channelStartTime)
 	assert.Equal(t, 1, len(c1.testQueue()))
 	assert.Equal(t, 0, len(c2.testQueue()))
-	assert.EqualValues(t, dataMsg.Num, c1.latestMsg().(*channeldpb.TestChannelDataMessage).Num)
+	assert.EqualValues(t, dataMsg.Num, c1.latestMsg().(*testpb.TestChannelDataMessage).Num)
 
 	c2.SubscribeToChannel(testChannel, &channeldpb.ChannelSubscriptionOptions{
 		FanOutIntervalMs: 100,
@@ -103,10 +104,10 @@ func TestFanOutChannelData(t *testing.T) {
 	testChannel.tickData(channelStartTime.AddMs(50))
 	assert.Equal(t, 1, len(c1.testQueue()))
 	assert.Equal(t, 1, len(c2.testQueue()))
-	assert.EqualValues(t, dataMsg.Num, c2.latestMsg().(*channeldpb.TestChannelDataMessage).Num)
+	assert.EqualValues(t, dataMsg.Num, c2.latestMsg().(*testpb.TestChannelDataMessage).Num)
 
 	// U1 arrives
-	u1 := &channeldpb.TestChannelDataMessage{Text: "b"}
+	u1 := &testpb.TestChannelDataMessage{Text: "b"}
 	testChannel.Data().OnUpdate(u1, channelStartTime.AddMs(60), nil)
 
 	// F2 = U1
@@ -114,35 +115,35 @@ func TestFanOutChannelData(t *testing.T) {
 	assert.Equal(t, 2, len(c1.testQueue()))
 	assert.Equal(t, 1, len(c2.testQueue()))
 	// U1 doesn't have "ClientConnNum" property
-	assert.NotEqualValues(t, dataMsg.Num, c1.latestMsg().(*channeldpb.TestChannelDataMessage).Num)
-	assert.EqualValues(t, "b", c1.latestMsg().(*channeldpb.TestChannelDataMessage).Text)
-	assert.EqualValues(t, "a", c2.latestMsg().(*channeldpb.TestChannelDataMessage).Text)
+	assert.NotEqualValues(t, dataMsg.Num, c1.latestMsg().(*testpb.TestChannelDataMessage).Num)
+	assert.EqualValues(t, "b", c1.latestMsg().(*testpb.TestChannelDataMessage).Text)
+	assert.EqualValues(t, "a", c2.latestMsg().(*testpb.TestChannelDataMessage).Text)
 
 	// U2 arrives
-	u2 := &channeldpb.TestChannelDataMessage{Text: "c"}
+	u2 := &testpb.TestChannelDataMessage{Text: "c"}
 	testChannel.Data().OnUpdate(u2, channelStartTime.AddMs(120), nil)
 
 	// F8=U1+U2; F3 = U2
 	testChannel.tickData(channelStartTime.AddMs(150))
 	assert.Equal(t, 3, len(c1.testQueue()))
 	assert.Equal(t, 2, len(c2.testQueue()))
-	assert.EqualValues(t, "c", c1.latestMsg().(*channeldpb.TestChannelDataMessage).Text)
-	assert.EqualValues(t, "c", c2.latestMsg().(*channeldpb.TestChannelDataMessage).Text)
+	assert.EqualValues(t, "c", c1.latestMsg().(*testpb.TestChannelDataMessage).Text)
+	assert.EqualValues(t, "c", c2.latestMsg().(*testpb.TestChannelDataMessage).Text)
 }
 
 func BenchmarkCustomMergeMap(b *testing.B) {
-	dst := &channeldpb.TestMergeMessage{
-		Kv: map[int64]*channeldpb.TestMergeMessage_StringWrapper{},
+	dst := &testpb.TestMergeMessage{
+		Kv: map[int64]*testpb.TestMergeMessage_StringWrapper{},
 	}
-	src := &channeldpb.TestMergeMessage{
-		Kv: map[int64]*channeldpb.TestMergeMessage_StringWrapper{},
+	src := &testpb.TestMergeMessage{
+		Kv: map[int64]*testpb.TestMergeMessage_StringWrapper{},
 	}
 	for i := 0; i < 100; i++ {
-		dst.Kv[int64(i)] = &channeldpb.TestMergeMessage_StringWrapper{Removed: false, Content: strconv.Itoa(rand.Int())}
+		dst.Kv[int64(i)] = &testpb.TestMergeMessage_StringWrapper{Removed: false, Content: strconv.Itoa(rand.Int())}
 		if rand.Intn(100) < 10 {
-			src.Kv[int64(i)] = &channeldpb.TestMergeMessage_StringWrapper{Removed: true}
+			src.Kv[int64(i)] = &testpb.TestMergeMessage_StringWrapper{Removed: true}
 		} else {
-			src.Kv[int64(i)] = &channeldpb.TestMergeMessage_StringWrapper{Removed: false, Content: strconv.Itoa(rand.Int())}
+			src.Kv[int64(i)] = &testpb.TestMergeMessage_StringWrapper{Removed: false, Content: strconv.Itoa(rand.Int())}
 		}
 	}
 
@@ -203,23 +204,23 @@ func TestListMoveElement(t *testing.T) {
 
 func TestDataMergeOptions(t *testing.T) {
 	InitLogsAndMetrics()
-	dstMsg := &channeldpb.TestMergeMessage{
+	dstMsg := &testpb.TestMergeMessage{
 		List: []string{"a", "b", "c"},
-		Kv: map[int64]*channeldpb.TestMergeMessage_StringWrapper{
+		Kv: map[int64]*testpb.TestMergeMessage_StringWrapper{
 			1: {Content: "aa"},
 			2: {Content: "bb"},
 		},
 	}
 
-	srcMsg := &channeldpb.TestMergeMessage{
+	srcMsg := &testpb.TestMergeMessage{
 		List: []string{"d", "e"},
-		Kv: map[int64]*channeldpb.TestMergeMessage_StringWrapper{
+		Kv: map[int64]*testpb.TestMergeMessage_StringWrapper{
 			1: {Removed: true},
 			2: {Content: "bbb"},
 		},
 	}
 
-	mergedMsg1 := proto.Clone(dstMsg).(*channeldpb.TestMergeMessage)
+	mergedMsg1 := proto.Clone(dstMsg).(*testpb.TestMergeMessage)
 	mergeOptions1 := &channeldpb.ChannelDataMergeOptions{
 		ShouldReplaceList: true,
 	}
@@ -227,7 +228,7 @@ func TestDataMergeOptions(t *testing.T) {
 	assert.Equal(t, 2, len(mergedMsg1.List))
 	assert.Equal(t, "e", mergedMsg1.List[1])
 
-	mergedMsg2 := proto.Clone(dstMsg).(*channeldpb.TestMergeMessage)
+	mergedMsg2 := proto.Clone(dstMsg).(*testpb.TestMergeMessage)
 	mergeOptions2 := &channeldpb.ChannelDataMergeOptions{
 		ListSizeLimit: 4,
 	}
@@ -239,7 +240,7 @@ func TestDataMergeOptions(t *testing.T) {
 	assert.Equal(t, "c", mergedMsg2.List[0])
 	assert.Equal(t, "e", mergedMsg2.List[3])
 
-	mergedMsg3 := proto.Clone(dstMsg).(*channeldpb.TestMergeMessage)
+	mergedMsg3 := proto.Clone(dstMsg).(*testpb.TestMergeMessage)
 	mergeOptions3 := &channeldpb.ChannelDataMergeOptions{
 		ShouldCheckRemovableMapField: true,
 	}
@@ -253,22 +254,23 @@ func TestDataMergeOptions(t *testing.T) {
 }
 
 func TestReflectChannelData(t *testing.T) {
+	RegisterChannelDataType(channeldpb.ChannelType_TEST, &testpb.TestChannelDataMessage{})
 	globalData, err := ReflectChannelData(channeldpb.ChannelType_TEST, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, globalData)
-	assert.IsType(t, &channeldpb.TestChannelDataMessage{}, globalData.msg)
+	assert.IsType(t, &testpb.TestChannelDataMessage{}, globalData.msg)
 }
 
 func TestDataFieldMasks(t *testing.T) {
-	nestedMsg := &channeldpb.TestFieldMaskMessage_NestedMessage{
+	nestedMsg := &testpb.TestFieldMaskMessage_NestedMessage{
 		P1: 1,
 		P2: 2,
 	}
-	testMsg := &channeldpb.TestFieldMaskMessage{
+	testMsg := &testpb.TestFieldMaskMessage{
 		Name: "test",
 		Msg:  nestedMsg,
-		List: []*channeldpb.TestFieldMaskMessage_NestedMessage{nestedMsg},
-		Kv1: map[int64]*channeldpb.TestFieldMaskMessage_NestedMessage{
+		List: []*testpb.TestFieldMaskMessage_NestedMessage{nestedMsg},
+		Kv1: map[int64]*testpb.TestFieldMaskMessage_NestedMessage{
 			10: nestedMsg,
 		},
 		Kv2: map[int64]string{
@@ -278,43 +280,43 @@ func TestDataFieldMasks(t *testing.T) {
 
 	filteredMsg1 := proto.Clone(testMsg)
 	fmutils.Filter(filteredMsg1, []string{"name"})
-	t.Log(filteredMsg1.(*channeldpb.TestFieldMaskMessage).String())
+	t.Log(filteredMsg1.(*testpb.TestFieldMaskMessage).String())
 
 	filteredMsg2 := proto.Clone(testMsg)
 	fmutils.Filter(filteredMsg2, []string{"msg.p1"})
-	t.Log(filteredMsg2.(*channeldpb.TestFieldMaskMessage).String())
+	t.Log(filteredMsg2.(*testpb.TestFieldMaskMessage).String())
 
 	filteredMsg3 := proto.Clone(testMsg)
 	fmutils.Filter(filteredMsg3, []string{"list.p2"})
-	t.Log(filteredMsg3.(*channeldpb.TestFieldMaskMessage).String())
+	t.Log(filteredMsg3.(*testpb.TestFieldMaskMessage).String())
 
 	filteredMsg4 := proto.Clone(testMsg)
 	fmutils.Filter(filteredMsg4, []string{"kv1.p1", "kv1.p2", "kv1.p3"})
-	t.Log(filteredMsg4.(*channeldpb.TestFieldMaskMessage).String())
+	t.Log(filteredMsg4.(*testpb.TestFieldMaskMessage).String())
 	fmutils.Prune(filteredMsg4, []string{"kv1.p1"})
-	t.Log(filteredMsg4.(*channeldpb.TestFieldMaskMessage).String())
+	t.Log(filteredMsg4.(*testpb.TestFieldMaskMessage).String())
 
 	filteredMsg5 := proto.Clone(testMsg)
 	fmutils.Filter(filteredMsg5, []string{"kv2.a"})
-	t.Log(filteredMsg5.(*channeldpb.TestFieldMaskMessage).String())
+	t.Log(filteredMsg5.(*testpb.TestFieldMaskMessage).String())
 }
 
 func TestProtobufAny(t *testing.T) {
-	any1, err := anypb.New(&channeldpb.TestAnyMessage_Type1{Value: "a"})
+	any1, err := anypb.New(&testpb.TestAnyMessage_Type1{Value: "a"})
 	assert.NoError(t, err)
 
-	any2, err := anypb.New(&channeldpb.TestAnyMessage_Type2{Value: 1})
+	any2, err := anypb.New(&testpb.TestAnyMessage_Type2{Value: 1})
 	assert.NoError(t, err)
 
-	msg1 := &channeldpb.TestAnyMessage{Msg: any1}
-	msg2 := &channeldpb.TestAnyMessage{Msg: any2}
+	msg1 := &testpb.TestAnyMessage{Msg: any1}
+	msg2 := &testpb.TestAnyMessage{Msg: any2}
 	// Can merge the any property from different type
 	proto.Merge(msg1, msg2)
 	assert.EqualValues(t, any2, msg1.Msg)
 	// Can be converted to a message of a unknown type
 	um, err := msg1.Msg.UnmarshalNew()
 	assert.NoError(t, err)
-	assert.EqualValues(t, 1, um.(*channeldpb.TestAnyMessage_Type2).Value)
+	assert.EqualValues(t, 1, um.(*testpb.TestAnyMessage_Type2).Value)
 
 	msg1.List = append(msg1.List, any1)
 	msg2.List = append(msg2.List, any2)
@@ -324,21 +326,21 @@ func TestProtobufAny(t *testing.T) {
 }
 
 func TestProtobufMapMerge(t *testing.T) {
-	testMsg := &channeldpb.TestMapMessage{
+	testMsg := &testpb.TestMapMessage{
 		Kv:  make(map[uint32]string),
-		Kv2: make(map[uint32]*channeldpb.TestMapMessage_StringWrapper),
+		Kv2: make(map[uint32]*testpb.TestMapMessage_StringWrapper),
 	}
 	testMsg.Kv[1] = "a"
 	testMsg.Kv[2] = "b"
 	testMsg.Kv[3] = "c"
 	testMsg.Kv[4] = "d"
 
-	testMsg.Kv2[1] = &channeldpb.TestMapMessage_StringWrapper{Content: "a"}
-	testMsg.Kv2[2] = &channeldpb.TestMapMessage_StringWrapper{Content: "b", Num: 2}
+	testMsg.Kv2[1] = &testpb.TestMapMessage_StringWrapper{Content: "a"}
+	testMsg.Kv2[2] = &testpb.TestMapMessage_StringWrapper{Content: "b", Num: 2}
 
-	updateMsg := &channeldpb.TestMapMessage{
+	updateMsg := &testpb.TestMapMessage{
 		Kv:  make(map[uint32]string),
-		Kv2: make(map[uint32]*channeldpb.TestMapMessage_StringWrapper),
+		Kv2: make(map[uint32]*testpb.TestMapMessage_StringWrapper),
 	}
 	updateMsg.Kv[2] = "bb"
 	updateMsg.Kv[3] = ""

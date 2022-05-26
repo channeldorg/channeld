@@ -3,25 +3,21 @@ package channeld
 import (
 	"container/list"
 	"fmt"
-	"strings"
 
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
-	"github.com/iancoleman/strcase"
+	"channeld.clewcat.com/channeld/pkg/common"
 	"github.com/indiest/fmutils"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-type ChannelDataMessage = Message //protoreflect.Message
-
 type ChannelData struct {
 	mergeOptions *channeldpb.ChannelDataMergeOptions
-	msg          ChannelDataMessage
-	//updateMsg       ChannelDataMessage
+	msg          common.ChannelDataMessage
+	//updateMsg       common.ChannelDataMessage
 	updateMsgBuffer     *list.List
 	maxFanOutIntervalMs uint32
 }
@@ -36,7 +32,7 @@ type fanOutConnection struct {
 }
 
 type updateMsgBufferElement struct {
-	updateMsg   ChannelDataMessage
+	updateMsg   common.ChannelDataMessage
 	arrivalTime ChannelTime
 }
 
@@ -44,21 +40,32 @@ const (
 	MaxUpdateMsgBufferSize = 512
 )
 
-func RegisterChannelDataType(channelType channeldpb.ChannelType, msgTemplate proto.Message) {
+var channelDataTypeRegistery = make(map[channeldpb.ChannelType]proto.Message)
 
+// Register a Protobuf message template as the channel data of a specific channel type.
+// This is needed when channeld doesn't know the package of the message is in,
+// as well as creating a ChannelData using ReflectChannelData()
+func RegisterChannelDataType(channelType channeldpb.ChannelType, msgTemplate proto.Message) {
+	channelDataTypeRegistery[channelType] = msgTemplate
 }
 
 func ReflectChannelData(channelType channeldpb.ChannelType, mergeOptions *channeldpb.ChannelDataMergeOptions) (*ChannelData, error) {
-	channelTypeName := channelType.String()
-	dataTypeName := fmt.Sprintf("channeld.%sChannelDataMessage",
-		strcase.ToCamel(strings.ToLower(channelTypeName)))
-	dataType, err := protoregistry.GlobalTypes.FindMessageByName(protoreflect.FullName(dataTypeName))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create data for channel type %s: %w", channelTypeName, err)
+	/*
+		channelTypeName := channelType.String()
+		dataTypeName := fmt.Sprintf("channeld.%sChannelDataMessage",
+			strcase.ToCamel(strings.ToLower(channelTypeName)))
+		dataType, err := protoregistry.GlobalTypes.FindMessageByName(protoreflect.FullName(dataTypeName))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create data for channel type %s: %w", channelTypeName, err)
+		}
+	*/
+	dataType, exists := channelDataTypeRegistery[channelType]
+	if !exists {
+		return nil, fmt.Errorf("failed to create data for channel type %s", channelType.String())
 	}
 
 	return &ChannelData{
-		msg:             dataType.New().Interface(),
+		msg:             dataType.ProtoReflect().New().Interface(),
 		mergeOptions:    mergeOptions,
 		updateMsgBuffer: list.New(),
 	}, nil
@@ -76,7 +83,7 @@ func (ch *Channel) Data() *ChannelData {
 	return ch.data
 }
 
-func (d *ChannelData) OnUpdate(updateMsg Message, t ChannelTime, spatialNotifier SpatialInfoChangedNotifier) {
+func (d *ChannelData) OnUpdate(updateMsg Message, t ChannelTime, spatialNotifier common.SpatialInfoChangedNotifier) {
 	if d.msg == nil {
 		d.msg = updateMsg
 	} else {
@@ -133,7 +140,7 @@ func (ch *Channel) tickData(t ChannelTime) {
 
 			var lastUpdateTime ChannelTime
 			bufp := ch.data.updateMsgBuffer.Front()
-			var accumulatedUpdateMsg ChannelDataMessage = nil
+			var accumulatedUpdateMsg common.ChannelDataMessage = nil
 
 			if foc.lastFanOutTime == 0 {
 				// Send the whole data for the first time
@@ -179,7 +186,7 @@ func (ch *Channel) tickData(t ChannelTime) {
 	}
 }
 
-func (ch *Channel) fanOutDataUpdate(conn ConnectionInChannel, cs *ChannelSubscription, updateMsg ChannelDataMessage) {
+func (ch *Channel) fanOutDataUpdate(conn ConnectionInChannel, cs *ChannelSubscription, updateMsg common.ChannelDataMessage) {
 	fmutils.Filter(updateMsg, cs.options.DataFieldMasks)
 	any, err := anypb.New(updateMsg)
 	if err != nil {
@@ -209,13 +216,13 @@ func postMergeMapKV(dst, src protoreflect.Map, k protoreflect.MapKey, v protoref
 }
 */
 
-// Implement this interface to manually merge the channel data. It will be MUCH more efficient than the default reflection-based merge.
+// Implement this interface to manually merge the channel data. In most cases it can be MUCH more efficient than the default reflection-based merge.
 type MergeableChannelData interface {
 	Message
-	Merge(src Message, options *channeldpb.ChannelDataMergeOptions, spatialNotifier SpatialInfoChangedNotifier) error
+	Merge(src Message, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) error
 }
 
-func mergeWithOptions(dst Message, src Message, options *channeldpb.ChannelDataMergeOptions, spatialNotifier SpatialInfoChangedNotifier) {
+func mergeWithOptions(dst Message, src Message, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) {
 	mergeable, ok := dst.(MergeableChannelData)
 	if ok {
 		if options == nil {

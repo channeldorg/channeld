@@ -1,4 +1,4 @@
-module channeld.clewcat.com/examples/chat-rooms
+module channeld.clewcat.com/channeld/examples/chat-rooms
 
 go 1.16
 
@@ -8,4 +8,4 @@ require (
 	google.golang.org/protobuf v1.27.1
 )
 
-replace channeld.clewcat.com/channeld => ../../../channeld
+replace channeld.clewcat.com/channeld => ../..

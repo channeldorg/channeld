@@ -9,12 +9,13 @@ import (
 )
 
 type Message = proto.Message //protoreflect.ProtoMessage
+
 // The context of a message for both sending and receiving
 type MessageContext struct {
 	MsgType    channeldpb.MessageType
-	Msg        Message     // The weak-typed Message object popped from the message queue
-	Connection *Connection // The connection that received the message
-	Channel    *Channel    // The channel that handling the message
+	Msg        Message             // The weak-typed Message object popped from the message queue
+	Connection ConnectionInChannel // The connection that received the message. No required for sending.
+	Channel    *Channel            // The channel that handling the message. No required for sending.
 	Broadcast  channeldpb.BroadcastType
 	StubId     uint32
 	ChannelId  uint32 // The original channelId in the Packet, could be different from Channel.id.
@@ -56,7 +57,7 @@ func handleClientToServerUserMessage(ctx MessageContext) {
 	} else {
 		ctx.Channel.Logger().Error("channel has no owner to forward the user-space messaged",
 			zap.Uint32("msgType", uint32(ctx.MsgType)),
-			zap.Uint32("connId", uint32(ctx.Connection.id)),
+			zap.Uint32("connId", uint32(ctx.Connection.Id())),
 		)
 	}
 }
@@ -110,11 +111,11 @@ func handleAuth(ctx MessageContext) {
 
 	// TODO: Authentication
 
-	ctx.Connection.fsm.MoveToNextState()
+	ctx.Connection.OnAuthenticated()
 
 	ctx.Msg = &channeldpb.AuthResultMessage{
 		Result:          channeldpb.AuthResultMessage_SUCCESSFUL,
-		ConnId:          uint32(ctx.Connection.id),
+		ConnId:          uint32(ctx.Connection.Id()),
 		CompressionType: GlobalSettings.CompressionType,
 	}
 	ctx.Connection.Send(ctx)
@@ -154,6 +155,31 @@ func handleCreateChannel(ctx MessageContext) {
 			ctx.Connection.Logger().Error("illegal attemp to create the GLOBAL channel")
 			return
 		}
+	} else if msg.ChannelType == channeldpb.ChannelType_SPATIAL {
+		if ctx.Connection.GetConnectionType() != channeldpb.ConnectionType_SERVER {
+			ctx.Connection.Logger().Error("illegal attemp to create Spatial channel from client connection")
+			return
+		}
+		if spatialController == nil {
+			ctx.Connection.Logger().Error("illegal attemp to create Spatial channel as there's no controller")
+			return
+		}
+		channels, err := spatialController.CreateChannels(ctx)
+		if err != nil {
+			ctx.Connection.Logger().Error("failed to create Spatial channel", zap.Error(err))
+			return
+		}
+		resultMsg := &channeldpb.CreateSpatialChannelsResultMessage{
+			SpatialChannelId: make([]uint32, len(channels)),
+			Metadata:         msg.Metadata,
+			OwnerConnId:      uint32(ctx.Connection.Id()),
+		}
+		for i := range channels {
+			resultMsg.SpatialChannelId[i] = uint32(channels[i].id)
+		}
+		ctx.Msg = resultMsg
+		ctx.Connection.Send(ctx)
+		return
 	} else {
 		newChannel, err = CreateChannel(msg.ChannelType, ctx.Connection)
 		if err != nil {
@@ -186,7 +212,7 @@ func handleCreateChannel(ctx MessageContext) {
 	ctx.Msg = &channeldpb.CreateChannelResultMessage{
 		ChannelType: newChannel.channelType,
 		Metadata:    newChannel.metadata,
-		OwnerConnId: uint32(ctx.Connection.id),
+		OwnerConnId: uint32(ctx.Connection.Id()),
 	}
 	ctx.Connection.Send(ctx)
 	// Also send the response to the GLOBAL channel owner.
@@ -303,7 +329,7 @@ func handleSubToChannel(ctx MessageContext) {
 		return
 	}
 
-	if connToSub.id != ctx.Connection.id && !connToSub.HasAuthorityOver(ctx.Channel) {
+	if connToSub.id != ctx.Connection.Id() && !connToSub.HasAuthorityOver(ctx.Channel) {
 		ctx.Connection.Logger().Error("illegal attemp to sub another connection as the sender has no authority",
 			zap.Uint32("subConnId", msg.ConnId),
 			zap.String("channelType", ctx.Channel.channelType.String()),
@@ -354,7 +380,7 @@ func handleUnsubFromChannel(ctx MessageContext) {
 		return
 	}
 
-	if connToUnsub.id != ctx.Connection.id && !connToUnsub.HasAuthorityOver(ctx.Channel) {
+	if connToUnsub.id != ctx.Connection.Id() && !connToUnsub.HasAuthorityOver(ctx.Channel) {
 		ctx.Connection.Logger().Error("illegal attemp to unsub another connection as the sender has no authority",
 			zap.Uint32("unsubConnId", msg.ConnId),
 			zap.String("channelType", ctx.Channel.channelType.String()),
@@ -406,7 +432,7 @@ func handleChannelDataUpdate(ctx MessageContext) {
 
 	if ctx.Channel.Data() == nil {
 		ctx.Channel.Logger().Info("channel data is not initialized - should send CreateChannelMessage before ChannelDataUpdateMessage",
-			zap.Uint32("connId", uint32(ctx.Connection.id)))
+			zap.Uint32("connId", uint32(ctx.Connection.Id())))
 		return
 	}
 

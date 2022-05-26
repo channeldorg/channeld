@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
+	"channeld.clewcat.com/channeld/pkg/common"
 	"go.uber.org/zap"
 )
 
@@ -37,15 +38,19 @@ type channelMessage struct {
 	handler MessageHandlerFunc
 }
 
-// Use this interface instead of Connection for protecting the connection from writing in the channel goroutine.
+// Use this interface instead of Connection for protecting the connection from unsafe writing in the channel goroutine.
 type ConnectionInChannel interface {
 	Id() ConnectionId
+	GetConnectionType() channeldpb.ConnectionType
+	OnAuthenticated()
+	HasAuthorityOver(ch *Channel) bool
 	IsRemoving() bool
 	Send(ctx MessageContext)
-	sendSubscribed(ctx MessageContext, ch *Channel, connToSub *Connection, stubId uint32, subOptions *channeldpb.ChannelSubscriptionOptions)
+	SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions)
+	UnsubscribeFromChannel(ch *Channel) error
+	sendSubscribed(ctx MessageContext, ch *Channel, connToSub ConnectionInChannel, stubId uint32, subOptions *channeldpb.ChannelSubscriptionOptions)
 	sendUnsubscribed(ctx MessageContext, ch *Channel, connToUnsub *Connection, stubId uint32)
 	Logger() *zap.Logger
-	IsNil() bool
 }
 
 type Channel struct {
@@ -56,7 +61,7 @@ type Channel struct {
 	subscribedConnections map[ConnectionInChannel]*ChannelSubscription
 	metadata              string // Read-only property, e.g. name
 	data                  *ChannelData
-	spatialNotifier       SpatialInfoChangedNotifier
+	spatialNotifier       common.SpatialInfoChangedNotifier
 	inMsgQueue            chan channelMessage
 	fanOutQueue           *list.List
 	startTime             time.Time // Time since channel created
@@ -99,7 +104,47 @@ func GetChannel(id ChannelId) *Channel {
 var ErrNonSpatialChannelFull = errors.New("non-spatial channels are full")
 var ErrSpatialChannelFull = errors.New("spatial channels are full")
 
-func CreateChannel(t channeldpb.ChannelType, owner *Connection) (*Channel, error) {
+func createChannelWithId(channelId ChannelId, t channeldpb.ChannelType, owner ConnectionInChannel) *Channel {
+	ch := &Channel{
+		id:                    channelId,
+		channelType:           t,
+		ownerConnection:       owner,
+		subscribedConnections: make(map[ConnectionInChannel]*ChannelSubscription),
+		/* Channel data is not created by default. See handleCreateChannel().
+		data:                  ReflectChannelData(t, nil),
+		*/
+		inMsgQueue:   make(chan channelMessage, 1024),
+		fanOutQueue:  list.New(),
+		startTime:    time.Now(),
+		tickInterval: time.Duration(GlobalSettings.GetChannelSettings(t).TickIntervalMs) * time.Millisecond,
+		tickFrames:   0,
+		logger: logger.With(
+			zap.String("channelType", t.String()),
+			zap.Uint32("channelId", uint32(nextChannelId)),
+		),
+		removing: 0,
+	}
+
+	if ch.channelType == channeldpb.ChannelType_SPATIAL {
+		ch.spatialNotifier = spatialController
+	}
+
+	// TODO: check state if tick()
+	if ch.HasOwner() {
+		ch.state = OPEN
+	} else {
+		ch.state = INIT
+	}
+
+	allChannels.Store(ch.id, ch)
+	go ch.Tick()
+
+	channelNum.WithLabelValues(ch.channelType.String()).Inc()
+
+	return ch
+}
+
+func CreateChannel(t channeldpb.ChannelType, owner ConnectionInChannel) (*Channel, error) {
 	if t == channeldpb.ChannelType_GLOBAL && globalChannel != nil {
 		return nil, errors.New("failed to create WORLD channel as it already exists")
 	}
@@ -130,49 +175,7 @@ func CreateChannel(t channeldpb.ChannelType, owner *Connection) (*Channel, error
 		}
 	}
 
-	ch := &Channel{
-		id:                    channelId,
-		channelType:           t,
-		ownerConnection:       owner,
-		subscribedConnections: make(map[ConnectionInChannel]*ChannelSubscription),
-		/* Channel data is not created by default. See handleCreateChannel().
-		data:                  ReflectChannelData(t, nil),
-		*/
-		inMsgQueue:   make(chan channelMessage, 1024),
-		fanOutQueue:  list.New(),
-		startTime:    time.Now(),
-		tickInterval: time.Duration(GlobalSettings.GetChannelSettings(t).TickIntervalMs) * time.Millisecond,
-		tickFrames:   0,
-		logger: logger.With(
-			zap.String("channelType", t.String()),
-			zap.Uint32("channelId", uint32(nextChannelId)),
-		),
-		removing: 0,
-	}
-	if ch.channelType == channeldpb.ChannelType_SPATIAL {
-		ch.spatialNotifier = &StaticGrid2DSpatialController{
-			channel:      ch,
-			WorldOffsetX: -40,
-			WorldOffsetZ: -40,
-			GridWidth:    8,
-			GridHeight:   8,
-			GridCols:     10,
-			GridRows:     10,
-		}
-	}
-
-	if owner == nil {
-		ch.state = INIT
-	} else {
-		ch.state = OPEN
-	}
-
-	allChannels.Store(ch.id, ch)
-	go ch.Tick()
-
-	channelNum.WithLabelValues(ch.channelType.String()).Inc()
-
-	return ch, nil
+	return createChannelWithId(channelId, t, owner), nil
 }
 
 func RemoveChannel(ch *Channel) {
