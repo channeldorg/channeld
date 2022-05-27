@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
+	"channeld.clewcat.com/channeld/pkg/common"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
@@ -35,6 +36,9 @@ var MessageMap = map[channeldpb.MessageType]*messageMapEntry{
 	channeldpb.MessageType_UNSUB_FROM_CHANNEL:  {&channeldpb.UnsubscribedFromChannelMessage{}, handleUnsubFromChannel},
 	channeldpb.MessageType_CHANNEL_DATA_UPDATE: {&channeldpb.ChannelDataUpdateMessage{}, handleChannelDataUpdate},
 	channeldpb.MessageType_DISCONNECT:          {&channeldpb.DisconnectMessage{}, handleDisconnect},
+	// CREATE_CHANNEL and CREATE_SPATIAL_CHANNEL shared the same message structure and handler
+	channeldpb.MessageType_CREATE_SPATIAL_CHANNEL: {&channeldpb.CreateChannelMessage{}, handleCreateChannel},
+	channeldpb.MessageType_QUERY_SPATIAL_CHANNEL:  {&channeldpb.QuerySpatialChannelMessage{}, handleQuerySpatialChannel},
 }
 
 func RegisterMessageHandler(msgType uint32, msg Message, handler MessageHandlerFunc) {
@@ -177,8 +181,17 @@ func handleCreateChannel(ctx MessageContext) {
 		for i := range channels {
 			resultMsg.SpatialChannelId[i] = uint32(channels[i].id)
 		}
+		ctx.MsgType = channeldpb.MessageType_CREATE_SPATIAL_CHANNEL
 		ctx.Msg = resultMsg
 		ctx.Connection.Send(ctx)
+		for _, newChannel = range channels {
+			// Subscribe to channel after creation
+			cs := ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
+			if cs != nil {
+				ctx.Connection.sendSubscribed(ctx, newChannel, ctx.Connection, 0, &cs.options)
+			}
+		}
+		ctx.Connection.Logger().Info("created spatial channel(s)", zap.Uint32s("channelIds", resultMsg.SpatialChannelId))
 		return
 	} else {
 		newChannel, err = CreateChannel(msg.ChannelType, ctx.Connection)
@@ -222,8 +235,10 @@ func handleCreateChannel(ctx MessageContext) {
 	}
 
 	// Subscribe to channel after creation
-	ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
-	ctx.Connection.sendSubscribed(ctx, newChannel, ctx.Connection, 0, msg.SubOptions)
+	cs := ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
+	if cs != nil {
+		ctx.Connection.sendSubscribed(ctx, newChannel, ctx.Connection, 0, &cs.options)
+	}
 }
 
 func handleRemoveChannel(ctx MessageContext) {
@@ -329,7 +344,7 @@ func handleSubToChannel(ctx MessageContext) {
 		return
 	}
 
-	if connToSub.id != ctx.Connection.Id() && !connToSub.HasAuthorityOver(ctx.Channel) {
+	if connToSub.id != ctx.Connection.Id() && !ctx.Connection.HasAuthorityOver(ctx.Channel) {
 		ctx.Connection.Logger().Error("illegal attemp to sub another connection as the sender has no authority",
 			zap.Uint32("subConnId", msg.ConnId),
 			zap.String("channelType", ctx.Channel.channelType.String()),
@@ -351,18 +366,20 @@ func handleSubToChannel(ctx MessageContext) {
 		return
 	}
 
-	connToSub.SubscribeToChannel(ctx.Channel, msg.SubOptions)
-
+	cs = connToSub.SubscribeToChannel(ctx.Channel, msg.SubOptions)
+	if cs == nil {
+		return
+	}
 	// Notify the sender.
-	ctx.Connection.sendSubscribed(ctx, ctx.Channel, connToSub, ctx.StubId, msg.SubOptions)
+	ctx.Connection.sendSubscribed(ctx, ctx.Channel, connToSub, ctx.StubId, &cs.options)
 
 	// Notify the subscribed (if not the sender).
 	if connToSub != ctx.Connection {
-		connToSub.sendSubscribed(ctx, ctx.Channel, connToSub, 0, msg.SubOptions)
+		connToSub.sendSubscribed(ctx, ctx.Channel, connToSub, 0, &cs.options)
 	}
 	// Notify the channel owner.
 	if ctx.Channel.HasOwner() && ctx.Channel.ownerConnection != ctx.Connection {
-		ctx.Channel.ownerConnection.sendSubscribed(ctx, ctx.Channel, connToSub, 0, msg.SubOptions)
+		ctx.Channel.ownerConnection.sendSubscribed(ctx, ctx.Channel, connToSub, 0, &cs.options)
 	}
 }
 
@@ -484,4 +501,41 @@ func handleDisconnect(ctx MessageContext) {
 		)
 	}
 	RemoveConnection(connToDisconnect)
+}
+
+func handleQuerySpatialChannel(ctx MessageContext) {
+	if ctx.Channel != globalChannel {
+		ctx.Connection.Logger().Error("illegal attemp to query spatial channel outside the GLOBAL channel")
+		return
+	}
+
+	msg, ok := ctx.Msg.(*channeldpb.QuerySpatialChannelMessage)
+	if !ok {
+		ctx.Connection.Logger().Error("message is not a QuerySpatialChannelMessage, will not be handled.")
+		return
+	}
+
+	if spatialController == nil {
+		ctx.Connection.Logger().Error("cannot query spatial channel as the spatial controller does not exist")
+		return
+	}
+
+	channelIds := make([]uint32, len(msg.SpatialInfo))
+	for i, info := range msg.SpatialInfo {
+		channelId, err := spatialController.GetChannelId(common.SpatialInfo{
+			X: info.X,
+			Y: info.Y,
+			Z: info.Z,
+		})
+		if err != nil {
+			ctx.Connection.Logger().Warn("failed to GetChannelId", zap.Error(err),
+				zap.Float64("x", info.X), zap.Float64("y", info.Y), zap.Float64("z", info.Z))
+		}
+		channelIds[i] = uint32(channelId)
+	}
+
+	ctx.Msg = &channeldpb.QuerySpatialChannelResultMessage{
+		ChannelId: channelIds,
+	}
+	ctx.Connection.Send(ctx)
 }

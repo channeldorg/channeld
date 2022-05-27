@@ -150,88 +150,11 @@ func (ctl *StaticGrid2DSpatialController) CreateChannels(ctx MessageContext) ([]
 	// When all spatial channels are created, subscribe each server to its adjacent grids(channels)
 	if ctl.serverIndex == ctl.ServerCols*ctl.ServerRows {
 		for i := uint32(0); i < ctl.serverIndex; i++ {
-			ctl.subToAdjacentChannels(i, serverGridCols, serverGridRows, msg.SubOptions)
+			err := ctl.subToAdjacentChannels(i, serverGridCols, serverGridRows, msg.SubOptions)
+			if err != nil {
+				return channels, fmt.Errorf("failed to sub to adjacent channels of server connection %d, err: %v", ctl.serverConnections[i].Id(), err)
+			}
 		}
-		/*
-			// right border
-			if serverX > 0 {
-				for y := uint32(0); y < serverGridRows; y++ {
-					for x := uint32(0); x < ctl.ServerInterestBorderSize; x++ {
-						spatialInfo.X = float64(serverX*serverGridCols-x) * ctl.GridWidth
-						spatialInfo.Z = float64(serverY*serverGridRows+y) * ctl.GridHeight
-						channelId, err := ctl.GetChannelIdNoOffset(spatialInfo)
-						if err != nil {
-							return nil, err
-						}
-						channelToSub := GetChannel(channelId)
-						if channelToSub == nil {
-							return nil, fmt.Errorf("failed to subscribe border channel %d as it doesn't exist", channelId)
-						}
-						ctx.Connection.SubscribeToChannel(channelToSub, msg.SubOptions)
-						ctx.Connection.sendSubscribed(ctx, channelToSub, ctx.Connection, 0, msg.SubOptions)
-					}
-				}
-			}
-
-			// left border
-			if serverX < ctl.ServerCols-1 {
-				for y := uint32(0); y < serverGridRows; y++ {
-					for x := uint32(0); x < ctl.ServerInterestBorderSize; x++ {
-						spatialInfo.X = float64((serverX+1)*serverGridCols+x) * ctl.GridWidth
-						spatialInfo.Z = float64(serverY*serverGridRows+y) * ctl.GridHeight
-						channelId, err := ctl.GetChannelIdNoOffset(spatialInfo)
-						if err != nil {
-							return nil, err
-						}
-						channelToSub := GetChannel(channelId)
-						if channelToSub == nil {
-							return nil, fmt.Errorf("failed to subscribe border channel %d as it doesn't exist", channelId)
-						}
-						ctx.Connection.SubscribeToChannel(channelToSub, msg.SubOptions)
-						ctx.Connection.sendSubscribed(ctx, channelToSub, ctx.Connection, 0, msg.SubOptions)
-					}
-				}
-			}
-
-			// top border
-			if serverY > 0 {
-				for y := uint32(0); y < ctl.ServerInterestBorderSize; y++ {
-					for x := uint32(0); x < serverGridCols; x++ {
-						spatialInfo.X = float64(serverX*serverGridCols+x) * ctl.GridWidth
-						spatialInfo.Z = float64(serverY*serverGridRows-y) * ctl.GridHeight
-						channelId, err := ctl.GetChannelIdNoOffset(spatialInfo)
-						if err != nil {
-							return nil, err
-						}
-						channelToSub := GetChannel(channelId)
-						if channelToSub == nil {
-							return nil, fmt.Errorf("failed to subscribe border channel %d as it doesn't exist", channelId)
-						}
-						ctx.Connection.SubscribeToChannel(channelToSub, msg.SubOptions)
-						ctx.Connection.sendSubscribed(ctx, channelToSub, ctx.Connection, 0, msg.SubOptions)
-					}
-				}
-			}
-
-			// bottom border
-			if serverY > 0 {
-				for y := uint32(0); y < ctl.ServerInterestBorderSize; y++ {
-					for x := uint32(0); x < serverGridCols; x++ {
-						spatialInfo.X = float64(serverX*serverGridCols+x) * ctl.GridWidth
-						spatialInfo.Z = float64((serverY+1)*serverGridRows+y) * ctl.GridHeight
-						channelId, err := ctl.GetChannelIdNoOffset(spatialInfo)
-						if err != nil {
-							return nil, err
-						}
-						channelToSub := GetChannel(channelId)
-						if channelToSub == nil {
-							return nil, fmt.Errorf("failed to subscribe border channel %d as it doesn't exist", channelId)
-						}
-						ctx.Connection.SubscribeToChannel(channelToSub, msg.SubOptions)
-					}
-				}
-			}
-		*/
 	}
 
 	return channels, nil
@@ -245,7 +168,7 @@ func (ctl *StaticGrid2DSpatialController) subToAdjacentChannels(serverIndex uint
 		X: float64(serverX*serverGridCols) * ctl.GridWidth,
 		Z: float64(serverY*serverGridRows) * ctl.GridHeight,
 	}
-	serverChannelId, err := ctl.GetChannelId(spatialInfo)
+	serverChannelId, err := ctl.GetChannelIdNoOffset(spatialInfo)
 	if err != nil {
 		return err
 	}
@@ -254,10 +177,10 @@ func (ctl *StaticGrid2DSpatialController) subToAdjacentChannels(serverIndex uint
 		return fmt.Errorf("failed to subscribe to adjacent channels for  %d as it doesn't exist", serverChannelId)
 	}
 
-	// right border
+	// Right border
 	if serverX > 0 {
 		for y := uint32(0); y < serverGridRows; y++ {
-			for x := uint32(0); x < ctl.ServerInterestBorderSize; x++ {
+			for x := uint32(1); x <= ctl.ServerInterestBorderSize; x++ {
 				spatialInfo.X = float64(serverX*serverGridCols-x) * ctl.GridWidth
 				spatialInfo.Z = float64(serverY*serverGridRows+y) * ctl.GridHeight
 				channelId, err := ctl.GetChannelIdNoOffset(spatialInfo)
@@ -268,13 +191,15 @@ func (ctl *StaticGrid2DSpatialController) subToAdjacentChannels(serverIndex uint
 				if channelToSub == nil {
 					return fmt.Errorf("failed to subscribe border channel %d as it doesn't exist", channelId)
 				}
-				serverConn.SubscribeToChannel(channelToSub, subOptions)
-				serverConn.sendSubscribed(MessageContext{}, channelToSub, serverConn, 0, subOptions)
+				cs := serverConn.SubscribeToChannel(channelToSub, subOptions)
+				if cs != nil {
+					serverConn.sendSubscribed(MessageContext{}, channelToSub, serverConn, 0, &cs.options)
+				}
 			}
 		}
 	}
 
-	// left border
+	// Left border
 	if serverX < ctl.ServerCols-1 {
 		for y := uint32(0); y < serverGridRows; y++ {
 			for x := uint32(0); x < ctl.ServerInterestBorderSize; x++ {
@@ -288,15 +213,17 @@ func (ctl *StaticGrid2DSpatialController) subToAdjacentChannels(serverIndex uint
 				if channelToSub == nil {
 					return fmt.Errorf("failed to subscribe border channel %d as it doesn't exist", channelId)
 				}
-				serverConn.SubscribeToChannel(channelToSub, subOptions)
-				serverConn.sendSubscribed(MessageContext{}, channelToSub, serverConn, 0, subOptions)
+				cs := serverConn.SubscribeToChannel(channelToSub, subOptions)
+				if cs != nil {
+					serverConn.sendSubscribed(MessageContext{}, channelToSub, serverConn, 0, &cs.options)
+				}
 			}
 		}
 	}
 
-	// top border
+	// Top border
 	if serverY > 0 {
-		for y := uint32(0); y < ctl.ServerInterestBorderSize; y++ {
+		for y := uint32(1); y <= ctl.ServerInterestBorderSize; y++ {
 			for x := uint32(0); x < serverGridCols; x++ {
 				spatialInfo.X = float64(serverX*serverGridCols+x) * ctl.GridWidth
 				spatialInfo.Z = float64(serverY*serverGridRows-y) * ctl.GridHeight
@@ -308,13 +235,15 @@ func (ctl *StaticGrid2DSpatialController) subToAdjacentChannels(serverIndex uint
 				if channelToSub == nil {
 					return fmt.Errorf("failed to subscribe border channel %d as it doesn't exist", channelId)
 				}
-				serverConn.SubscribeToChannel(channelToSub, subOptions)
-				serverConn.sendSubscribed(MessageContext{}, channelToSub, serverConn, 0, subOptions)
+				cs := serverConn.SubscribeToChannel(channelToSub, subOptions)
+				if cs != nil {
+					serverConn.sendSubscribed(MessageContext{}, channelToSub, serverConn, 0, &cs.options)
+				}
 			}
 		}
 	}
 
-	// bottom border
+	// Bottom border
 	if serverY < ctl.ServerRows-1 {
 		for y := uint32(0); y < ctl.ServerInterestBorderSize; y++ {
 			for x := uint32(0); x < serverGridCols; x++ {
@@ -328,8 +257,10 @@ func (ctl *StaticGrid2DSpatialController) subToAdjacentChannels(serverIndex uint
 				if channelToSub == nil {
 					return fmt.Errorf("failed to subscribe border channel %d as it doesn't exist", channelId)
 				}
-				serverConn.SubscribeToChannel(channelToSub, subOptions)
-				serverConn.sendSubscribed(MessageContext{}, channelToSub, serverConn, 0, subOptions)
+				cs := serverConn.SubscribeToChannel(channelToSub, subOptions)
+				if cs != nil {
+					serverConn.sendSubscribed(MessageContext{}, channelToSub, serverConn, 0, &cs.options)
+				}
 			}
 		}
 	}

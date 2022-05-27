@@ -4,6 +4,8 @@ import "google.golang.org/protobuf/proto"
 
 type ChannelDataMessage = proto.Message //protoreflect.Message
 
+// channeldpb.SpatialInfo is heavy with mutex lock and other allocations.
+// We need a light struct for frequent value copy.
 type SpatialInfo struct {
 	X float64
 	Y float64

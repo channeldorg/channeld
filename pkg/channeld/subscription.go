@@ -15,10 +15,10 @@ type ChannelSubscription struct {
 	fanOutElement *list.Element
 }
 
-func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) {
+func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) *ChannelSubscription {
 	if ch.subscribedConnections[c] != nil {
 		c.Logger().Info("already subscribed", zap.String("channel", ch.String()))
-		return
+		return nil
 	}
 
 	cs := &ChannelSubscription{
@@ -48,6 +48,7 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.Channel
 		ch.data.maxFanOutIntervalMs = cs.options.FanOutIntervalMs
 	}
 	ch.subscribedConnections[c] = cs
+	return cs
 }
 
 func (c *Connection) UnsubscribeFromChannel(ch *Channel) error {
@@ -82,7 +83,8 @@ func (c *Connection) sendConnUnsubscribed(connId ConnectionId, ids ...ChannelId)
 */
 
 func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel, connToSub ConnectionInChannel, stubId uint32, subOptions *channeldpb.ChannelSubscriptionOptions) {
-	ctx.Channel = ch
+	//ctx.Channel = ch
+	ctx.ChannelId = uint32(ch.id)
 	ctx.StubId = stubId
 	ctx.MsgType = channeldpb.MessageType_SUB_TO_CHANNEL
 	ctx.Msg = &channeldpb.SubscribedToChannelResultMessage{

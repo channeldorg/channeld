@@ -35,8 +35,9 @@ type GlobalSettingsType struct {
 }
 
 type ChannelSettingsType struct {
-	TickIntervalMs          uint
-	DefaultFanOutIntervalMs uint32
+	TickIntervalMs                 uint
+	DefaultFanOutIntervalMs        uint32
+	RemoveChannelAfterOwnerRemoved bool
 }
 
 var GlobalSettings = GlobalSettingsType{
@@ -46,8 +47,9 @@ var GlobalSettings = GlobalSettingsType{
 	SpatialChannelIdStart: 65536,
 	ChannelSettings: map[channeldpb.ChannelType]ChannelSettingsType{
 		channeldpb.ChannelType_GLOBAL: {
-			TickIntervalMs:          10,
-			DefaultFanOutIntervalMs: 20,
+			TickIntervalMs:                 10,
+			DefaultFanOutIntervalMs:        20,
+			RemoveChannelAfterOwnerRemoved: false,
 		},
 	},
 }

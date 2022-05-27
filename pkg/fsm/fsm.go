@@ -121,18 +121,14 @@ func Load(bytes []byte) (FiniteStateMachine, error) {
 
 func (fsm *FiniteStateMachine) IsAllowed(msgType uint32) bool {
 	fsm.lock.RLock()
-	defer func() {
-		fsm.lock.RUnlock()
-	}()
+	defer fsm.lock.RUnlock()
 
 	return fsm.currentState.allowedMsgTypes[msgType]
 }
 
 func (fsm *FiniteStateMachine) OnReceived(msgType uint32) {
 	fsm.lock.Lock()
-	defer func() {
-		fsm.lock.Unlock()
-	}()
+	defer fsm.lock.Unlock()
 
 	newState := fsm.currentState.transitions[msgType]
 	if newState != nil {
@@ -142,17 +138,14 @@ func (fsm *FiniteStateMachine) OnReceived(msgType uint32) {
 
 func (fsm *FiniteStateMachine) CurrentState() *State {
 	fsm.lock.RLock()
-	defer func() {
-		fsm.lock.RUnlock()
-	}()
+	defer fsm.lock.RUnlock()
+
 	return fsm.currentState
 }
 
 func (fsm *FiniteStateMachine) ChangeState(name string) error {
 	fsm.lock.Lock()
-	defer func() {
-		fsm.lock.Unlock()
-	}()
+	defer fsm.lock.Unlock()
 
 	state, exists := fsm.stateNameMap[name]
 	if exists {
@@ -164,9 +157,7 @@ func (fsm *FiniteStateMachine) ChangeState(name string) error {
 
 func (fsm *FiniteStateMachine) MoveToNextState() bool {
 	fsm.lock.Lock()
-	defer func() {
-		fsm.lock.Unlock()
-	}()
+	defer fsm.lock.Unlock()
 
 	for i := 0; i < len(fsm.States)-1; i++ {
 		if fsm.currentState == &fsm.States[i] {

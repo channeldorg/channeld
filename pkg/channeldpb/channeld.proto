@@ -22,7 +22,7 @@ message MessagePack {
     BroadcastType broadcast = 2;
 
     // The stub for RPC callbacks.
-    // 0 means the packet is not a RPC message.
+    // 0 means the message is not a RPC message.
     uint32 stubId = 3;
 
     // The MessageType either defined in @MessageType enum, or defined in user space.
@@ -39,8 +39,8 @@ enum BroadcastType {
     ALL = 1;
     // Broadcast the message to all the connections in the channel, the sender excluded.
     ALL_BUT_SENDER = 2;
-    // Forward the packet to the connection. Can only be used by the backend server.
-    // This has the same behavior as sending the packet to the PRIVATE channel owned by the target connection with BroadcastType = NO.
+    // Forward the message to the connection. Can only be used by the backend server.
+    // This has the same behavior as sending the message to the PRIVATE channel owned by the target connection with BroadcastType = NO.
     SINGLE_CONNECTION = 3; 
 }
 
@@ -52,7 +52,7 @@ enum ConnectionType {
 
 enum ChannelType {
     UNKNOWN = 0;
-    // Default channel. Any message without ChannelId specified will be sent to this channel.
+    // Default channel. Any message without ChannelId specified (equals 0) will be sent to this channel.
     GLOBAL = 1;
     // Per-connection channel. Useful to store the user data and subscribe the client to the data update.
     PRIVATE = 2;
@@ -71,16 +71,41 @@ enum ChannelType {
 
 enum MessageType {
     INVALID = 0;
+
+    // Used by both @AuthMessage and @AuthResultMessage
     AUTH = 1;
-    //AUTH_RESULT = 2;
+    
+    // Used by both @CreateChannelMessage and @CreateChannelResultMessage
     CREATE_CHANNEL = 3;
+    
+    // Used by @RemoveChannelMessage
     REMOVE_CHANNEL = 4;
+    
+    // Used by both @ListChannelMessage and @ListChannelResultMessage
     LIST_CHANNEL = 5;
+    
+    // Used by both @SubscribedToChannelMessage and @SubscribedToChannelResultMessage
     SUB_TO_CHANNEL = 6;
+    
+    // Used by both @UnsubscribedFromChannelMessage and @UnsubscribedFromChannelResultMessage
     UNSUB_FROM_CHANNEL = 7;
+    
+    // Used by @ChannelDataUpdateMessage
     CHANNEL_DATA_UPDATE = 8;
+    
+    // Used by @DisconnectMessage
     DISCONNECT = 9;
-    CHANNEL_DATA_HANDOVER = 10;
+    
+    // Used by both @CreateChannelMessage and @CreateSpatialChannelsResultMessage
+    CREATE_SPATIAL_CHANNEL = 10;
+    
+    // Used by both @QuerySpatialChannelMessage and @QuerySpatialChannelResultMessage
+    QUERY_SPATIAL_CHANNEL = 11;
+    
+    // Used by @ChannelDataHandoverMessage
+    CHANNEL_DATA_HANDOVER = 12;
+    
+    // Start of any user-space defined message
     USER_SPACE_START = 100;
 }
 
@@ -93,7 +118,7 @@ message ServerForwardMessage {
     bytes payload = 2;
 }
 
-// The packet should have channelId = 0 in order to be handled.
+// The message should have channelId = 0 in order to be handled.
 // Response: @AuthResultMessage. The GLOBAL channel owner will also receive this message (to handle the client's subscription if it doesn't have the authority to).
 message AuthMessage {
     string playerIdentifierToken = 1;
@@ -141,8 +166,9 @@ message ChannelDataMergeOptions {
 	bool shouldCheckRemovableMapField = 4;
 }
 
-// The packet should have channelId = 0 in order to be handled.
-// Response: @CreateChannelResultMessage. The channelId in the response MessagePack corresponds to the created channel. The GLOBAL channel owner will also receive this message.
+// The message should have channelId = 0 in order to be handled.
+// Response: @CreateChannelResultMessage, if the MessageType is CREATE_CHANNEL and the channelType is not SPATIAL. The channelId in the response MessagePack corresponds to the created channel. The GLOBAL channel owner will also receive this message.
+// Response: @CreateSpatialChannelsResultMessage, if the MessageType is CREATE_SPATIAL_CHANNEL and the channelType is SPATIAL.
 // Response: @SubscribedToChannelResultMessage. The channel creator will also be subscripbed to the channel immediately after the creation.
 message CreateChannelMessage {
     ChannelType channelType = 1;
@@ -158,13 +184,13 @@ message CreateChannelResultMessage {
     uint32 ownerConnId = 3;
 }
 
-// The packet should have channelId = 0 in order to be handled.
+// The message should have channelId = 0 in order to be handled.
 // Response: all connections in the channel will receive @RemoveChannelMessage. The GLOBAL channel owner will also receive this message.
 message RemoveChannelMessage {
     uint32 channelId = 1;
 }
 
-// The packet should have channelId = 0 in order to be handled.
+// The message should have channelId = 0 in order to be handled.
 // Response: @ListChannelResultMessage
 message ListChannelMessage {
     ChannelType typeFilter = 1;
@@ -215,7 +241,7 @@ message ChannelDataUpdateMessage {
 
 // Disconnect another connection from channeld. 
 // This message should only be sent by the server connection in a server-authoratative environment.
-// The packet should have channelId = 0 in order to be handled.
+// The message should have channelId = 0 in order to be handled.
 // Response: no.
 message DisconnectMessage {
     uint32 connId = 1;
@@ -223,30 +249,32 @@ message DisconnectMessage {
 
 // ----------------- START OF SPATIAL MESSAGES --------------------//
 
+message SpatialInfo {
+    double x = 1;
+    double y = 2;
+    double z = 3;
+}
+
 message CreateSpatialChannelsResultMessage {
     repeated uint32 spatialChannelId = 1;
     string metadata = 2;
     uint32 ownerConnId = 3;
 }
 
+// The message should have channelId = 0 in order to be handled.
+// Response: @QuerySpatialChannelResultMessage
+message QuerySpatialChannelMessage {
+    repeated SpatialInfo spatialInfo = 1;
+}
+
+message QuerySpatialChannelResultMessage {
+    repeated uint32 channelId = 1;
+}
+
 message ChannelDataHandoverMessage {
     uint32 srcChannelId = 1;
     uint32 dstChannelId = 2;
     google.protobuf.Any data = 3;
-}
-
-message Location {
-    double x = 1;
-    double y = 2;
-    double z = 3;
-}
-
-message SpatialEntityInfo {
-    Location loc = 1;
-}
-
-message SpatialChannelDataMessage {
-    map<uint32, SpatialEntityInfo> entities = 1;
 }
 
 // ------------------ END SPATIAL MESSAGES ---------------------//

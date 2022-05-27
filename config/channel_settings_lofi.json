@@ -1,6 +1,12 @@
 {
-    "0": {
+    "1": {
         "TickIntervalMs": 100,
-        "DefaultFanOutIntervalMs": 200
+        "DefaultFanOutIntervalMs": 200,
+        "RemoveChannelAfterOwnerRemoved": false
+    },
+    "3": {
+        "TickIntervalMs": 100,
+        "DefaultFanOutIntervalMs": 200,
+        "RemoveChannelAfterOwnerRemoved": true
     }
 }

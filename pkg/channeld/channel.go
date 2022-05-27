@@ -46,7 +46,7 @@ type ConnectionInChannel interface {
 	HasAuthorityOver(ch *Channel) bool
 	IsRemoving() bool
 	Send(ctx MessageContext)
-	SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions)
+	SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) *ChannelSubscription
 	UnsubscribeFromChannel(ch *Channel) error
 	sendSubscribed(ctx MessageContext, ch *Channel, connToSub ConnectionInChannel, stubId uint32, subOptions *channeldpb.ChannelSubscriptionOptions)
 	sendUnsubscribed(ctx MessageContext, ch *Channel, connToUnsub *Connection, stubId uint32)
@@ -120,7 +120,7 @@ func createChannelWithId(channelId ChannelId, t channeldpb.ChannelType, owner Co
 		tickFrames:   0,
 		logger: logger.With(
 			zap.String("channelType", t.String()),
-			zap.Uint32("channelId", uint32(nextChannelId)),
+			zap.Uint32("channelId", uint32(channelId)),
 		),
 		removing: 0,
 	}
@@ -235,11 +235,17 @@ func (ch *Channel) Tick() {
 			if conn.IsRemoving() {
 				// Unsub the connection from the channel
 				delete(ch.subscribedConnections, conn)
-				if ch.HasOwner() {
-					if ch.ownerConnection == conn {
+				if ownerConn, ok := ch.ownerConnection.(*Connection); ok && conn != nil {
+					if ownerConn == conn {
 						// Reset the owner if it's removed
 						ch.ownerConnection = nil
 						conn.Logger().Info("found removed ownner connection of channel", zap.Uint32("channelId", uint32(ch.id)))
+						if GlobalSettings.GetChannelSettings(ch.channelType).RemoveChannelAfterOwnerRemoved {
+							// TODO: send RemoveChannelMessage to all subscribed connections
+							RemoveChannel(ch)
+							ch.Logger().Info("removed channel after the owner is removed")
+							return
+						}
 					} else if conn != nil {
 						ch.ownerConnection.sendUnsubscribed(MessageContext{}, ch, conn.(*Connection), 0)
 					}
