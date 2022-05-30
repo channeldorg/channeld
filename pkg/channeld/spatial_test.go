@@ -41,7 +41,17 @@ func TestCreateSpatialChannels3(t *testing.T) {
 			assert.Len(t, channels, 1)
 		}
 	}
-	assert.Empty(t, testConn.SubscribedChannels)
+	assert.Empty(t, testConn.subscribedChannels)
+
+	testConn.removed = true
+	ctl.Tick()
+	assert.EqualValues(t, 0, ctl.nextServerIndex())
+
+	testConn.removed = false
+	channels, err := ctl.CreateChannels(ctx)
+	assert.NoError(t, err)
+	assert.EqualValues(t, channels[0].id, GlobalSettings.SpatialChannelIdStart)
+	assert.EqualValues(t, 1, ctl.nextServerIndex())
 }
 
 func TestCreateSpatialChannels2(t *testing.T) {
@@ -70,7 +80,19 @@ func TestCreateSpatialChannels2(t *testing.T) {
 	channels, err := ctl.CreateChannels(ctx)
 	assert.NoError(t, err)
 	assert.Len(t, channels, 1)
-	assert.Empty(t, testConn.SubscribedChannels)
+	assert.Empty(t, testConn.subscribedChannels)
+
+	testConn.removed = true
+	ctl.Tick()
+	assert.EqualValues(t, 0, ctl.nextServerIndex())
+
+	testConn.removed = false
+	channels, err = ctl.CreateChannels(ctx)
+	assert.NoError(t, err)
+	assert.EqualValues(t, channels[0].id, GlobalSettings.SpatialChannelIdStart)
+	assert.EqualValues(t, 1, ctl.nextServerIndex())
+	_, err = ctl.CreateChannels(ctx)
+	assert.Error(t, err)
 }
 
 func TestCreateSpatialChannels1(t *testing.T) {
@@ -111,7 +133,7 @@ func TestCreateSpatialChannels1(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, channels, 2)
 	}
-	assert.EqualValues(t, 6, ctl.serverIndex)
+	assert.EqualValues(t, 6, ctl.nextServerIndex())
 
 	/* Grids and Servers:
 	3  2  |  1  0
@@ -120,40 +142,41 @@ func TestCreateSpatialChannels1(t *testing.T) {
 	-------------
 	11 10 |  9  8
 	*/
-	assert.Contains(t, conns[0].SubscribedChannels, GlobalSettings.SpatialChannelIdStart+2)
-	assert.Contains(t, conns[0].SubscribedChannels, GlobalSettings.SpatialChannelIdStart+4)
-	assert.Contains(t, conns[0].SubscribedChannels, GlobalSettings.SpatialChannelIdStart+5)
+	assert.Contains(t, conns[0].subscribedChannels, GlobalSettings.SpatialChannelIdStart+2)
+	assert.Contains(t, conns[0].subscribedChannels, GlobalSettings.SpatialChannelIdStart+4)
+	assert.Contains(t, conns[0].subscribedChannels, GlobalSettings.SpatialChannelIdStart+5)
 
-	assert.Contains(t, conns[1].SubscribedChannels, GlobalSettings.SpatialChannelIdStart+1)
-	assert.Contains(t, conns[1].SubscribedChannels, GlobalSettings.SpatialChannelIdStart+6)
-	assert.Contains(t, conns[1].SubscribedChannels, GlobalSettings.SpatialChannelIdStart+7)
+	assert.Contains(t, conns[1].subscribedChannels, GlobalSettings.SpatialChannelIdStart+1)
+	assert.Contains(t, conns[1].subscribedChannels, GlobalSettings.SpatialChannelIdStart+6)
+	assert.Contains(t, conns[1].subscribedChannels, GlobalSettings.SpatialChannelIdStart+7)
 
-	assert.Contains(t, conns[2].SubscribedChannels, GlobalSettings.SpatialChannelIdStart+0)
-	assert.Contains(t, conns[2].SubscribedChannels, GlobalSettings.SpatialChannelIdStart+1)
-	assert.Contains(t, conns[2].SubscribedChannels, GlobalSettings.SpatialChannelIdStart+6)
-	assert.Contains(t, conns[2].SubscribedChannels, GlobalSettings.SpatialChannelIdStart+8)
-	assert.Contains(t, conns[2].SubscribedChannels, GlobalSettings.SpatialChannelIdStart+9)
+	assert.Contains(t, conns[2].subscribedChannels, GlobalSettings.SpatialChannelIdStart+0)
+	assert.Contains(t, conns[2].subscribedChannels, GlobalSettings.SpatialChannelIdStart+1)
+	assert.Contains(t, conns[2].subscribedChannels, GlobalSettings.SpatialChannelIdStart+6)
+	assert.Contains(t, conns[2].subscribedChannels, GlobalSettings.SpatialChannelIdStart+8)
+	assert.Contains(t, conns[2].subscribedChannels, GlobalSettings.SpatialChannelIdStart+9)
 
-	assert.Contains(t, conns[3].SubscribedChannels, GlobalSettings.SpatialChannelIdStart+2)
-	assert.Contains(t, conns[3].SubscribedChannels, GlobalSettings.SpatialChannelIdStart+3)
-	assert.Contains(t, conns[3].SubscribedChannels, GlobalSettings.SpatialChannelIdStart+5)
-	assert.Contains(t, conns[3].SubscribedChannels, GlobalSettings.SpatialChannelIdStart+10)
-	assert.Contains(t, conns[3].SubscribedChannels, GlobalSettings.SpatialChannelIdStart+11)
+	assert.Contains(t, conns[3].subscribedChannels, GlobalSettings.SpatialChannelIdStart+2)
+	assert.Contains(t, conns[3].subscribedChannels, GlobalSettings.SpatialChannelIdStart+3)
+	assert.Contains(t, conns[3].subscribedChannels, GlobalSettings.SpatialChannelIdStart+5)
+	assert.Contains(t, conns[3].subscribedChannels, GlobalSettings.SpatialChannelIdStart+10)
+	assert.Contains(t, conns[3].subscribedChannels, GlobalSettings.SpatialChannelIdStart+11)
 
-	assert.Contains(t, conns[5].SubscribedChannels, GlobalSettings.SpatialChannelIdStart+6)
-	assert.Contains(t, conns[5].SubscribedChannels, GlobalSettings.SpatialChannelIdStart+7)
-	assert.Contains(t, conns[5].SubscribedChannels, GlobalSettings.SpatialChannelIdStart+9)
+	assert.Contains(t, conns[5].subscribedChannels, GlobalSettings.SpatialChannelIdStart+6)
+	assert.Contains(t, conns[5].subscribedChannels, GlobalSettings.SpatialChannelIdStart+7)
+	assert.Contains(t, conns[5].subscribedChannels, GlobalSettings.SpatialChannelIdStart+9)
 }
 
 type testConnection struct {
-	SentMsgs           []MessageContext
-	SubscribedChannels map[ChannelId]*Channel
+	sentMsgs           []MessageContext
+	subscribedChannels map[ChannelId]*Channel
+	removed            bool
 }
 
 func createTestConnection() *testConnection {
 	return &testConnection{
-		SentMsgs:           make([]MessageContext, 0),
-		SubscribedChannels: make(map[ChannelId]*Channel),
+		sentMsgs:           make([]MessageContext, 0),
+		subscribedChannels: make(map[ChannelId]*Channel),
 	}
 }
 
@@ -173,20 +196,27 @@ func (c *testConnection) HasAuthorityOver(ch *Channel) bool {
 	return false
 }
 
+func (c *testConnection) Remove() {
+	c.removed = true
+}
+
 func (c *testConnection) IsRemoving() bool {
-	return false
+	return c.removed
 }
 
 func (c *testConnection) Send(ctx MessageContext) {
 
 }
 
-func (c *testConnection) SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) {
-	c.SubscribedChannels[ch.id] = ch
+func (c *testConnection) SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) *ChannelSubscription {
+	c.subscribedChannels[ch.id] = ch
+	return &ChannelSubscription{
+		options: channeldpb.ChannelSubscriptionOptions{},
+	}
 }
 
 func (c *testConnection) UnsubscribeFromChannel(ch *Channel) error {
-	delete(c.SubscribedChannels, ch.id)
+	delete(c.subscribedChannels, ch.id)
 	return nil
 }
 

@@ -223,6 +223,11 @@ func (ch *Channel) Tick() {
 			return
 		}
 
+		// Run the code of SpatialController only in GLOBAL channel, to avoid any race condition.
+		if ch.channelType == channeldpb.ChannelType_GLOBAL && spatialController != nil {
+			spatialController.Tick()
+		}
+
 		// Tick connections
 		/*
 			if ch.ownerConnection != nil {

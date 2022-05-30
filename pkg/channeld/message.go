@@ -73,6 +73,13 @@ func handleServerToClientUserMessage(ctx MessageContext) {
 		return
 	}
 
+	ctx.Connection.Logger().Debug("forward user-space message",
+		zap.Uint32("msgType", uint32(ctx.MsgType)),
+		zap.Uint32("clientConnId", msg.ClientConnId),
+		zap.Uint32("channelId", uint32(ctx.Channel.id)),
+		zap.Int("payloadSize", len(msg.Payload)),
+	)
+
 	switch ctx.Broadcast {
 	case channeldpb.BroadcastType_NO_BROADCAST:
 		if ctx.Channel.HasOwner() {

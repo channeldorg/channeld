@@ -11,10 +11,12 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
+// Runs in GLOBAL channel
 type SpatialController interface {
 	common.SpatialInfoChangedNotifier
 	GetChannelId(info common.SpatialInfo) (ChannelId, error)
 	CreateChannels(ctx MessageContext) ([]*Channel, error)
+	Tick()
 }
 
 var spatialController SpatialController
@@ -61,7 +63,7 @@ type StaticGrid2DSpatialController struct {
 	// Remarks: the value should always be less than the size of the authority area (=Min(GridCols/ServerCols, GridRows/ServerRows))
 	ServerInterestBorderSize uint32
 
-	serverIndex       uint32
+	//serverIndex       uint32
 	serverConnections []ConnectionInChannel
 }
 
@@ -87,7 +89,9 @@ func (ctl *StaticGrid2DSpatialController) GetChannelIdWithOffset(info common.Spa
 }
 
 func (ctl *StaticGrid2DSpatialController) CreateChannels(ctx MessageContext) ([]*Channel, error) {
-	if ctl.serverIndex >= ctl.ServerCols*ctl.ServerRows {
+	ctl.initServerConnections()
+	serverIndex := ctl.nextServerIndex()
+	if serverIndex >= ctl.ServerCols*ctl.ServerRows {
 		return nil, fmt.Errorf("failed to create spatail channel as all %d grids are allocated to %d servers", ctl.GridCols*ctl.GridRows, ctl.ServerCols*ctl.ServerRows)
 	}
 
@@ -108,8 +112,8 @@ func (ctl *StaticGrid2DSpatialController) CreateChannels(ctx MessageContext) ([]
 	}
 
 	channelIds := make([]ChannelId, serverGridCols*serverGridRows)
-	serverX := ctl.serverIndex % ctl.ServerCols
-	serverY := ctl.serverIndex / ctl.ServerCols
+	serverX := serverIndex % ctl.ServerCols
+	serverY := serverIndex / ctl.ServerCols
 	var spatialInfo common.SpatialInfo
 	for y := uint32(0); y < serverGridRows; y++ {
 		for x := uint32(0); x < serverGridCols; x++ {
@@ -141,15 +145,13 @@ func (ctl *StaticGrid2DSpatialController) CreateChannels(ctx MessageContext) ([]
 		channels[index] = channel
 	}
 
-	if ctl.serverConnections == nil {
-		ctl.serverConnections = make([]ConnectionInChannel, ctl.ServerCols*ctl.ServerRows)
-	}
 	// Save the connection for later use
-	ctl.serverConnections[ctl.serverIndex] = ctx.Connection
-	ctl.serverIndex++
+	ctl.serverConnections[serverIndex] = ctx.Connection
+	//ctl.serverIndex++
+	serverIndex = ctl.nextServerIndex()
 	// When all spatial channels are created, subscribe each server to its adjacent grids(channels)
-	if ctl.serverIndex == ctl.ServerCols*ctl.ServerRows {
-		for i := uint32(0); i < ctl.serverIndex; i++ {
+	if serverIndex == ctl.ServerCols*ctl.ServerRows {
+		for i := uint32(0); i < serverIndex; i++ {
 			err := ctl.subToAdjacentChannels(i, serverGridCols, serverGridRows, msg.SubOptions)
 			if err != nil {
 				return channels, fmt.Errorf("failed to sub to adjacent channels of server connection %d, err: %v", ctl.serverConnections[i].Id(), err)
@@ -342,6 +344,31 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 		StubId:    0,
 		ChannelId: uint32(newChannelId),
 	})
+}
+
+func (ctl *StaticGrid2DSpatialController) initServerConnections() {
+	if ctl.serverConnections == nil {
+		ctl.serverConnections = make([]ConnectionInChannel, ctl.ServerCols*ctl.ServerRows)
+	}
+}
+
+func (ctl *StaticGrid2DSpatialController) nextServerIndex() uint32 {
+	var i int = 0
+	for i = 0; i < len(ctl.serverConnections); i++ {
+		if ctl.serverConnections[i] == nil || ctl.serverConnections[i].IsRemoving() {
+			break
+		}
+	}
+	return uint32(i)
+}
+
+func (ctl *StaticGrid2DSpatialController) Tick() {
+	ctl.initServerConnections()
+	for i := 0; i < len(ctl.serverConnections); i++ {
+		if ctl.serverConnections[i] != nil && ctl.serverConnections[i].IsRemoving() {
+			ctl.serverConnections[i] = nil
+		}
+	}
 }
 
 /*
