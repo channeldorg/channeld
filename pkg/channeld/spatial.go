@@ -15,6 +15,7 @@ import (
 type SpatialController interface {
 	common.SpatialInfoChangedNotifier
 	GetChannelId(info common.SpatialInfo) (ChannelId, error)
+	GetRegions() ([]*channeldpb.SpatialRegion, error)
 	CreateChannels(ctx MessageContext) ([]*Channel, error)
 	Tick()
 }
@@ -86,6 +87,30 @@ func (ctl *StaticGrid2DSpatialController) GetChannelIdWithOffset(info common.Spa
 	}
 	index := uint32(gridX) + uint32(gridY)*ctl.GridCols
 	return ChannelId(index) + GlobalSettings.SpatialChannelIdStart, nil
+}
+
+func (ctl *StaticGrid2DSpatialController) GetRegions() ([]*channeldpb.SpatialRegion, error) {
+	regions := make([]*channeldpb.SpatialRegion, ctl.GridCols*ctl.GridRows)
+	for y := uint32(0); y < ctl.GridRows; y++ {
+		for x := uint32(0); x < ctl.GridCols; x++ {
+			index := x + y*ctl.GridCols
+			serverX := x / ctl.ServerCols
+			serverY := y / ctl.ServerRows
+			regions[index] = &channeldpb.SpatialRegion{
+				Min: &channeldpb.SpatialInfo{
+					X: ctl.WorldOffsetX + ctl.GridWidth*float64(x),
+					Z: ctl.WorldOffsetZ + ctl.GridHeight*float64(y),
+				},
+				Max: &channeldpb.SpatialInfo{
+					X: ctl.WorldOffsetX + ctl.GridWidth*float64(x+1),
+					Z: ctl.WorldOffsetZ + ctl.GridHeight*float64(y+1),
+				},
+				ChannelId:   uint32(GlobalSettings.SpatialChannelIdStart) + index,
+				ServerIndex: serverX + serverY*ctl.ServerCols,
+			}
+		}
+	}
+	return regions, nil
 }
 
 func (ctl *StaticGrid2DSpatialController) CreateChannels(ctx MessageContext) ([]*Channel, error) {
@@ -330,6 +355,7 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 		DstChannelId: uint32(newChannelId),
 		Data:         anyData,
 	}
+
 	oldChannel.ownerConnection.Send(MessageContext{
 		MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
 		Msg:       handoverMsg,
@@ -337,13 +363,16 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 		StubId:    0,
 		ChannelId: uint32(oldChannelId),
 	})
-	newChannel.ownerConnection.Send(MessageContext{
-		MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
-		Msg:       handoverMsg,
-		Broadcast: channeldpb.BroadcastType_NO_BROADCAST,
-		StubId:    0,
-		ChannelId: uint32(newChannelId),
-	})
+
+	if newChannel.ownerConnection != oldChannel.ownerConnection {
+		newChannel.ownerConnection.Send(MessageContext{
+			MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
+			Msg:       handoverMsg,
+			Broadcast: channeldpb.BroadcastType_NO_BROADCAST,
+			StubId:    0,
+			ChannelId: uint32(newChannelId),
+		})
+	}
 }
 
 func (ctl *StaticGrid2DSpatialController) initServerConnections() {
@@ -367,6 +396,7 @@ func (ctl *StaticGrid2DSpatialController) Tick() {
 	for i := 0; i < len(ctl.serverConnections); i++ {
 		if ctl.serverConnections[i] != nil && ctl.serverConnections[i].IsRemoving() {
 			ctl.serverConnections[i] = nil
+			logger.Info("reset spatial server connection", zap.Int("serverIndex", i))
 		}
 	}
 }

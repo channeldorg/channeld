@@ -38,11 +38,14 @@ func (dst *TankGameChannelData) Merge(src proto.Message, options *channeldpb.Cha
 	for k, v := range srcMsg.TransformStates {
 		if v.Removed {
 			delete(dst.TransformStates, k)
-		} else {
-			trans, exists := dst.TransformStates[k]
-			if exists {
-				if v.Position != nil {
-					if trans.Position != nil && spatialNotifier != nil {
+			continue
+		}
+
+		trans, exists := dst.TransformStates[k]
+		if exists {
+			if v.Position != nil {
+				if trans.Position != nil && spatialNotifier != nil {
+					if trans.Position.X != v.Position.X || trans.Position.Z != v.Position.Z {
 						spatialNotifier.Notify(
 							common.SpatialInfo{
 								X: float64(trans.Position.X),
@@ -53,32 +56,30 @@ func (dst *TankGameChannelData) Merge(src proto.Message, options *channeldpb.Cha
 							func() proto.Message {
 								data := &TankGameChannelData{
 									TransformStates: map[uint32]*channeldpb.TransformState{
-										k: v,
+										k: trans, //v,
 									},
 									TankStates: map[uint32]*TankState{},
 								}
 
 								if tankState, exists := dst.TankStates[k]; exists {
 									data.TankStates[k] = tankState
-
-									// TODO: sub/unsub the tank's client connection between spatial channels
 								}
 
 								return data
 							},
 						)
 					}
-					trans.Position = v.Position
 				}
-				if v.Rotation != nil {
-					trans.Rotation = v.Rotation
-				}
-				if v.Scale != nil {
-					trans.Scale = v.Scale
-				}
-			} else {
-				dst.TransformStates[k] = v
+				trans.Position = v.Position
 			}
+			if v.Rotation != nil {
+				trans.Rotation = v.Rotation
+			}
+			if v.Scale != nil {
+				trans.Scale = v.Scale
+			}
+		} else {
+			dst.TransformStates[k] = v
 		}
 	}
 

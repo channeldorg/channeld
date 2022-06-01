@@ -37,8 +37,9 @@ var MessageMap = map[channeldpb.MessageType]*messageMapEntry{
 	channeldpb.MessageType_CHANNEL_DATA_UPDATE: {&channeldpb.ChannelDataUpdateMessage{}, handleChannelDataUpdate},
 	channeldpb.MessageType_DISCONNECT:          {&channeldpb.DisconnectMessage{}, handleDisconnect},
 	// CREATE_CHANNEL and CREATE_SPATIAL_CHANNEL shared the same message structure and handler
-	channeldpb.MessageType_CREATE_SPATIAL_CHANNEL: {&channeldpb.CreateChannelMessage{}, handleCreateChannel},
-	channeldpb.MessageType_QUERY_SPATIAL_CHANNEL:  {&channeldpb.QuerySpatialChannelMessage{}, handleQuerySpatialChannel},
+	channeldpb.MessageType_CREATE_SPATIAL_CHANNEL:    {&channeldpb.CreateChannelMessage{}, handleCreateChannel},
+	channeldpb.MessageType_QUERY_SPATIAL_CHANNEL:     {&channeldpb.QuerySpatialChannelMessage{}, handleQuerySpatialChannel},
+	channeldpb.MessageType_DEBUG_GET_SPATIAL_REGIONS: {&channeldpb.DebugGetSpatialRegionsMessage{}, handleGetSpatialRegionsMessage},
 }
 
 func RegisterMessageHandler(msgType uint32, msg Message, handler MessageHandlerFunc) {
@@ -100,7 +101,7 @@ func handleServerToClientUserMessage(ctx MessageContext) {
 		if clientConn != nil {
 			clientConn.Send(ctx)
 		} else {
-			ctx.Connection.Logger().Error("cannot forward the message as the target connection does not exist",
+			ctx.Connection.Logger().Warn("cannot forward the message as the target connection does not exist",
 				zap.Uint32("msgType", uint32(ctx.MsgType)),
 				zap.Uint32("targetConnId", msg.ClientConnId),
 			)
@@ -115,7 +116,7 @@ func handleAuth(ctx MessageContext) {
 	}
 	_, ok := ctx.Msg.(*channeldpb.AuthMessage)
 	if !ok {
-		ctx.Connection.Logger().Error("mssage is not a AuthMessage, will not be handled.")
+		ctx.Connection.Logger().Error("mssage is not an AuthMessage, will not be handled.")
 		return
 	}
 	//log.Printf("Auth PIT: %s, LT: %s\n", msg.PlayerIdentifierToken, msg.LoginToken)

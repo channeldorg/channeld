@@ -5,4 +5,4 @@
 _data
 /vendor
 .devcontainer/devcontainer.json
-cmd/gen_proto.sh
+cmd/gen_proto.*

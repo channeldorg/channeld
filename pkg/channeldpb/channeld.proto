@@ -105,6 +105,9 @@ enum MessageType {
     // Used by @ChannelDataHandoverMessage
     CHANNEL_DATA_HANDOVER = 12;
     
+    // Used by @DebugGetSpatialRegionsMessage and DebugGetSpatialRegionsResultMessage
+    DEBUG_GET_SPATIAL_REGIONS = 99;
+
     // Start of any user-space defined message
     USER_SPACE_START = 100;
 }
@@ -247,7 +250,7 @@ message DisconnectMessage {
     uint32 connId = 1;
 }
 
-// ----------------- START OF SPATIAL MESSAGES --------------------//
+// ----------------- SPATIAL messages start --------------------//
 
 message SpatialInfo {
     double x = 1;
@@ -277,11 +280,20 @@ message ChannelDataHandoverMessage {
     google.protobuf.Any data = 3;
 }
 
-// ------------------ END SPATIAL MESSAGES ---------------------//
+// ------------------ DEBUG messages start ---------------------//
 
+message SpatialRegion {
+    SpatialInfo min = 1;
+    SpatialInfo max = 2;
+    uint32 channelId = 3;
+    uint32 serverIndex = 4;
+}
 
+message DebugGetSpatialRegionsMessage {
+}
 
-// ----------------- START OF INTERNAL MESSAGES --------------------//
+message DebugGetSpatialRegionsResultMessage {
+    repeated SpatialRegion regions = 1;
+}
 
-
-// ------------------ END INTERNAL MESSAGES ---------------------//
+// ----------------- INTERNAL messages start --------------------//
