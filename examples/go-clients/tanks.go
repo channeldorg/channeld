@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"channeld.clewcat.com/channeld/examples/unity-mirror-tanks/tankspb"
+	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -18,7 +20,7 @@ const (
 )
 
 func TanksInitFunc(client *Client, data *clientData) {
-	data.ctx[ctxKeyTanksChannelData] = &channeldpb.TankGameChannelData{}
+	data.ctx[ctxKeyTanksChannelData] = &tankspb.TankGameChannelData{}
 	client.AddMessageHandler(uint32(channeldpb.MessageType_AUTH), func(c *Client, channelId uint32, m Message) {
 		resultMsg := m.(*channeldpb.AuthResultMessage)
 		if resultMsg.Result == channeldpb.AuthResultMessage_SUCCESSFUL {
@@ -42,7 +44,7 @@ var TanksClientActions = []*clientAction{
 		probability: 1,
 		minInterval: time.Millisecond * 200,
 		perform: func(client *Client, data *clientData) bool {
-			tanksChannelData, ok := data.ctx[ctxKeyTanksChannelData].(*channeldpb.TankGameChannelData)
+			tanksChannelData, ok := data.ctx[ctxKeyTanksChannelData].(*tankspb.TankGameChannelData)
 			if !ok {
 				return false
 			}
@@ -73,7 +75,7 @@ var TanksClientActions = []*clientAction{
 				log.Printf("updating transform (netId=%d) to %s\n", netId, pos.String())
 			*/
 
-			any, err := anypb.New(&channeldpb.TankGameChannelData{
+			any, err := anypb.New(&tankspb.TankGameChannelData{
 				TransformStates: map[uint32]*channeldpb.TransformState{
 					netId: {
 						//Position: transform.Position,
@@ -117,13 +119,13 @@ var tanksNetIdMapping sync.Map
 
 func wrapTanksChannelDataUpateHandle(data *clientData) MessageHandlerFunc {
 	return func(client *Client, channelId uint32, m Message) {
-		tanksChannelData, ok := data.ctx[ctxKeyTanksChannelData].(*channeldpb.TankGameChannelData)
+		tanksChannelData, ok := data.ctx[ctxKeyTanksChannelData].(*tankspb.TankGameChannelData)
 		if !ok {
 			log.Println("tanksChannelData is not initialized in the ctx!")
 			return
 		}
 		updateMsg, _ := m.(*channeldpb.ChannelDataUpdateMessage)
-		var channelData channeldpb.TankGameChannelData
+		var channelData tankspb.TankGameChannelData
 		updateMsg.Data.UnmarshalTo(&channelData)
 		proto.Merge(tanksChannelData, &channelData)
 

@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"time"
 
+	"channeld.clewcat.com/channeld/examples/chat-rooms/chatpb"
+	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -128,8 +130,8 @@ var ChatClientActions = []*clientAction{
 		probability: 1,
 		minInterval: time.Millisecond * 1000,
 		perform: func(client *Client, data *clientData) bool {
-			dataUpdate, _ := anypb.New(&channeldpb.ChatChannelData{
-				ChatMessages: []*channeldpb.ChatMessage{{
+			dataUpdate, _ := anypb.New(&chatpb.ChatChannelData{
+				ChatMessages: []*chatpb.ChatMessage{{
 					Sender:   fmt.Sprintf("Client%d", client.Id),
 					SendTime: time.Now().Unix(),
 					Content:  fmt.Sprintf("How are you, User%d?", rand.Intn(ClientNum)),
