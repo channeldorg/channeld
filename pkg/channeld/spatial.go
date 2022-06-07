@@ -90,12 +90,23 @@ func (ctl *StaticGrid2DSpatialController) GetChannelIdWithOffset(info common.Spa
 }
 
 func (ctl *StaticGrid2DSpatialController) GetRegions() ([]*channeldpb.SpatialRegion, error) {
+	// How many grids a server has in X axis
+	serverGridCols := ctl.GridCols / ctl.ServerCols
+	if ctl.GridCols%ctl.ServerCols > 0 {
+		serverGridCols++
+	}
+	// How many grids a server has in Z axis
+	serverGridRows := ctl.GridRows / ctl.ServerRows
+	if ctl.GridRows%ctl.ServerRows > 0 {
+		serverGridRows++
+	}
+
 	regions := make([]*channeldpb.SpatialRegion, ctl.GridCols*ctl.GridRows)
 	for y := uint32(0); y < ctl.GridRows; y++ {
 		for x := uint32(0); x < ctl.GridCols; x++ {
 			index := x + y*ctl.GridCols
-			serverX := x / ctl.ServerCols
-			serverY := y / ctl.ServerRows
+			serverX := x / serverGridCols
+			serverY := y / serverGridRows
 			regions[index] = &channeldpb.SpatialRegion{
 				Min: &channeldpb.SpatialInfo{
 					X: ctl.WorldOffsetX + ctl.GridWidth*float64(x),
