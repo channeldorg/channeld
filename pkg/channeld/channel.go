@@ -228,60 +228,71 @@ func (ch *Channel) Tick() {
 			spatialController.Tick()
 		}
 
-		// Tick connections
-		/*
-			if ch.ownerConnection != nil {
-				if ch.ownerConnection.IsRemoving() {
-					ch.ownerConnection = nil
-				}
-			}
-		*/
-		for conn := range ch.subscribedConnections {
-			if conn.IsRemoving() {
-				// Unsub the connection from the channel
-				delete(ch.subscribedConnections, conn)
-				if ownerConn, ok := ch.ownerConnection.(*Connection); ok && conn != nil {
-					if ownerConn == conn {
-						// Reset the owner if it's removed
-						ch.ownerConnection = nil
-						conn.Logger().Info("found removed ownner connection of channel", zap.Uint32("channelId", uint32(ch.id)))
-						if GlobalSettings.GetChannelSettings(ch.channelType).RemoveChannelAfterOwnerRemoved {
-							// TODO: send RemoveChannelMessage to all subscribed connections
-							RemoveChannel(ch)
-							ch.Logger().Info("removed channel after the owner is removed")
-							return
-						}
-					} else if conn != nil {
-						ch.ownerConnection.sendUnsubscribed(MessageContext{}, ch, conn.(*Connection), 0)
-					}
-				}
-			}
-		}
-
 		tickStart := time.Now()
 		ch.tickFrames++
 
-		for len(ch.inMsgQueue) > 0 {
-			cm := <-ch.inMsgQueue
-			if cm.ctx.Connection == nil {
-				ch.Logger().Warn("drops message as the sender is lost", zap.Uint32("msgType", uint32(cm.ctx.MsgType)))
-				continue
-			}
-			cm.handler(cm.ctx)
-			if ch.tickInterval > 0 && time.Since(tickStart) >= ch.tickInterval {
-				ch.Logger().Warn("spent too long handling messages, will delay the left to the next tick",
-					zap.Duration("duration", time.Since(tickStart)),
-					zap.Int("remaining", len(ch.inMsgQueue)),
-				)
-				break
-			}
-		}
+		ch.tickMessages(tickStart)
+
 		ch.tickData(ch.GetTime())
+
+		ch.tickConnections()
 
 		tickDuration := time.Since(tickStart)
 		channelTickDuration.WithLabelValues(ch.channelType.String()).Set(float64(tickDuration) / float64(time.Millisecond))
 
 		time.Sleep(ch.tickInterval - tickDuration)
+	}
+}
+
+func (ch *Channel) tickMessages(tickStart time.Time) {
+	for len(ch.inMsgQueue) > 0 {
+		cm := <-ch.inMsgQueue
+		if cm.ctx.Connection == nil {
+			ch.Logger().Warn("drops message as the sender is lost", zap.Uint32("msgType", uint32(cm.ctx.MsgType)))
+			continue
+		}
+		cm.handler(cm.ctx)
+		if ch.tickInterval > 0 && time.Since(tickStart) >= ch.tickInterval {
+			ch.Logger().Warn("spent too long handling messages, will delay the left to the next tick",
+				zap.Duration("duration", time.Since(tickStart)),
+				zap.Int("remaining", len(ch.inMsgQueue)),
+			)
+			break
+		}
+	}
+}
+
+func (ch *Channel) tickConnections() {
+
+	// Tick connections
+	/*
+		if ch.ownerConnection != nil {
+			if ch.ownerConnection.IsRemoving() {
+				ch.ownerConnection = nil
+			}
+		}
+	*/
+	for conn := range ch.subscribedConnections {
+		if conn.IsRemoving() {
+			// Unsub the connection from the channel
+			delete(ch.subscribedConnections, conn)
+			conn.Logger().Info("removed subscription of a disconnected endpoint", zap.Uint32("channelId", uint32(ch.id)))
+			if ownerConn, ok := ch.ownerConnection.(*Connection); ok && conn != nil {
+				if ownerConn == conn {
+					// Reset the owner if it's removed
+					ch.ownerConnection = nil
+					conn.Logger().Info("found removed ownner connection of channel", zap.Uint32("channelId", uint32(ch.id)))
+					if GlobalSettings.GetChannelSettings(ch.channelType).RemoveChannelAfterOwnerRemoved {
+						// TODO: send RemoveChannelMessage to all subscribed connections
+						RemoveChannel(ch)
+						ch.Logger().Info("removed channel after the owner is removed")
+						return
+					}
+				} else if conn != nil {
+					ch.ownerConnection.sendUnsubscribed(MessageContext{}, ch, conn.(*Connection), 0)
+				}
+			}
+		}
 	}
 }
 

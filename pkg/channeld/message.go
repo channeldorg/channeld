@@ -348,7 +348,7 @@ func handleSubToChannel(ctx MessageContext) {
 	// The connection that subscribes. Could be different to the connection that sends the message.
 	connToSub := GetConnection(ConnectionId(msg.ConnId))
 	if connToSub == nil {
-		ctx.Connection.Logger().Error("invalid ConnectionId for sub", zap.Uint32("connId", msg.ConnId))
+		ctx.Connection.Logger().Error("invalid ConnectionId for sub", zap.Uint32("connIdInMsg", msg.ConnId))
 		return
 	}
 
