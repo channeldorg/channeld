@@ -30,7 +30,11 @@ type ChannelId uint32
 type ChannelTime int64 // time.Duration
 
 func (t ChannelTime) AddMs(ms uint32) ChannelTime {
-	return t + ChannelTime(uint32(time.Millisecond)*ms)
+	return t + ChannelTime(ms*uint32(time.Millisecond))
+}
+
+func (t ChannelTime) OffsetMs(ms int32) ChannelTime {
+	return t + ChannelTime(ms*int32(time.Millisecond))
 }
 
 type channelMessage struct {

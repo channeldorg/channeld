@@ -77,6 +77,8 @@ func TestFanOutChannelData(t *testing.T) {
 	c2 := addTestConnectionWithProcessor(channeldpb.ConnectionType_CLIENT, testChannelDataMessageProcessor)
 
 	testChannel, _ := CreateChannel(channeldpb.ChannelType_TEST, c0)
+	// Stop the channel.Tick() goroutine
+	testChannel.removing = 1
 	dataMsg := &testpb.TestChannelDataMessage{
 		Text: "a",
 		Num:  1,

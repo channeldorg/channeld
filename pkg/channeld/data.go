@@ -142,7 +142,7 @@ func (ch *Channel) tickData(t ChannelTime) {
 			bufp := ch.data.updateMsgBuffer.Front()
 			var accumulatedUpdateMsg common.ChannelDataMessage = nil
 
-			if foc.lastFanOutTime == 0 {
+			if foc.lastFanOutTime <= 0 {
 				// Send the whole data for the first time
 				ch.fanOutDataUpdate(conn, cs, ch.data.msg)
 			} else if bufp != nil {

@@ -7,25 +7,10 @@
         },
         {
             "Name": "OPEN",
-            "MsgTypeWhitelist": "2-20,100-65535",
-            "MsgTypeBlacklist": ""
-        },
-        {
-            "Name": "HANDOVER",
-            "MsgTypeWhitelist": "21,22",
+            "MsgTypeWhitelist": "2-65535",
             "MsgTypeBlacklist": ""
         }
     ],
     "Transitions": [
-        {
-            "FromState": "OPEN",
-            "ToState": "HANDOVER",
-            "MsgType": 20
-        },
-        {
-            "FromState": "HANDOVER",
-            "ToState": "OPEN",
-            "MsgType": 22
-        }
     ]
 }

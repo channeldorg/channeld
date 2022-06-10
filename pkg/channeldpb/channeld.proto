@@ -150,9 +150,22 @@ message AuthResultMessage {
 }
 
 message ChannelSubscriptionOptions {
-	bool CanUpdateData = 1;
+	// Should the subscriber be able to update the channel data?
+    bool CanUpdateData = 1;
+    
+    // How the fields are filtered before sending to the subscriber.
+    // For detailed usage, see https://developers.google.com/protocol-buffers/docs/reference/csharp/class/google/protobuf/well-known-types/field-mask.
 	repeated string DataFieldMasks = 2;
+    
+    // How frequent the updated channel data will be fanned-out to the subscriber, in millisecond. 
+    // For an MMORPG-style server/client, the value should be between 50-100, while an FPS-style game, the value should be between 10-30.
 	uint32 FanOutIntervalMs = 3;
+
+    // How long between the subscription and the first (and full-state) ChannelDataUpdateMessage being send to the subscriber, in millisecond.
+    // To be accurate, the first fan-out time will be (sub time + fan-out delay). It's possible to set the delay to a negative value to makee the first fan-out happen earlier.
+    // Fan-out delay is useful when the clients need spawn message (sent from the backend server) to be handled, before handling the ChannelDataUpdateMessage properly.
+    // In Mirror, it can take up to 100ms to wait.
+    int32 FanOutDelayMs = 4;
 }
 
 // Defines how two @ChannelDataUpdateMessage.data are merged.
@@ -161,11 +174,14 @@ message ChannelSubscriptionOptions {
 message ChannelDataMergeOptions {
     // By default, Protobuf appends the src list to the dst list. Setting this option to true will replace the dst list with the src list.
 	bool shouldReplaceList = 1;
-	// If the value is greater than 0, truncate the the list when oversized.
+	
+    // If the value is greater than 0, truncate the the list when oversized.
 	uint32 listSizeLimit = 2;
+    
     // If true, the top elements of the list will be truncated instead of the end. It's useful for scenarios like chat message list.
     bool truncateTop = 3;
-	// If true, the merge method will remove any map entry that has removed=true in its value.
+	
+    // If true, the merge method will remove any map entry that has removed=true in its value.
 	bool shouldCheckRemovableMapField = 4;
 }
 
