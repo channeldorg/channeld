@@ -308,12 +308,12 @@ func (ctl *StaticGrid2DSpatialController) subToAdjacentChannels(serverIndex uint
 func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, newInfo common.SpatialInfo, handoverDataProvider func() common.ChannelDataMessage) {
 	oldChannelId, err := ctl.GetChannelId(oldInfo)
 	if err != nil {
-		logger.Error("failed to calculate oldChannelId", zap.Error(err))
+		rootLogger.Error("failed to calculate oldChannelId", zap.Error(err))
 		return
 	}
 	newChannelId, err := ctl.GetChannelId(newInfo)
 	if err != nil {
-		logger.Error("failed to calculate newChannelId", zap.Error(err))
+		rootLogger.Error("failed to calculate newChannelId", zap.Error(err))
 		return
 	}
 	if newChannelId == oldChannelId {
@@ -322,31 +322,31 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 
 	oldChannel := GetChannel(oldChannelId)
 	if oldChannel == nil {
-		logger.Error("channel doesn't exist, failed to handover channel data", zap.Uint32("oldChannelId", uint32(oldChannelId)))
+		rootLogger.Error("channel doesn't exist, failed to handover channel data", zap.Uint32("oldChannelId", uint32(oldChannelId)))
 		return
 	}
 	if !oldChannel.HasOwner() {
-		logger.Error("channel doesn't have owner, failed to handover channel data", zap.Uint32("oldChannelId", uint32(oldChannelId)))
+		rootLogger.Error("channel doesn't have owner, failed to handover channel data", zap.Uint32("oldChannelId", uint32(oldChannelId)))
 	}
 
 	newChannel := GetChannel(newChannelId)
 	if newChannel == nil {
-		logger.Error("channel doesn't exist, failed to handover channel data", zap.Uint32("newChannelId", uint32(newChannelId)))
+		rootLogger.Error("channel doesn't exist, failed to handover channel data", zap.Uint32("newChannelId", uint32(newChannelId)))
 		return
 	}
 	if !oldChannel.HasOwner() {
-		logger.Error("channel doesn't have owner, failed to handover channel data", zap.Uint32("newChannelId", uint32(newChannelId)))
+		rootLogger.Error("channel doesn't have owner, failed to handover channel data", zap.Uint32("newChannelId", uint32(newChannelId)))
 	}
 
 	handoverData := handoverDataProvider()
 	if handoverData == nil {
-		logger.Error("failed to provider handover channel data", zap.Uint32("oldChannelId", uint32(oldChannelId)), zap.Uint32("newChannelId", uint32(newChannelId)))
+		rootLogger.Error("failed to provider handover channel data", zap.Uint32("oldChannelId", uint32(oldChannelId)), zap.Uint32("newChannelId", uint32(newChannelId)))
 		return
 	}
 
 	anyData, err := anypb.New(handoverData)
 	if err != nil {
-		logger.Error("failed to marshall handover data", zap.Error(err))
+		rootLogger.Error("failed to marshall handover data", zap.Error(err))
 		return
 	}
 
@@ -407,7 +407,7 @@ func (ctl *StaticGrid2DSpatialController) Tick() {
 	for i := 0; i < len(ctl.serverConnections); i++ {
 		if ctl.serverConnections[i] != nil && ctl.serverConnections[i].IsRemoving() {
 			ctl.serverConnections[i] = nil
-			logger.Info("reset spatial server connection", zap.Int("serverIndex", i))
+			rootLogger.Info("reset spatial server connection", zap.Int("serverIndex", i))
 		}
 	}
 }

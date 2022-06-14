@@ -234,7 +234,7 @@ func mergeWithOptions(dst Message, src Message, options *channeldpb.ChannelDataM
 			}
 		}
 		if err := mergeable.Merge(src, options, spatialNotifier); err != nil {
-			logger.Error("custom merge error", zap.Error(err),
+			rootLogger.Error("custom merge error", zap.Error(err),
 				zap.String("dstType", string(dst.ProtoReflect().Descriptor().FullName().Name())),
 				zap.String("srcType", string(src.ProtoReflect().Descriptor().FullName().Name())),
 			)

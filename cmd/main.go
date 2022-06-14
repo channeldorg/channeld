@@ -40,7 +40,8 @@ func main() {
 		fmt.Printf("error parsing CLI flag: %v\n", err)
 	}
 	channeld.StartProfiling()
-	channeld.InitLogsAndMetrics()
+	channeld.InitLogs()
+	channeld.InitMetrics()
 	channeld.InitConnections(channeld.GlobalSettings.ServerFSM, channeld.GlobalSettings.ClientFSM)
 	channeld.InitChannels()
 

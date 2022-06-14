@@ -8,7 +8,7 @@ import (
 )
 
 func TestSubscribeToChannel(t *testing.T) {
-	InitLogsAndMetrics()
+	InitLogs()
 	c1 := &Connection{id: 1, connectionType: channeldpb.ConnectionType_SERVER}
 	//c2 := &Connection{id: 2, connectionType: SERVER}
 	//c3 := &Connection{id: 3, connectionType: CLIENT}

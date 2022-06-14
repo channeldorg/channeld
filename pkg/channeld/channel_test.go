@@ -10,7 +10,7 @@ import (
 )
 
 func TestConcurrentAccessChannels(t *testing.T) {
-	InitLogsAndMetrics()
+	InitLogs()
 	InitChannels()
 	wg := sync.WaitGroup{}
 

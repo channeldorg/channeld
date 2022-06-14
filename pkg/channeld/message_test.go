@@ -12,7 +12,7 @@ import (
 )
 
 func TestHandleListChannels(t *testing.T) {
-	InitLogsAndMetrics()
+	InitLogs()
 	InitChannels()
 	c := addTestConnection(channeldpb.ConnectionType_SERVER)
 	ch0 := globalChannel

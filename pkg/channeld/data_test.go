@@ -69,7 +69,7 @@ func testChannelDataMessageProcessor(msg Message) (Message, error) {
 // See the test case in [the design doc](doc/design.md#fan-out)
 // TODO: add test cases with FieldMasks (no fan-out if no property is updated)
 func TestFanOutChannelData(t *testing.T) {
-	InitLogsAndMetrics()
+	InitLogs()
 	InitChannels()
 
 	c0 := addTestConnectionWithProcessor(channeldpb.ConnectionType_SERVER, testChannelDataMessageProcessor)
@@ -205,7 +205,7 @@ func TestListMoveElement(t *testing.T) {
 }
 
 func TestDataMergeOptions(t *testing.T) {
-	InitLogsAndMetrics()
+	InitLogs()
 	dstMsg := &testpb.TestMergeMessage{
 		List: []string{"a", "b", "c"},
 		Kv: map[int64]*testpb.TestMergeMessage_StringWrapper{

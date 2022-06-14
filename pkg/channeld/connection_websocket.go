@@ -84,7 +84,7 @@ func startWebSocketServer(t channeldpb.ConnectionType, address string) {
 	mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			logger.Panic("Upgrade to websocket connection", zap.Error(err))
+			rootLogger.Panic("Upgrade to websocket connection", zap.Error(err))
 		}
 		c := AddConnection(&wsConn{conn}, t)
 		startGoroutines(c)
@@ -97,5 +97,5 @@ func startWebSocketServer(t channeldpb.ConnectionType, address string) {
 
 	defer server.Close()
 
-	logger.Error("stopped listening", zap.Error(server.ListenAndServe()))
+	rootLogger.Error("stopped listening", zap.Error(server.ListenAndServe()))
 }

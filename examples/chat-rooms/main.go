@@ -67,7 +67,8 @@ func main() {
 	http.HandleFunc("/proto/chat", handleChatProto)
 	http.Handle("/metrics", promhttp.Handler())
 
-	channeld.InitLogsAndMetrics()
+	channeld.InitLogs()
+	channeld.InitMetrics()
 	channeld.InitConnections("../../config/server_authoratative_fsm.json", "../../config/client_authoratative_fsm.json")
 	channeld.InitChannels()
 	channeld.GetChannel(channeld.GlobalChannelId).InitData(

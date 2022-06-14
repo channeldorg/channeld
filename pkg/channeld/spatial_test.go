@@ -7,11 +7,10 @@ import (
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"channeld.clewcat.com/channeld/pkg/common"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
 )
 
 func TestCreateSpatialChannels3(t *testing.T) {
-	InitLogsAndMetrics()
+	InitLogs()
 
 	// 2-by-2-grid world, 1:1 grid:server; servers don't have border
 	ctl := &StaticGrid2DSpatialController{
@@ -55,7 +54,7 @@ func TestCreateSpatialChannels3(t *testing.T) {
 }
 
 func TestCreateSpatialChannels2(t *testing.T) {
-	InitLogsAndMetrics()
+	InitLogs()
 
 	// 1-by-1-grid world consists of 1-by-1-grid server
 	ctl := &StaticGrid2DSpatialController{
@@ -96,7 +95,7 @@ func TestCreateSpatialChannels2(t *testing.T) {
 }
 
 func TestCreateSpatialChannels1(t *testing.T) {
-	InitLogsAndMetrics()
+	InitLogs()
 
 	// 4-by-3-grid world consists of 2-by-1-grid servers - there are 2x3=6 servers.
 	ctl := &StaticGrid2DSpatialController{
@@ -228,8 +227,8 @@ func (c *testConnection) sendUnsubscribed(ctx MessageContext, ch *Channel, connT
 
 }
 
-func (c *testConnection) Logger() *zap.Logger {
-	return logger
+func (c *testConnection) Logger() *Logger {
+	return rootLogger
 }
 
 func TestGetChannelId2(t *testing.T) {

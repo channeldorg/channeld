@@ -54,7 +54,7 @@ type ConnectionInChannel interface {
 	UnsubscribeFromChannel(ch *Channel) error
 	sendSubscribed(ctx MessageContext, ch *Channel, connToSub ConnectionInChannel, stubId uint32, subOptions *channeldpb.ChannelSubscriptionOptions)
 	sendUnsubscribed(ctx MessageContext, ch *Channel, connToUnsub *Connection, stubId uint32)
-	Logger() *zap.Logger
+	Logger() *Logger
 }
 
 type Channel struct {
@@ -72,7 +72,7 @@ type Channel struct {
 	tickInterval          time.Duration
 	tickFrames            int
 	enableClientBroadcast bool
-	logger                *zap.Logger
+	logger                *Logger
 	removing              int32
 }
 
@@ -122,10 +122,10 @@ func createChannelWithId(channelId ChannelId, t channeldpb.ChannelType, owner Co
 		startTime:    time.Now(),
 		tickInterval: time.Duration(GlobalSettings.GetChannelSettings(t).TickIntervalMs) * time.Millisecond,
 		tickFrames:   0,
-		logger: logger.With(
+		logger: &Logger{rootLogger.With(
 			zap.String("channelType", t.String()),
 			zap.Uint32("channelId", uint32(channelId)),
-		),
+		)},
 		removing: 0,
 	}
 
@@ -329,7 +329,7 @@ func (ch *Channel) String() string {
 	return fmt.Sprintf("Channel(%s %d)", ch.channelType.String(), ch.id)
 }
 
-func (ch *Channel) Logger() *zap.Logger {
+func (ch *Channel) Logger() *Logger {
 	return ch.logger
 }
 

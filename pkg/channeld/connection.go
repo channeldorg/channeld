@@ -45,7 +45,7 @@ type Connection struct {
 	sender          MessageSender
 	sendQueue       chan MessageContext
 	fsm             *fsm.FiniteStateMachine
-	logger          *zap.Logger
+	logger          *Logger
 	removing        int32 // Don't put the removing state into the FSM as 1) the FSM's states are user-defined. 2) the FSM doesn't have the race condition.
 }
 
@@ -60,11 +60,11 @@ func InitConnections(serverFsmPath string, clientFsmPath string) {
 		serverFsm, err = fsm.Load(bytes)
 	}
 	if err != nil {
-		logger.Panic("failed to read server FSM",
+		rootLogger.Panic("failed to read server FSM",
 			zap.Error(err),
 		)
 	} else {
-		logger.Info("loaded server FSM",
+		rootLogger.Info("loaded server FSM",
 			zap.String("path", serverFsmPath),
 			zap.String("currentState", serverFsm.CurrentState().Name),
 		)
@@ -75,9 +75,9 @@ func InitConnections(serverFsmPath string, clientFsmPath string) {
 		clientFsm, err = fsm.Load(bytes)
 	}
 	if err != nil {
-		logger.Panic("failed to read client FSM", zap.Error(err))
+		rootLogger.Panic("failed to read client FSM", zap.Error(err))
 	} else {
-		logger.Info("loaded client FSM",
+		rootLogger.Info("loaded client FSM",
 			zap.String("path", clientFsmPath),
 			zap.String("currentState", clientFsm.CurrentState().Name),
 		)
@@ -127,7 +127,7 @@ func startGoroutines(connection *Connection) {
 }
 
 func StartListening(t channeldpb.ConnectionType, network string, address string) {
-	logger.Info("start listenning",
+	rootLogger.Info("start listenning",
 		zap.String("connType", t.String()),
 		zap.String("network", network),
 		zap.String("address", address),
@@ -146,7 +146,7 @@ func StartListening(t channeldpb.ConnectionType, network string, address string)
 	}
 
 	if err != nil {
-		logger.Panic("failed to listen", zap.Error(err))
+		rootLogger.Panic("failed to listen", zap.Error(err))
 		return
 	}
 
@@ -155,7 +155,7 @@ func StartListening(t channeldpb.ConnectionType, network string, address string)
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			logger.Error("failed to accept connection", zap.Error(err))
+			rootLogger.Error("failed to accept connection", zap.Error(err))
 		} else {
 			connection := AddConnection(conn, t)
 			connection.Logger().Debug("accepted connection")
@@ -177,10 +177,10 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 		writer:          bufio.NewWriter(c),
 		sender:          &queuedMessageSender{},
 		sendQueue:       make(chan MessageContext, 128),
-		logger: logger.With(
+		logger: &Logger{rootLogger.With(
 			zap.String("connType", t.String()),
 			zap.Uint32("connId", uint32(nextConnectionId)),
-		),
+		)},
 		removing: 0,
 	}
 	// IMPORTANT: always make a value copy
@@ -194,7 +194,7 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 
 	connection.fsm = &fsm
 	if connection.fsm == nil {
-		logger.Panic("cannot set the FSM for connection", zap.String("connType", t.String()))
+		rootLogger.Panic("cannot set the FSM for connection", zap.String("connType", t.String()))
 	}
 
 	allConnections.Store(connection.id, connection)
@@ -395,7 +395,8 @@ func (c *Connection) receiveMessage(mp *channeldpb.MessagePack) {
 
 	channel.PutMessage(msg, handler, c, mp)
 
-	c.Logger().Debug("received message", zap.Uint32("msgType", mp.MsgType), zap.Int("size", len(mp.MsgBody)))
+	c.Logger().Trace("received message", zap.Uint32("msgType", mp.MsgType), zap.Int("size", len(mp.MsgBody)))
+	//c.Logger().Debug("received message", zap.Uint32("msgType", mp.MsgType), zap.Int("size", len(mp.MsgBody)))
 
 	msgReceived.WithLabelValues(c.connectionType.String()).Inc() /*.WithLabelValues(
 		strconv.FormatUint(uint64(p.ChannelId), 10),
@@ -442,7 +443,7 @@ func (c *Connection) Flush() {
 		})
 		size = proto.Size(&p)
 
-		c.Logger().Debug("sent message", zap.Uint32("msgType", uint32(mc.MsgType)), zap.Int("size", len(msgBody)))
+		c.Logger().Trace("sent message", zap.Uint32("msgType", uint32(mc.MsgType)), zap.Int("size", len(msgBody)))
 
 		msgSent.WithLabelValues(c.connectionType.String()).Inc() /*.WithLabelValues(
 			strconv.FormatUint(uint64(e.Channel.id), 10),
@@ -508,6 +509,6 @@ func (c *Connection) String() string {
 	return fmt.Sprintf("Connection(%s %d %s)", c.connectionType, c.id, c.fsm.CurrentState().Name)
 }
 
-func (c *Connection) Logger() *zap.Logger {
+func (c *Connection) Logger() *Logger {
 	return c.logger
 }

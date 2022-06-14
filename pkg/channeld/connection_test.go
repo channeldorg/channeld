@@ -18,11 +18,11 @@ import (
 
 func TestDropPacket(t *testing.T) {
 	GlobalSettings.Development = true
-	InitLogsAndMetrics()
+	InitLogs()
 	pipeReader, pipeWriter := io.Pipe()
 	c := &Connection{
 		reader: bufio.NewReader(pipeReader),
-		logger: logger,
+		logger: rootLogger,
 	}
 
 	go func() {
@@ -52,7 +52,7 @@ func TestDropPacket(t *testing.T) {
 }
 
 func TestKCPConnection(t *testing.T) {
-	InitLogsAndMetrics()
+	InitLogs()
 	const addr string = "localhost:12108"
 	go func() {
 		StartListening(channeldpb.ConnectionType_CLIENT, "kcp", addr)
@@ -62,7 +62,7 @@ func TestKCPConnection(t *testing.T) {
 }
 
 func TestWebSocketConnection(t *testing.T) {
-	InitLogsAndMetrics()
+	InitLogs()
 	const addr string = "ws://localhost:8080"
 	go func() {
 		StartListening(channeldpb.ConnectionType_CLIENT, "ws", addr)
@@ -72,7 +72,7 @@ func TestWebSocketConnection(t *testing.T) {
 }
 
 func TestConcurrentAccessConnections(t *testing.T) {
-	InitLogsAndMetrics()
+	InitLogs()
 	wg := sync.WaitGroup{}
 
 	wg.Add(1)

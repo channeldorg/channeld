@@ -15,7 +15,8 @@ func main() {
 		fmt.Printf("error parsing CLI flag: %v\n", err)
 	}
 	channeld.StartProfiling()
-	channeld.InitLogsAndMetrics()
+	channeld.InitLogs()
+	channeld.InitMetrics()
 	channeld.InitConnections(channeld.GlobalSettings.ServerFSM, channeld.GlobalSettings.ClientFSM)
 	channeld.InitChannels()
 
@@ -28,16 +29,22 @@ func main() {
 		// GridHeight:   8,
 		// GridCols:     10,
 		// GridRows:     10,
-		WorldOffsetX:             -5,
-		WorldOffsetZ:             -5,
-		GridWidth:                5,
-		GridHeight:               5,
-		GridCols:                 2,
-		GridRows:                 2,
-		ServerCols:               1,
-		ServerRows:               2,
-		ServerInterestBorderSize: 0,
-	})
+
+		WorldOffsetX: -5,
+		WorldOffsetZ: -5,
+		GridWidth:    5,
+		GridHeight:   5,
+		GridCols:     2,
+		GridRows:     2,
+		ServerCols:   1,
+		ServerRows:   1,
+		// GridWidth:                10,
+		// GridHeight:               10,
+		// GridCols:                 1,
+		// GridRows:                 1,
+		// ServerCols:               1,
+		// ServerRows:               1,
+		ServerInterestBorderSize: 0})
 
 	// Setup Prometheus
 	http.Handle("/metrics", promhttp.Handler())
