@@ -63,12 +63,17 @@ type Channel struct {
 	state                 ChannelState
 	ownerConnection       ConnectionInChannel
 	subscribedConnections map[ConnectionInChannel]*ChannelSubscription
-	metadata              string // Read-only property, e.g. name
-	data                  *ChannelData
-	spatialNotifier       common.SpatialInfoChangedNotifier
-	inMsgQueue            chan channelMessage
-	fanOutQueue           *list.List
-	startTime             time.Time // Time since channel created
+	connectionsLock       sync.RWMutex
+	// Read-only property, e.g. name
+	metadata string
+	data     *ChannelData
+	// The ID of the client connection that causes the latest ChannelDataUpdate
+	latestDataUpdateConnId ConnectionId
+	spatialNotifier        common.SpatialInfoChangedNotifier
+	inMsgQueue             chan channelMessage
+	fanOutQueue            *list.List
+	// Time since channel created
+	startTime             time.Time
 	tickInterval          time.Duration
 	tickFrames            int
 	enableClientBroadcast bool
@@ -114,6 +119,7 @@ func createChannelWithId(channelId ChannelId, t channeldpb.ChannelType, owner Co
 		channelType:           t,
 		ownerConnection:       owner,
 		subscribedConnections: make(map[ConnectionInChannel]*ChannelSubscription),
+		connectionsLock:       sync.RWMutex{},
 		/* Channel data is not created by default. See handleCreateChannel().
 		data:                  ReflectChannelData(t, nil),
 		*/
@@ -301,7 +307,7 @@ func (ch *Channel) tickConnections() {
 }
 
 func (ch *Channel) Broadcast(ctx MessageContext) {
-	for conn := range ctx.Channel.subscribedConnections {
+	for conn := range ch.subscribedConnections {
 		//c := GetConnection(connId)
 		if conn == nil {
 			continue
@@ -309,8 +315,25 @@ func (ch *Channel) Broadcast(ctx MessageContext) {
 		if ctx.Broadcast == channeldpb.BroadcastType_ALL_BUT_SENDER && conn == ctx.Connection {
 			continue
 		}
+		if ctx.Broadcast == channeldpb.BroadcastType_ALL_BUT_OWNER && conn == ch.ownerConnection {
+			continue
+		}
 		conn.Send(ctx)
 	}
+}
+
+// Goroutine-safe read of the subscribed connections
+func (ch *Channel) GetAllConnections() map[ConnectionInChannel]struct{} {
+	defer func() {
+		ch.connectionsLock.RUnlock()
+	}()
+	ch.connectionsLock.RLock()
+
+	conns := make(map[ConnectionInChannel]struct{})
+	for conn := range ch.subscribedConnections {
+		conns[conn] = struct{}{}
+	}
+	return conns
 }
 
 // Return true if the connection can 1)remove; 2)sub/unsub another connection to/from; the channel.

@@ -83,6 +83,10 @@ func (ch *Channel) Data() *ChannelData {
 	return ch.data
 }
 
+func (ch *Channel) SetDataUpdateConnId(connId ConnectionId) {
+	ch.latestDataUpdateConnId = connId
+}
+
 func (d *ChannelData) OnUpdate(updateMsg Message, t ChannelTime, spatialNotifier common.SpatialInfoChangedNotifier) {
 	if d.msg == nil {
 		d.msg = updateMsg

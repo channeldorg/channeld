@@ -13,13 +13,18 @@ type Message = proto.Message //protoreflect.ProtoMessage
 
 // The context of a message for both sending and receiving
 type MessageContext struct {
-	MsgType    channeldpb.MessageType
-	Msg        Message             // The weak-typed Message object popped from the message queue
-	Connection ConnectionInChannel // The connection that received the message. No required for sending.
-	Channel    *Channel            // The channel that handling the message. No required for sending.
-	Broadcast  channeldpb.BroadcastType
-	StubId     uint32
-	ChannelId  uint32 // The original channelId in the Packet, could be different from Channel.id.
+	MsgType channeldpb.MessageType
+	// The weak-typed Message object popped from the message queue
+	Msg       Message
+	Broadcast channeldpb.BroadcastType
+	StubId    uint32
+	// The original channelId in the Packet, could be different from Channel.id.
+	ChannelId uint32
+
+	// The connection that received the message. Required for BroadcastType_ALL_BUT_SENDER but not for sending.
+	Connection ConnectionInChannel
+	// The channel that handling the message. Not required for sending or broadcasting.
+	Channel *Channel
 }
 type MessageHandlerFunc func(ctx MessageContext)
 type messageMapEntry struct {
@@ -192,6 +197,11 @@ func handleCreateChannel(ctx MessageContext) {
 		ctx.MsgType = channeldpb.MessageType_CREATE_SPATIAL_CHANNEL
 		ctx.Msg = resultMsg
 		ctx.Connection.Send(ctx)
+		// Also send the response to the GLOBAL channel owner.
+		if globalChannel.ownerConnection != ctx.Connection && globalChannel.HasOwner() {
+			ctx.StubId = 0
+			globalChannel.ownerConnection.Send(ctx)
+		}
 		for _, newChannel = range channels {
 			// Subscribe to channel after creation
 			cs := ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
@@ -476,9 +486,9 @@ func handleChannelDataUpdate(ctx MessageContext) {
 
 	if ctx.Channel.spatialNotifier != nil {
 		if ctx.Connection.GetConnectionType() == channeldpb.ConnectionType_CLIENT {
-			ctx.Channel.spatialNotifier.SetContextConnId(uint32(ctx.Connection.Id()))
+			ctx.Channel.SetDataUpdateConnId(ctx.Connection.Id())
 		} else {
-			ctx.Channel.spatialNotifier.SetContextConnId(msg.ContextConnId)
+			ctx.Channel.SetDataUpdateConnId(ConnectionId(msg.ContextConnId))
 		}
 	}
 	ctx.Channel.Data().OnUpdate(updateMsg, ctx.Channel.GetTime(), ctx.Channel.spatialNotifier)

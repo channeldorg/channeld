@@ -16,6 +16,11 @@ type ChannelSubscription struct {
 }
 
 func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) *ChannelSubscription {
+	defer func() {
+		ch.connectionsLock.Unlock()
+	}()
+	ch.connectionsLock.Lock()
+
 	if ch.subscribedConnections[c] != nil {
 		c.Logger().Info("already subscribed", zap.String("channel", ch.String()))
 		return nil
@@ -55,6 +60,11 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.Channel
 }
 
 func (c *Connection) UnsubscribeFromChannel(ch *Channel) (*channeldpb.ChannelSubscriptionOptions, error) {
+	defer func() {
+		ch.connectionsLock.Unlock()
+	}()
+	ch.connectionsLock.Lock()
+
 	cs, exists := ch.subscribedConnections[c]
 	if !exists {
 		return nil, errors.New("subscription does not exist")

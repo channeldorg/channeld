@@ -35,13 +35,19 @@ message MessagePack {
 enum BroadcastType {
     // No broadcast. All internal messages should use this type, and other types are ignored.
     NO_BROADCAST = 0;
+
     // Broadcast the message to all the connections in the channel, the sender included.
     ALL = 1;
+
     // Broadcast the message to all the connections in the channel, the sender excluded.
     ALL_BUT_SENDER = 2;
+
+    // Broadcast the message to all the connections in the channel, the owner excluded.
+    ALL_BUT_OWNER = 3;
+
     // Forward the message to the connection. Can only be used by the backend server.
     // This has the same behavior as sending the message to the PRIVATE channel owned by the target connection with BroadcastType = NO.
-    SINGLE_CONNECTION = 3; 
+    SINGLE_CONNECTION = 4; 
 }
 
 enum ConnectionType {
@@ -187,7 +193,7 @@ message ChannelDataMergeOptions {
 
 // The message should have channelId = 0 in order to be handled.
 // Response: @CreateChannelResultMessage, if the MessageType is CREATE_CHANNEL and the channelType is not SPATIAL. The channelId in the response MessagePack corresponds to the created channel. The GLOBAL channel owner will also receive this message.
-// Response: @CreateSpatialChannelsResultMessage, if the MessageType is CREATE_SPATIAL_CHANNEL and the channelType is SPATIAL.
+// Response: @CreateSpatialChannelsResultMessage, if the MessageType is CREATE_SPATIAL_CHANNEL and the channelType is SPATIAL. The GLOBAL channel owner will also receive this message.
 // Response: @SubscribedToChannelResultMessage. The channel creator will also be subscripbed to the channel immediately after the creation.
 message CreateChannelMessage {
     ChannelType channelType = 1;

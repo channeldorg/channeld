@@ -12,15 +12,20 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-// Runs in GLOBAL channel
 type SpatialController interface {
+	// Notify() is called in the spatial channels (shared instance)
 	common.SpatialInfoChangedNotifier
+	// Called in GLOBAL and spatial channels
 	GetChannelId(info common.SpatialInfo) (ChannelId, error)
+	// Called in GLOBAL channel
 	GetRegions() ([]*channeldpb.SpatialRegion, error)
+	// Called in GLOBAL channel
 	CreateChannels(ctx MessageContext) ([]*Channel, error)
+	// Called in GLOBAL channel
 	Tick()
 }
 
+// A channeld instance should have only one SpatialController
 var spatialController SpatialController
 
 func InitSpatialController(controller SpatialController) {
@@ -67,11 +72,6 @@ type StaticGrid2DSpatialController struct {
 
 	//serverIndex       uint32
 	serverConnections []ConnectionInChannel
-	contextConnId     uint32
-}
-
-func (ctl *StaticGrid2DSpatialController) SetContextConnId(connId uint32) {
-	ctl.contextConnId = connId
 }
 
 func (ctl *StaticGrid2DSpatialController) GetChannelId(info common.SpatialInfo) (ChannelId, error) {
@@ -313,11 +313,8 @@ func (ctl *StaticGrid2DSpatialController) subToAdjacentChannels(serverIndex uint
 
 var dataMarshalOptions = protojson.MarshalOptions{Multiline: false}
 
+// Runs in the source spatial channel (shared instance)
 func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, newInfo common.SpatialInfo, handoverDataProvider func() common.ChannelDataMessage) {
-	defer func() {
-		ctl.contextConnId = 0
-	}()
-
 	srcChannelId, err := ctl.GetChannelId(oldInfo)
 	if err != nil {
 		rootLogger.Error("failed to calculate srcChannelId", zap.Error(err))
@@ -381,19 +378,25 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 		SrcChannelId:  uint32(srcChannelId),
 		DstChannelId:  uint32(dstChannelId),
 		Data:          anyData,
-		ContextConnId: ctl.contextConnId,
+		ContextConnId: uint32(srcChannel.latestDataUpdateConnId),
 	}
 
-	srcChannel.ownerConnection.Send(MessageContext{
-		MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
-		Msg:       handoverMsg,
-		Broadcast: channeldpb.BroadcastType_NO_BROADCAST,
-		StubId:    0,
-		ChannelId: uint32(srcChannelId),
-	})
-
-	if dstChannel.ownerConnection != srcChannel.ownerConnection {
-		dstChannel.ownerConnection.Send(MessageContext{
+	// Avoid duplicate sending
+	// Race Condition: reading dstChannel's subscribedConnections in srcChannel
+	conns := dstChannel.GetAllConnections()
+	for conn := range srcChannel.subscribedConnections {
+		if _, exists := conns[conn]; !exists {
+			conn.Send(MessageContext{
+				MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
+				Msg:       handoverMsg,
+				Broadcast: channeldpb.BroadcastType_NO_BROADCAST,
+				StubId:    0,
+				ChannelId: uint32(srcChannelId),
+			})
+		}
+	}
+	for conn := range conns {
+		conn.Send(MessageContext{
 			MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
 			Msg:       handoverMsg,
 			Broadcast: channeldpb.BroadcastType_NO_BROADCAST,
@@ -402,6 +405,30 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 		})
 	}
 
+	/* Broadcast in both channels can cause duplicate sending
+	srcChannel.Broadcast(MessageContext{
+		MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
+		Msg:       handoverMsg,
+		Broadcast: channeldpb.BroadcastType_ALL,
+		StubId:    0,
+		ChannelId: uint32(srcChannelId),
+	})
+
+	var broadcastType = channeldpb.BroadcastType_ALL
+	// Don't send the spatial server twice (if it's the owner of both channels)
+	if dstChannel.ownerConnection == srcChannel.ownerConnection {
+		broadcastType = channeldpb.BroadcastType_ALL_BUT_OWNER
+	}
+	dstChannel.Broadcast(MessageContext{
+		MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
+		Msg:       handoverMsg,
+		Broadcast: broadcastType,
+		StubId:    0,
+		ChannelId: uint32(dstChannelId),
+	})
+	*/
+
+	/* Unsub and Sub is controlled by server/client, and has nothing to do with src/dst channel in most cases.
 	// Unsub from srcChannel & Sub to dstChannel
 	clientConn := GetConnection(ConnectionId(ctl.contextConnId))
 	if clientConn != nil {
@@ -417,6 +444,7 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 		clientConn.SubscribeToChannel(dstChannel, subOptions)
 		clientConn.sendSubscribed(MessageContext{}, dstChannel, clientConn, 0, subOptions)
 	}
+	*/
 }
 
 func (ctl *StaticGrid2DSpatialController) initServerConnections() {
