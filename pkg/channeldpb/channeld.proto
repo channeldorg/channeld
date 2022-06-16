@@ -256,6 +256,11 @@ message UnsubscribedFromChannelResultMessage {
 // Response: no. Each connection in the channel receives the @ChannelDataUpdateMessage in every @ChannelSubscriptionOptions.FanOutIntervalMs
 message ChannelDataUpdateMessage {
     google.protobuf.Any data = 1;
+
+    // The ID of the connection that causes the update of the channel data.
+    // In a server-authoratative system (which means the @ChannelDataUpdateMessage will only be sent by server), the servers need to send this field to channeld.
+    // If the sender is a client, this field will be ignored.
+    uint32 contextConnId = 2;
 }
 
 // Disconnect another connection from channeld. 
@@ -293,7 +298,13 @@ message QuerySpatialChannelResultMessage {
 message ChannelDataHandoverMessage {
     uint32 srcChannelId = 1;
     uint32 dstChannelId = 2;
-    google.protobuf.Any data = 3;
+    
+    // The ID of the client connection that triggered the handover. If the handover is triggered by server (e.g. NPC movement), the value will be 0.
+    // The client will be received @UnsubscribedFromChannelResultMessage and @SubscribedToChannelResultMessage.
+    uint32 contextConnId = 3;
+
+    // The spatial channel data that migrate from the source channel to the destination channel.
+    google.protobuf.Any data = 4;
 }
 
 // ------------------ DEBUG messages start ---------------------//

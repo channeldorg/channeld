@@ -8,6 +8,7 @@ import (
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"channeld.clewcat.com/channeld/pkg/common"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -66,6 +67,11 @@ type StaticGrid2DSpatialController struct {
 
 	//serverIndex       uint32
 	serverConnections []ConnectionInChannel
+	contextConnId     uint32
+}
+
+func (ctl *StaticGrid2DSpatialController) SetContextConnId(connId uint32) {
+	ctl.contextConnId = connId
 }
 
 func (ctl *StaticGrid2DSpatialController) GetChannelId(info common.SpatialInfo) (ChannelId, error) {
@@ -305,44 +311,54 @@ func (ctl *StaticGrid2DSpatialController) subToAdjacentChannels(serverIndex uint
 	return nil
 }
 
+var dataMarshalOptions = protojson.MarshalOptions{Multiline: false}
+
 func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, newInfo common.SpatialInfo, handoverDataProvider func() common.ChannelDataMessage) {
-	oldChannelId, err := ctl.GetChannelId(oldInfo)
+	defer func() {
+		ctl.contextConnId = 0
+	}()
+
+	srcChannelId, err := ctl.GetChannelId(oldInfo)
 	if err != nil {
-		rootLogger.Error("failed to calculate oldChannelId", zap.Error(err))
+		rootLogger.Error("failed to calculate srcChannelId", zap.Error(err))
 		return
 	}
-	newChannelId, err := ctl.GetChannelId(newInfo)
+	dstChannelId, err := ctl.GetChannelId(newInfo)
 	if err != nil {
-		rootLogger.Error("failed to calculate newChannelId", zap.Error(err))
+		rootLogger.Error("failed to calculate dstChannelId", zap.Error(err))
 		return
 	}
-	if newChannelId == oldChannelId {
+	// No migration between channels
+	if dstChannelId == srcChannelId {
 		return
 	}
 
-	oldChannel := GetChannel(oldChannelId)
-	if oldChannel == nil {
-		rootLogger.Error("channel doesn't exist, failed to handover channel data", zap.Uint32("oldChannelId", uint32(oldChannelId)))
+	srcChannel := GetChannel(srcChannelId)
+	if srcChannel == nil {
+		rootLogger.Error("channel doesn't exist, failed to handover channel data", zap.Uint32("srcChannelId", uint32(srcChannelId)))
 		return
 	}
-	if !oldChannel.HasOwner() {
-		rootLogger.Error("channel doesn't have owner, failed to handover channel data", zap.Uint32("oldChannelId", uint32(oldChannelId)))
+	if !srcChannel.HasOwner() {
+		rootLogger.Error("channel doesn't have owner, failed to handover channel data", zap.Uint32("srcChannelId", uint32(srcChannelId)))
 	}
 
-	newChannel := GetChannel(newChannelId)
-	if newChannel == nil {
-		rootLogger.Error("channel doesn't exist, failed to handover channel data", zap.Uint32("newChannelId", uint32(newChannelId)))
+	dstChannel := GetChannel(dstChannelId)
+	if dstChannel == nil {
+		rootLogger.Error("channel doesn't exist, failed to handover channel data", zap.Uint32("dstChannelId", uint32(dstChannelId)))
 		return
 	}
-	if !oldChannel.HasOwner() {
-		rootLogger.Error("channel doesn't have owner, failed to handover channel data", zap.Uint32("newChannelId", uint32(newChannelId)))
+	if !srcChannel.HasOwner() {
+		rootLogger.Error("channel doesn't have owner, failed to handover channel data", zap.Uint32("dstChannelId", uint32(dstChannelId)))
 	}
 
+	// Handover data is provider by the Merger [channeld.MergeableChannelData]
 	handoverData := handoverDataProvider()
 	if handoverData == nil {
-		rootLogger.Error("failed to provider handover channel data", zap.Uint32("oldChannelId", uint32(oldChannelId)), zap.Uint32("newChannelId", uint32(newChannelId)))
+		rootLogger.Error("failed to provider handover channel data", zap.Uint32("srcChannelId", uint32(srcChannelId)), zap.Uint32("dstChannelId", uint32(dstChannelId)))
 		return
 	}
+	rootLogger.Debug("handover channel data", zap.Uint32("srcChannelId", uint32(srcChannelId)), zap.Uint32("dstChannelId", uint32(dstChannelId)),
+		zap.String("data", dataMarshalOptions.Format(handoverData)))
 
 	anyData, err := anypb.New(handoverData)
 	if err != nil {
@@ -357,32 +373,49 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 			MsgType:   uint32(channeldpb.MessageType_CHANNEL_DATA_UPDATE),
 			Broadcast: channeldpb.BroadcastType_NO_BROADCAST,
 			StubId:    0,
-			ChannelId: uint32(newChannelId),
+			ChannelId: uint32(dstChannelId),
 		})
 	*/
 
 	handoverMsg := &channeldpb.ChannelDataHandoverMessage{
-		SrcChannelId: uint32(oldChannelId),
-		DstChannelId: uint32(newChannelId),
-		Data:         anyData,
+		SrcChannelId:  uint32(srcChannelId),
+		DstChannelId:  uint32(dstChannelId),
+		Data:          anyData,
+		ContextConnId: ctl.contextConnId,
 	}
 
-	oldChannel.ownerConnection.Send(MessageContext{
+	srcChannel.ownerConnection.Send(MessageContext{
 		MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
 		Msg:       handoverMsg,
 		Broadcast: channeldpb.BroadcastType_NO_BROADCAST,
 		StubId:    0,
-		ChannelId: uint32(oldChannelId),
+		ChannelId: uint32(srcChannelId),
 	})
 
-	if newChannel.ownerConnection != oldChannel.ownerConnection {
-		newChannel.ownerConnection.Send(MessageContext{
+	if dstChannel.ownerConnection != srcChannel.ownerConnection {
+		dstChannel.ownerConnection.Send(MessageContext{
 			MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
 			Msg:       handoverMsg,
 			Broadcast: channeldpb.BroadcastType_NO_BROADCAST,
 			StubId:    0,
-			ChannelId: uint32(newChannelId),
+			ChannelId: uint32(dstChannelId),
 		})
+	}
+
+	// Unsub from srcChannel & Sub to dstChannel
+	clientConn := GetConnection(ConnectionId(ctl.contextConnId))
+	if clientConn != nil {
+		subOptions, err := clientConn.UnsubscribeFromChannel(srcChannel)
+		if err != nil {
+			rootLogger.Error("failed to unsub from channel",
+				zap.String("channelType", srcChannel.channelType.String()),
+				zap.Uint32("channelId", uint32(srcChannel.id)),
+				zap.Error(err))
+		}
+		clientConn.sendUnsubscribed(MessageContext{}, srcChannel, clientConn, 0)
+
+		clientConn.SubscribeToChannel(dstChannel, subOptions)
+		clientConn.sendSubscribed(MessageContext{}, dstChannel, clientConn, 0, subOptions)
 	}
 }
 

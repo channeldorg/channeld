@@ -54,15 +54,15 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.Channel
 	return cs
 }
 
-func (c *Connection) UnsubscribeFromChannel(ch *Channel) error {
+func (c *Connection) UnsubscribeFromChannel(ch *Channel) (*channeldpb.ChannelSubscriptionOptions, error) {
 	cs, exists := ch.subscribedConnections[c]
 	if !exists {
-		return errors.New("subscription does not exist")
+		return nil, errors.New("subscription does not exist")
 	} else {
 		ch.fanOutQueue.Remove(cs.fanOutElement)
 		delete(ch.subscribedConnections, c)
 	}
-	return nil
+	return &cs.options, nil
 }
 
 /*
@@ -86,7 +86,6 @@ func (c *Connection) sendConnUnsubscribed(connId ConnectionId, ids ...ChannelId)
 */
 
 func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel, connToSub ConnectionInChannel, stubId uint32, subOptions *channeldpb.ChannelSubscriptionOptions) {
-	//ctx.Channel = ch
 	ctx.ChannelId = uint32(ch.id)
 	ctx.StubId = stubId
 	ctx.MsgType = channeldpb.MessageType_SUB_TO_CHANNEL
@@ -104,7 +103,7 @@ func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel, connToSub C
 }
 
 func (c *Connection) sendUnsubscribed(ctx MessageContext, ch *Channel, connToUnsub *Connection, stubId uint32) {
-	ctx.Channel = ch
+	ctx.ChannelId = uint32(ch.id)
 	ctx.StubId = stubId
 	ctx.MsgType = channeldpb.MessageType_UNSUB_FROM_CHANNEL
 	ctx.Msg = &channeldpb.UnsubscribedFromChannelResultMessage{

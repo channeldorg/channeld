@@ -74,7 +74,7 @@ func handleServerToClientUserMessage(ctx MessageContext) {
 		return
 	}
 
-	ctx.Connection.Logger().Debug("forward user-space message",
+	ctx.Connection.Logger().Trace("forward user-space message",
 		zap.Uint32("msgType", uint32(ctx.MsgType)),
 		zap.Uint32("clientConnId", msg.ClientConnId),
 		zap.Uint32("channelId", uint32(ctx.Channel.id)),
@@ -414,7 +414,7 @@ func handleUnsubFromChannel(ctx MessageContext) {
 		return
 	}
 
-	err := connToUnsub.UnsubscribeFromChannel(ctx.Channel)
+	_, err := connToUnsub.UnsubscribeFromChannel(ctx.Channel)
 	if err != nil {
 		ctx.Connection.Logger().Error("failed to unsub from channel",
 			zap.String("channelType", ctx.Channel.channelType.String()),
@@ -474,6 +474,13 @@ func handleChannelDataUpdate(ctx MessageContext) {
 		return
 	}
 
+	if ctx.Channel.spatialNotifier != nil {
+		if ctx.Connection.GetConnectionType() == channeldpb.ConnectionType_CLIENT {
+			ctx.Channel.spatialNotifier.SetContextConnId(uint32(ctx.Connection.Id()))
+		} else {
+			ctx.Channel.spatialNotifier.SetContextConnId(msg.ContextConnId)
+		}
+	}
 	ctx.Channel.Data().OnUpdate(updateMsg, ctx.Channel.GetTime(), ctx.Channel.spatialNotifier)
 }
 

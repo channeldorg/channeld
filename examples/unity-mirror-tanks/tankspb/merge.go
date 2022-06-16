@@ -8,6 +8,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// Implement [channeld.MergeableChannelData]
 func (dst *TankGameChannelData) Merge(src proto.Message, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) error {
 	srcMsg, ok := src.(*TankGameChannelData)
 	if !ok {

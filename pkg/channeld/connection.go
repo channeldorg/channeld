@@ -167,6 +167,7 @@ func StartListening(t channeldpb.ConnectionType, network string, address string)
 func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 	// TODO: check if the connections map is full
 	// Should use mutex to lock the map while checking
+	// TODO: add MaxConnId in the settings. Mirror's connId uses int32.
 	atomic.AddUint64(&nextConnectionId, 1)
 	connection := &Connection{
 		id:              ConnectionId(nextConnectionId),

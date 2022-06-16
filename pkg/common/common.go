@@ -14,5 +14,5 @@ type SpatialInfo struct {
 
 type SpatialInfoChangedNotifier interface {
 	Notify(oldInfo SpatialInfo, newInfo SpatialInfo, handoverDataProvider func() ChannelDataMessage)
-	//IsNotified() bool
+	SetContextConnId(connId uint32)
 }
