@@ -214,9 +214,9 @@ func (c *testConnection) SubscribeToChannel(ch *Channel, options *channeldpb.Cha
 	}
 }
 
-func (c *testConnection) UnsubscribeFromChannel(ch *Channel) error {
+func (c *testConnection) UnsubscribeFromChannel(ch *Channel) (*channeldpb.ChannelSubscriptionOptions, error) {
 	delete(c.subscribedChannels, ch.id)
-	return nil
+	return nil, nil
 }
 
 func (c *testConnection) sendSubscribed(ctx MessageContext, ch *Channel, connToSub ConnectionInChannel, stubId uint32, subOptions *channeldpb.ChannelSubscriptionOptions) {
