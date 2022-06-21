@@ -166,6 +166,25 @@ func BenchmarkCustomMergeMap(b *testing.B) {
 	// BenchmarkCustomMergeMap-12    	  419090	      3004 ns/op	       0 B/op	       0 allocs/op
 }
 
+func TestMergeSubOptions(t *testing.T) {
+	subOptions := &channeldpb.ChannelSubscriptionOptions{
+		DataAccess:       channeldpb.ChannelDataAccess_WRITE_ACCESS,
+		FanOutIntervalMs: 100,
+		FanOutDelayMs:    200,
+	}
+
+	updateOptions := &channeldpb.ChannelSubscriptionOptions{
+		DataAccess:       channeldpb.ChannelDataAccess_READ_ACCESS,
+		FanOutIntervalMs: 50,
+	}
+
+	proto.Merge(subOptions, updateOptions)
+
+	assert.EqualValues(t, 50, subOptions.FanOutIntervalMs)
+	//assert.False(t, subOptions.CanUpdateData)
+	assert.EqualValues(t, channeldpb.ChannelDataAccess_READ_ACCESS, subOptions.DataAccess)
+}
+
 func TestListRemoveElement(t *testing.T) {
 	list := list.New()
 	list.PushBack("a")

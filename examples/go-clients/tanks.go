@@ -28,7 +28,7 @@ func TanksInitFunc(client *Client, data *clientData) {
 			client.Send(0, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_SUB_TO_CHANNEL), &channeldpb.SubscribedToChannelMessage{
 				ConnId: resultMsg.ConnId,
 				SubOptions: &channeldpb.ChannelSubscriptionOptions{
-					CanUpdateData:    true,
+					DataAccess:       channeldpb.ChannelDataAccess_WRITE_ACCESS,
 					FanOutIntervalMs: 10,
 					DataFieldMasks:   []string{},
 				},

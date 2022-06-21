@@ -371,7 +371,7 @@ func handleSubToChannel(ctx MessageContext) {
 		return
 	}
 
-	cs, exists := ctx.Channel.subscribedConnections[ctx.Connection]
+	cs, exists := ctx.Channel.subscribedConnections[connToSub]
 	if exists {
 		ctx.Connection.Logger().Info("already subscribed to channel, the subscription options will be merged",
 			zap.String("channelType", ctx.Channel.channelType.String()),
@@ -380,7 +380,8 @@ func handleSubToChannel(ctx MessageContext) {
 		if msg.SubOptions != nil {
 			proto.Merge(&cs.options, msg.SubOptions)
 		}
-		// Do not send the SubscribedToChannelResultMessage if already subed.
+		//// Do not send the SubscribedToChannelResultMessage if already subed.
+		connToSub.sendSubscribed(ctx, ctx.Channel, connToSub, 0, &cs.options)
 		return
 	}
 
@@ -456,8 +457,8 @@ func handleChannelDataUpdate(ctx MessageContext) {
 	// Only channel owner or writable subsciptors can update the data
 	if ctx.Channel.ownerConnection != ctx.Connection {
 		cs := ctx.Channel.subscribedConnections[ctx.Connection]
-		if cs == nil || !cs.options.CanUpdateData {
-			ctx.Connection.Logger().Error("attempt to update channel data but has no access",
+		if cs == nil || cs.options.DataAccess != channeldpb.ChannelDataAccess_WRITE_ACCESS {
+			ctx.Connection.Logger().Warn("attempt to update channel data but has no access",
 				zap.String("channelType", ctx.Channel.channelType.String()),
 				zap.Uint32("channelId", uint32(ctx.Channel.id)),
 			)

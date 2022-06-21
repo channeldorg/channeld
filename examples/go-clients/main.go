@@ -14,7 +14,7 @@ var ServerAddr string = "ws://localhost:12108" //"49.234.9.192:12108" //"ws://49
 
 const (
 	ClientNum                int           = 500
-	MaxChannelNum            int           = 0
+	MaxChannelNum            int           = 100
 	RunDuration              time.Duration = 120 * time.Second
 	ConnectInterval          time.Duration = 100 * time.Millisecond
 	MaxTickInterval          time.Duration = 100 * time.Millisecond

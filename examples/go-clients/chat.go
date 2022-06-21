@@ -39,7 +39,7 @@ var ChatClientActions = []*clientAction{
 				ChannelType: channeldpb.ChannelType_SUBWORLD,
 				Metadata:    fmt.Sprintf("Room%d", data.rnd.Uint32()),
 				SubOptions: &channeldpb.ChannelSubscriptionOptions{
-					CanUpdateData:    true,
+					DataAccess:       channeldpb.ChannelDataAccess_WRITE_ACCESS,
 					DataFieldMasks:   make([]string, 0),
 					FanOutIntervalMs: 100,
 				},
@@ -93,7 +93,7 @@ var ChatClientActions = []*clientAction{
 				client.Send(channelIdToSub, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_SUB_TO_CHANNEL), &channeldpb.SubscribedToChannelMessage{
 					ConnId: client.Id,
 					SubOptions: &channeldpb.ChannelSubscriptionOptions{
-						CanUpdateData:    true,
+						DataAccess:       channeldpb.ChannelDataAccess_WRITE_ACCESS,
 						FanOutIntervalMs: 200,
 						DataFieldMasks:   []string{},
 					},

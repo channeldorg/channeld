@@ -155,9 +155,16 @@ message AuthResultMessage {
     CompressionType compressionType = 3;
 }
 
+enum ChannelDataAccess {
+    NO_ACCESS = 0;
+    READ_ACCESS = 1;
+    WRITE_ACCESS = 2;
+}
+
 message ChannelSubscriptionOptions {
 	// Should the subscriber be able to update the channel data?
-    bool CanUpdateData = 1;
+    // Use enum over bool as in Protobuf, after setting a bool field to true, merging it with false won't work!
+    ChannelDataAccess dataAccess = 1;
     
     // How the fields are filtered before sending to the subscriber.
     // For detailed usage, see https://developers.google.com/protocol-buffers/docs/reference/csharp/class/google/protobuf/well-known-types/field-mask.
