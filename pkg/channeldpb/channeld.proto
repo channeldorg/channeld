@@ -168,17 +168,17 @@ message ChannelSubscriptionOptions {
     
     // How the fields are filtered before sending to the subscriber.
     // For detailed usage, see https://developers.google.com/protocol-buffers/docs/reference/csharp/class/google/protobuf/well-known-types/field-mask.
-	repeated string DataFieldMasks = 2;
+	repeated string dataFieldMasks = 2;
     
     // How frequent the updated channel data will be fanned-out to the subscriber, in millisecond. 
     // For an MMORPG-style server/client, the value should be between 50-100, while an FPS-style game, the value should be between 10-30.
-	uint32 FanOutIntervalMs = 3;
+	uint32 fanOutIntervalMs = 3;
 
     // How long between the subscription and the first (and full-state) ChannelDataUpdateMessage being send to the subscriber, in millisecond.
     // To be accurate, the first fan-out time will be (sub time + fan-out delay). It's possible to set the delay to a negative value to makee the first fan-out happen earlier.
     // Fan-out delay is useful when the clients need spawn message (sent from the backend server) to be handled, before handling the ChannelDataUpdateMessage properly.
     // In Mirror, it can take up to 100ms to wait.
-    int32 FanOutDelayMs = 4;
+    int32 fanOutDelayMs = 4;
 }
 
 // Defines how two @ChannelDataUpdateMessage.data are merged.

@@ -39,7 +39,6 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.Channel
 		}
 	} else {
 		cs.options = channeldpb.ChannelSubscriptionOptions{
-			// FIXME: the default access should be READ
 			DataAccess:       channeldpb.ChannelDataAccess_WRITE_ACCESS,
 			DataFieldMasks:   make([]string, 0),
 			FanOutIntervalMs: GlobalSettings.GetChannelSettings(ch.channelType).DefaultFanOutIntervalMs,
