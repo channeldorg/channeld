@@ -98,7 +98,7 @@ func handleServerToClientUserMessage(ctx MessageContext) {
 			)
 		}
 
-	case channeldpb.BroadcastType_ALL, channeldpb.BroadcastType_ALL_BUT_SENDER:
+	case channeldpb.BroadcastType_ALL, channeldpb.BroadcastType_ALL_BUT_SENDER, channeldpb.BroadcastType_ALL_BUT_OWNER:
 		ctx.Channel.Broadcast(ctx)
 
 	case channeldpb.BroadcastType_SINGLE_CONNECTION:
@@ -110,6 +110,42 @@ func handleServerToClientUserMessage(ctx MessageContext) {
 				zap.Uint32("msgType", uint32(ctx.MsgType)),
 				zap.Uint32("targetConnId", msg.ClientConnId),
 			)
+		}
+
+	case channeldpb.BroadcastType_ADJACENT_CHANNELS:
+		if ctx.Channel.channelType != channeldpb.ChannelType_SPATIAL {
+			ctx.Connection.Logger().Warn("BroadcastType_ADJACENT_CHANNELS only works for Spatial channel")
+			return
+		}
+		if spatialController == nil {
+			ctx.Connection.Logger().Error("spatial controller doesn't exist")
+			return
+		}
+		channelIds, err := spatialController.GetAdjacentChannels(ctx.Channel.id)
+		if err != nil {
+			ctx.Connection.Logger().Error("failed to retrieve spatial regions", zap.Error(err))
+			return
+		}
+
+		// Merge all connection in the adjacent channels to one map, to avoid duplicate send.
+		adjacentConns := make(map[ConnectionInChannel]struct{})
+		for _, id := range channelIds {
+			channel := GetChannel(id)
+			if channel == nil {
+				ctx.Connection.Logger().Error("invalid channel id for broadcast", zap.Uint32("channelId", uint32(id)))
+				continue
+			}
+			conns := channel.GetAllConnections()
+			for conn := range conns {
+				adjacentConns[conn] = struct{}{}
+			}
+		}
+		for conn := range adjacentConns {
+			// Ignore the sender and the client
+			if conn == ctx.Connection || conn.Id() == ConnectionId(msg.ClientConnId) {
+				continue
+			}
+			conn.Send(ctx)
 		}
 	}
 }

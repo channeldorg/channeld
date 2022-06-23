@@ -307,6 +307,11 @@ func (ch *Channel) tickConnections() {
 }
 
 func (ch *Channel) Broadcast(ctx MessageContext) {
+	defer func() {
+		ch.connectionsLock.RUnlock()
+	}()
+	ch.connectionsLock.RLock()
+
 	for conn := range ch.subscribedConnections {
 		//c := GetConnection(connId)
 		if conn == nil {

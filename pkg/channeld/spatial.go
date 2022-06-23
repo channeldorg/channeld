@@ -19,6 +19,8 @@ type SpatialController interface {
 	GetChannelId(info common.SpatialInfo) (ChannelId, error)
 	// Called in GLOBAL channel
 	GetRegions() ([]*channeldpb.SpatialRegion, error)
+	// Called in any spatial channel
+	GetAdjacentChannels(spatialChannelId ChannelId) ([]ChannelId, error)
 	// Called in GLOBAL channel
 	CreateChannels(ctx MessageContext) ([]*Channel, error)
 	// Called in GLOBAL channel
@@ -128,6 +130,31 @@ func (ctl *StaticGrid2DSpatialController) GetRegions() ([]*channeldpb.SpatialReg
 		}
 	}
 	return regions, nil
+}
+
+func (ctl *StaticGrid2DSpatialController) GetAdjacentChannels(spatialChannelId ChannelId) ([]ChannelId, error) {
+	index := uint32(spatialChannelId - GlobalSettings.SpatialChannelIdStart)
+	gridX := int32(index % ctl.GridCols)
+	gridY := int32(index / ctl.GridCols)
+	channelIds := make([]ChannelId, 0)
+	for y := gridY - 1; y <= gridY+1; y++ {
+		if y < 0 || y >= int32(ctl.GridRows-1) {
+			continue
+		}
+
+		for x := gridX - 1; x <= gridX+1; x++ {
+			if x < 0 || x >= int32(ctl.GridCols-1) {
+				continue
+			}
+			if x == gridX && y == gridY {
+				continue
+			}
+
+			channelIndex := uint32(x) + uint32(y)*ctl.GridCols
+			channelIds = append(channelIds, ChannelId(channelIndex)+GlobalSettings.SpatialChannelIdStart)
+		}
+	}
+	return channelIds, nil
 }
 
 func (ctl *StaticGrid2DSpatialController) CreateChannels(ctx MessageContext) ([]*Channel, error) {

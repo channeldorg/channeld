@@ -48,6 +48,9 @@ enum BroadcastType {
     // Forward the message to the connection. Can only be used by the backend server.
     // This has the same behavior as sending the message to the PRIVATE channel owned by the target connection with BroadcastType = NO.
     SINGLE_CONNECTION = 4; 
+
+    // Broadcast the message to all the connections in all the adjacent spatial channels. Ignored if the target channel is not a spatial channel.
+    ADJACENT_CHANNELS = 5;
 }
 
 enum ConnectionType {

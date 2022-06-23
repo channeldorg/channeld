@@ -9,6 +9,43 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestGetAdjacentChannels(t *testing.T) {
+	InitLogs()
+
+	// 1-by-1-grid world
+	ctl1 := &StaticGrid2DSpatialController{
+		WorldOffsetX:             0,
+		WorldOffsetZ:             0,
+		GridWidth:                10,
+		GridHeight:               10,
+		GridCols:                 1,
+		GridRows:                 1,
+		ServerCols:               1,
+		ServerRows:               1,
+		ServerInterestBorderSize: 1,
+	}
+	channelIds, err := ctl1.GetAdjacentChannels(GlobalSettings.SpatialChannelIdStart)
+	assert.NoError(t, err)
+	assert.Empty(t, channelIds)
+
+	// 2-by-2-grid world
+	ctl2 := &StaticGrid2DSpatialController{
+		WorldOffsetX:             -5,
+		WorldOffsetZ:             -5,
+		GridWidth:                5,
+		GridHeight:               5,
+		GridCols:                 2,
+		GridRows:                 2,
+		ServerCols:               1,
+		ServerRows:               1,
+		ServerInterestBorderSize: 0,
+	}
+	channelIds, err = ctl2.GetAdjacentChannels(GlobalSettings.SpatialChannelIdStart)
+	assert.NoError(t, err)
+	assert.Len(t, channelIds, 3)
+
+}
+
 func TestCreateSpatialChannels3(t *testing.T) {
 	InitLogs()
 
