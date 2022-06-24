@@ -209,43 +209,7 @@ func handleCreateChannel(ctx MessageContext) {
 			return
 		}
 	} else if msg.ChannelType == channeldpb.ChannelType_SPATIAL {
-		if ctx.Connection.GetConnectionType() != channeldpb.ConnectionType_SERVER {
-			ctx.Connection.Logger().Error("illegal attemp to create Spatial channel from client connection")
-			return
-		}
-		if spatialController == nil {
-			ctx.Connection.Logger().Error("illegal attemp to create Spatial channel as there's no controller")
-			return
-		}
-		channels, err := spatialController.CreateChannels(ctx)
-		if err != nil {
-			ctx.Connection.Logger().Error("failed to create Spatial channel", zap.Error(err))
-			return
-		}
-		resultMsg := &channeldpb.CreateSpatialChannelsResultMessage{
-			SpatialChannelId: make([]uint32, len(channels)),
-			Metadata:         msg.Metadata,
-			OwnerConnId:      uint32(ctx.Connection.Id()),
-		}
-		for i := range channels {
-			resultMsg.SpatialChannelId[i] = uint32(channels[i].id)
-		}
-		ctx.MsgType = channeldpb.MessageType_CREATE_SPATIAL_CHANNEL
-		ctx.Msg = resultMsg
-		ctx.Connection.Send(ctx)
-		// Also send the response to the GLOBAL channel owner.
-		if globalChannel.ownerConnection != ctx.Connection && globalChannel.HasOwner() {
-			ctx.StubId = 0
-			globalChannel.ownerConnection.Send(ctx)
-		}
-		for _, newChannel = range channels {
-			// Subscribe to channel after creation
-			cs := ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
-			if cs != nil {
-				ctx.Connection.sendSubscribed(ctx, newChannel, ctx.Connection, 0, &cs.options)
-			}
-		}
-		ctx.Connection.Logger().Info("created spatial channel(s)", zap.Uint32s("channelIds", resultMsg.SpatialChannelId))
+		handleCreateSpatialChannel(ctx, msg)
 		return
 	} else {
 		newChannel, err = CreateChannel(msg.ChannelType, ctx.Connection)
@@ -293,6 +257,66 @@ func handleCreateChannel(ctx MessageContext) {
 	if cs != nil {
 		ctx.Connection.sendSubscribed(ctx, newChannel, ctx.Connection, 0, &cs.options)
 	}
+}
+
+func handleCreateSpatialChannel(ctx MessageContext, msg *channeldpb.CreateChannelMessage) {
+	if ctx.Connection.GetConnectionType() != channeldpb.ConnectionType_SERVER {
+		ctx.Connection.Logger().Error("illegal attemp to create Spatial channel from client connection")
+		return
+	}
+
+	if spatialController == nil {
+		ctx.Connection.Logger().Error("illegal attemp to create Spatial channel as there's no controller")
+		return
+	}
+
+	channels, err := spatialController.CreateChannels(ctx)
+	if err != nil {
+		ctx.Connection.Logger().Error("failed to create Spatial channel", zap.Error(err))
+		return
+	}
+
+	resultMsg := &channeldpb.CreateSpatialChannelsResultMessage{
+		SpatialChannelId: make([]uint32, len(channels)),
+		Metadata:         msg.Metadata,
+		OwnerConnId:      uint32(ctx.Connection.Id()),
+	}
+
+	for i := range channels {
+		resultMsg.SpatialChannelId[i] = uint32(channels[i].id)
+	}
+
+	ctx.MsgType = channeldpb.MessageType_CREATE_SPATIAL_CHANNEL
+	ctx.Msg = resultMsg
+	ctx.Connection.Send(ctx)
+	// Also send the response to the GLOBAL channel owner.
+	if globalChannel.ownerConnection != ctx.Connection && globalChannel.HasOwner() {
+		ctx.StubId = 0
+		globalChannel.ownerConnection.Send(ctx)
+	}
+
+	for _, newChannel := range channels {
+		// Subscribe to channel after creation
+		cs := ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
+		if cs != nil {
+			ctx.Connection.sendSubscribed(ctx, newChannel, ctx.Connection, 0, &cs.options)
+		}
+	}
+
+	ctx.Connection.Logger().Info("created spatial channel(s)", zap.Uint32s("channelIds", resultMsg.SpatialChannelId))
+
+	// Send the regions info upon the spatial channels creation
+	regions, err := spatialController.GetRegions()
+	if err != nil {
+		ctx.Connection.Logger().Error("failed to send Spatial regions info upon the spatial channels creation",
+			zap.Uint32s("channelIds", resultMsg.SpatialChannelId))
+		return
+	}
+	ctx.MsgType = channeldpb.MessageType_SPATIAL_REGIONS_UPDATE
+	ctx.Msg = &channeldpb.SpatialRegionsUpdateMessage{
+		Regions: regions,
+	}
+	ctx.Connection.Send(ctx)
 }
 
 func handleRemoveChannel(ctx MessageContext) {

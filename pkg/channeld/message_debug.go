@@ -31,8 +31,8 @@ func handleGetSpatialRegionsMessage(ctx MessageContext) {
 	if err != nil {
 		ctx.Connection.Logger().Error("failed to retrieve spatial regions", zap.Error(err))
 	}
-	ctx.MsgType = channeldpb.MessageType_DEBUG_GET_SPATIAL_REGIONS
-	ctx.Msg = &channeldpb.DebugGetSpatialRegionsResultMessage{
+	ctx.MsgType = channeldpb.MessageType_SPATIAL_REGIONS_UPDATE
+	ctx.Msg = &channeldpb.SpatialRegionsUpdateMessage{
 		Regions: regions,
 	}
 	ctx.Connection.Send(ctx)

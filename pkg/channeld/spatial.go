@@ -21,6 +21,7 @@ type SpatialController interface {
 	GetRegions() ([]*channeldpb.SpatialRegion, error)
 	// Called in any spatial channel
 	GetAdjacentChannels(spatialChannelId ChannelId) ([]ChannelId, error)
+	// Create spatial channels for a spatial server.
 	// Called in GLOBAL channel
 	CreateChannels(ctx MessageContext) ([]*Channel, error)
 	// Called in GLOBAL channel

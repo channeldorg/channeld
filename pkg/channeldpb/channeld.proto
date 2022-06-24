@@ -113,8 +113,11 @@ enum MessageType {
     
     // Used by @ChannelDataHandoverMessage
     CHANNEL_DATA_HANDOVER = 12;
+
+    // Used by @SpatialRegionsUpdateMessage
+    SPATIAL_REGIONS_UPDATE = 13;
     
-    // Used by @DebugGetSpatialRegionsMessage and DebugGetSpatialRegionsResultMessage
+    // Used by @DebugGetSpatialRegionsMessage
     DEBUG_GET_SPATIAL_REGIONS = 99;
 
     // Start of any user-space defined message
@@ -323,8 +326,6 @@ message ChannelDataHandoverMessage {
     google.protobuf.Any data = 4;
 }
 
-// ------------------ DEBUG messages start ---------------------//
-
 message SpatialRegion {
     SpatialInfo min = 1;
     SpatialInfo max = 2;
@@ -332,11 +333,18 @@ message SpatialRegion {
     uint32 serverIndex = 4;
 }
 
-message DebugGetSpatialRegionsMessage {
+// channeld updates the information of spatial channels and regions to the spatial servers.
+// Spatial servers use this information mainly for mapping the position of a spawned object to a correct channelId at realtime (rather than querying it before sending the spawn message to the client).
+// Sent upon the creation of spatial channels (after @CreateSpatialChannelsResultMessage being sent), or any regional change (basiclally caused by the loadbalancer).
+message SpatialRegionsUpdateMessage {
+    repeated SpatialRegion regions = 1;
 }
 
-message DebugGetSpatialRegionsResultMessage {
-    repeated SpatialRegion regions = 1;
+// ------------------ DEBUG messages start ---------------------//
+
+// Client requests the spatail regions information. Only valid in Development mode (with "-dev" launch argument).
+// Response: @SpatialRegionsUpdateMessage
+message DebugGetSpatialRegionsMessage {
 }
 
 // ----------------- INTERNAL messages start --------------------//
