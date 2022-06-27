@@ -1950,6 +1950,9 @@ func (x *SpatialRegion) GetServerIndex() uint32 {
 	return 0
 }
 
+// channeld updates the information of spatial channels and regions to the spatial servers.
+// Spatial servers use this information mainly for mapping the position of a spawned object to a correct channelId at realtime (rather than querying it before sending the spawn message to the client).
+// Sent upon the creation of spatial channels (after @CreateSpatialChannelsResultMessage being sent), or any regional change (basiclally caused by the loadbalancer).
 type SpatialRegionsUpdateMessage struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
