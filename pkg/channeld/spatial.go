@@ -35,6 +35,11 @@ func InitSpatialController(controller SpatialController) {
 	spatialController = controller
 }
 
+const (
+	MinY = -3.40282347e+38 / 2
+	MaxY = 3.40282347e+38 / 2
+)
+
 // Divide the world into GridCols x GridRows static squares on the XZ plane. Each square(grid) represents a spatial channel.
 // Typically, a player's view distance is 150m, so a grid is sized at 50x50m.
 // A 100x100 km world has 2000x2000 grids, which needs about 2^22 spatial channels.
@@ -111,18 +116,22 @@ func (ctl *StaticGrid2DSpatialController) GetRegions() ([]*channeldpb.SpatialReg
 	}
 
 	regions := make([]*channeldpb.SpatialRegion, ctl.GridCols*ctl.GridRows)
+	//var MinFloat64 = math.Inf(-1)
 	for y := uint32(0); y < ctl.GridRows; y++ {
 		for x := uint32(0); x < ctl.GridCols; x++ {
 			index := x + y*ctl.GridCols
 			serverX := x / serverGridCols
 			serverY := y / serverGridRows
+
 			regions[index] = &channeldpb.SpatialRegion{
 				Min: &channeldpb.SpatialInfo{
 					X: ctl.WorldOffsetX + ctl.GridWidth*float64(x),
+					Y: MinY,
 					Z: ctl.WorldOffsetZ + ctl.GridHeight*float64(y),
 				},
 				Max: &channeldpb.SpatialInfo{
 					X: ctl.WorldOffsetX + ctl.GridWidth*float64(x+1),
+					Y: MaxY,
 					Z: ctl.WorldOffsetZ + ctl.GridHeight*float64(y+1),
 				},
 				ChannelId:   uint32(GlobalSettings.SpatialChannelIdStart) + index,
