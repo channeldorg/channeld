@@ -293,9 +293,29 @@ func (ch *Channel) tickConnections() {
 					ch.ownerConnection = nil
 					conn.Logger().Info("found removed ownner connection of channel", zap.Uint32("channelId", uint32(ch.id)))
 					if GlobalSettings.GetChannelSettings(ch.channelType).RemoveChannelAfterOwnerRemoved {
+						atomic.AddInt32(&ch.removing, 1)
+						/* Let the GLOBAL channel handles the channel remove
 						// TODO: send RemoveChannelMessage to all subscribed connections
+						ch.Broadcast(MessageContext{
+							MsgType: channeldpb.MessageType_REMOVE_CHANNEL,
+							Msg: &channeldpb.RemoveChannelMessage{
+								ChannelId: uint32(ch.id),
+							},
+							Broadcast: uint32(channeldpb.BroadcastType_ALL_BUT_OWNER),
+							StubId:    0,
+							ChannelId: uint32(ch.id),
+						})
 						RemoveChannel(ch)
-						ch.Logger().Info("removed channel after the owner is removed")
+						*/
+						globalChannel.PutMessage(&channeldpb.RemoveChannelMessage{
+							ChannelId: uint32(ch.id),
+						}, handleRemoveChannel, nil, &channeldpb.MessagePack{
+							Broadcast: 0,
+							StubId:    0,
+							ChannelId: uint32(GlobalChannelId),
+						})
+
+						ch.Logger().Info("removing channel after the owner is removed")
 						return
 					}
 				} else if conn != nil {

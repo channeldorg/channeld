@@ -26,6 +26,12 @@ type MessageContext struct {
 	// The channel that handling the message. Not required for sending or broadcasting.
 	Channel *Channel
 }
+
+func (ctx *MessageContext) HasConnection() bool {
+	conn, ok := ctx.Connection.(*Connection)
+	return ok && conn != nil && !conn.IsRemoving()
+}
+
 type MessageHandlerFunc func(ctx MessageContext)
 type messageMapEntry struct {
 	msg     Message
@@ -347,7 +353,8 @@ func handleRemoveChannel(ctx MessageContext) {
 		return
 	}
 	// Only the channel owner or GLOBAL owner can remove the channel
-	if !ctx.Connection.HasAuthorityOver(channelToRemove) {
+	// If ctx.Connection == nil, the removal is triggered internally (e.g. ChannelSettings.RemoveChannelAfterOwnerRemoved)
+	if ctx.HasConnection() && !ctx.Connection.HasAuthorityOver(channelToRemove) {
 		ownerConnId := uint32(0)
 		if channelToRemove.HasOwner() {
 			ownerConnId = uint32(channelToRemove.ownerConnection.Id())
@@ -363,18 +370,20 @@ func handleRemoveChannel(ctx MessageContext) {
 	for sc := range channelToRemove.subscribedConnections {
 		if sc != nil {
 			//sc.sendUnsubscribed(ctx, channelToRemove, 0)
-			respond := ctx
-			respond.StubId = 0
-			sc.Send(respond)
+			response := ctx
+			response.StubId = 0
+			sc.Send(response)
 		}
 	}
 	RemoveChannel(channelToRemove)
 
-	ctx.Connection.Logger().Info("removed channel",
-		zap.String("channelType", channelToRemove.channelType.String()),
-		zap.Uint32("channelId", uint32(channelToRemove.id)),
-		zap.Int("subs", len(channelToRemove.subscribedConnections)),
-	)
+	if ctx.HasConnection() {
+		ctx.Connection.Logger().Info("removed channel",
+			zap.String("channelType", channelToRemove.channelType.String()),
+			zap.Uint32("channelId", uint32(channelToRemove.id)),
+			zap.Int("subs", len(channelToRemove.subscribedConnections)),
+		)
+	}
 }
 
 func handleListChannel(ctx MessageContext) {
