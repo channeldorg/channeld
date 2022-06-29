@@ -317,10 +317,10 @@ func (ch *Channel) Broadcast(ctx MessageContext) {
 		if conn == nil {
 			continue
 		}
-		if ctx.Broadcast == channeldpb.BroadcastType_ALL_BUT_SENDER && conn == ctx.Connection {
+		if channeldpb.BroadcastType_ALL_BUT_SENDER.Check(ctx.Broadcast) && conn == ctx.Connection {
 			continue
 		}
-		if ctx.Broadcast == channeldpb.BroadcastType_ALL_BUT_OWNER && conn == ch.ownerConnection {
+		if channeldpb.BroadcastType_ALL_BUT_OWNER.Check(ctx.Broadcast) && conn == ch.ownerConnection {
 			continue
 		}
 		conn.Send(ctx)

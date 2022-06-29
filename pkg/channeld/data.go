@@ -202,7 +202,7 @@ func (ch *Channel) fanOutDataUpdate(conn ConnectionInChannel, cs *ChannelSubscri
 		Msg:        &channeldpb.ChannelDataUpdateMessage{Data: any},
 		Connection: nil,
 		Channel:    ch,
-		Broadcast:  channeldpb.BroadcastType_NO_BROADCAST,
+		Broadcast:  0,
 		StubId:     0,
 		ChannelId:  uint32(ch.id),
 	})

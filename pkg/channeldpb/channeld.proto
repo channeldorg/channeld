@@ -17,9 +17,9 @@ message MessagePack {
     // 0 means the message should be handled in the global channel (e.g. a @CreateChannel message)
     uint32 channelId = 1;
 
-    // Will the message be broadcasted to all connections in the channel? 
-    // ONLY works for the user-space messages. 
-    BroadcastType broadcast = 2;
+    // How the message will be broadcasted to all connections in the channel? 
+    // See @BroadcastType. ONLY works for the user-space messages. 
+    uint32 broadcast = 2;
 
     // The stub for RPC callbacks.
     // 0 means the message is not a RPC message.
@@ -32,25 +32,27 @@ message MessagePack {
     bytes msgBody = 5;
 }
 
+// Can be used as the Flags-style enum in C#. See https://groups.google.com/g/protobuf/c/L105Q4NIk0U?pli=1.
 enum BroadcastType {
     // No broadcast. All internal messages should use this type, and other types are ignored.
-    NO_BROADCAST = 0;
+    NO_BROADCAST = 0x00;
 
     // Broadcast the message to all the connections in the channel, the sender included.
-    ALL = 1;
+    ALL = 0x01;
 
     // Broadcast the message to all the connections in the channel, the sender excluded.
-    ALL_BUT_SENDER = 2;
+    ALL_BUT_SENDER = 0x02;
 
     // Broadcast the message to all the connections in the channel, the owner excluded.
-    ALL_BUT_OWNER = 3;
+    ALL_BUT_OWNER = 0x04;
 
     // Forward the message to the connection. Can only be used by the backend server.
     // This has the same behavior as sending the message to the PRIVATE channel owned by the target connection with BroadcastType = NO.
-    SINGLE_CONNECTION = 4; 
+    SINGLE_CONNECTION = 0x08; 
 
-    // Broadcast the message to all the connections in all the adjacent spatial channels. Ignored if the target channel is not a spatial channel.
-    ADJACENT_CHANNELS = 5;
+    // Broadcast the message to all the connections in all the adjacent(3x3) spatial channels. Ignored if the target channel is not a spatial channel.
+    // To ignore the center spatial channel, use ADJACENT_CHANNELS | ALL_BUT_OWNER; to ignore the sender(spatial server), use ADJACENT_CHANNELS | ALL_BUT_SENDER.
+    ADJACENT_CHANNELS = 0x10;
 }
 
 enum ConnectionType {

@@ -426,7 +426,7 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 			conn.Send(MessageContext{
 				MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
 				Msg:       handoverMsg,
-				Broadcast: channeldpb.BroadcastType_NO_BROADCAST,
+				Broadcast: 0,
 				StubId:    0,
 				ChannelId: uint32(srcChannelId),
 			})
@@ -436,7 +436,7 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 		conn.Send(MessageContext{
 			MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
 			Msg:       handoverMsg,
-			Broadcast: channeldpb.BroadcastType_NO_BROADCAST,
+			Broadcast: 0,
 			StubId:    0,
 			ChannelId: uint32(dstChannelId),
 		})
