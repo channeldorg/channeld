@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"strconv"
 	"strings"
 
@@ -29,6 +30,8 @@ type GlobalSettingsType struct {
 
 	CompressionType channeldpb.CompressionType
 
+	MaxConnectionId ConnectionId
+
 	SpatialChannelIdStart ChannelId
 
 	ChannelSettings map[channeldpb.ChannelType]ChannelSettingsType
@@ -41,9 +44,11 @@ type ChannelSettingsType struct {
 }
 
 var GlobalSettings = GlobalSettingsType{
-	LogLevel:              &NullableInt{},
-	LogFile:               &NullableString{},
-	CompressionType:       channeldpb.CompressionType_NO_COMPRESSION,
+	LogLevel:        &NullableInt{},
+	LogFile:         &NullableString{},
+	CompressionType: channeldpb.CompressionType_NO_COMPRESSION,
+	// Mirror uses int32 as the connId
+	MaxConnectionId:       math.MaxInt32,
 	SpatialChannelIdStart: 65536,
 	ChannelSettings: map[channeldpb.ChannelType]ChannelSettingsType{
 		channeldpb.ChannelType_GLOBAL: {
@@ -120,6 +125,8 @@ func (s *GlobalSettingsType) ParseFlag() error {
 	flag.StringVar(&s.ClientFSM, "cfsm", "config/client_non_authoratative_fsm.json", "the path to the client FSM config")
 
 	ct := flag.Uint("ct", 0, "the compression type, 0 = No, 1 = Snappy")
+	scs := flag.Uint("scs", uint(s.SpatialChannelIdStart), "start ChannelId of spatial channels")
+	mcid := flag.Uint("mcid", uint(s.MaxConnectionId), "max ConnectionId")
 
 	chs := flag.String("chs", "config/channel_settings_hifi.json", "the path to the channel settings file")
 
@@ -127,6 +134,14 @@ func (s *GlobalSettingsType) ParseFlag() error {
 
 	if ct != nil {
 		s.CompressionType = channeldpb.CompressionType(*ct)
+	}
+
+	if scs != nil {
+		s.SpatialChannelIdStart = ChannelId(*scs)
+	}
+
+	if mcid != nil {
+		s.MaxConnectionId = ConnectionId(*mcid)
 	}
 
 	chsData, err := ioutil.ReadFile(*chs)

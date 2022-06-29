@@ -165,10 +165,12 @@ func StartListening(t channeldpb.ConnectionType, network string, address string)
 }
 
 func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
-	// TODO: check if the connections map is full
-	// Should use mutex to lock the map while checking
-	// TODO: add MaxConnId in the settings. Mirror's connId uses int32.
+	// TODO: In non-dev mode, hash the (remote address + timestamp) to get a less guessable ID
 	atomic.AddUint64(&nextConnectionId, 1)
+	if nextConnectionId >= uint64(GlobalSettings.MaxConnectionId) {
+		// For now, we don't consider re-using the ConnectionId. Even if there are 100 incoming connections per sec, channeld can run over a year.
+		return nil
+	}
 	connection := &Connection{
 		id:              ConnectionId(nextConnectionId),
 		connectionType:  t,

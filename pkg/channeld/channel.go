@@ -139,7 +139,6 @@ func createChannelWithId(channelId ChannelId, t channeldpb.ChannelType, owner Co
 		ch.spatialNotifier = spatialController
 	}
 
-	// TODO: check state if tick()
 	if ch.HasOwner() {
 		ch.state = OPEN
 	} else {
@@ -295,7 +294,7 @@ func (ch *Channel) tickConnections() {
 					if GlobalSettings.GetChannelSettings(ch.channelType).RemoveChannelAfterOwnerRemoved {
 						atomic.AddInt32(&ch.removing, 1)
 						/* Let the GLOBAL channel handles the channel remove
-						// TODO: send RemoveChannelMessage to all subscribed connections
+						// Send RemoveChannelMessage to all subscribed connections
 						ch.Broadcast(MessageContext{
 							MsgType: channeldpb.MessageType_REMOVE_CHANNEL,
 							Msg: &channeldpb.RemoveChannelMessage{
