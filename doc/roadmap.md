@@ -6,7 +6,7 @@
 - [ ] Authentication
 - [ ] Health check
 - [ ] Front-end load-balancing
-- [ ] Spatial-based pub/sub
+- [x] Spatial-based pub/sub
 - [ ] Spatial-based load-balancing
 
 # Modules
@@ -30,8 +30,11 @@
 
 # SDKs
 - [ ] Web SDK
-- [ ] Unity SDK
+- [x] Unity SDK
 - [ ] Unreal SDK
+
+# Tools
+- [ ] Web inspector
 
 # Example projects
 - [x] Web chat rooms
@@ -44,8 +47,9 @@
     - [ ] Mirror Integration
         - [x] Transport
         - [x] SyncVar and NetworkTransform
-        - [ ] Observers and Interest Management
-    - [ ] Multi-server support
+        - [x] Observers and Interest Management
+        - [ ] SyncVar and RPC code generation
+    - [x] Multi-server support
 - [ ] Unreal seamless world travelling
     - [x] Implement the C++ client library
     - [ ] Integrate with Unreal's networking stack
