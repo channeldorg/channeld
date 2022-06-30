@@ -63,7 +63,8 @@ type Channel struct {
 	state                 ChannelState
 	ownerConnection       ConnectionInChannel
 	subscribedConnections map[ConnectionInChannel]*ChannelSubscription
-	connectionsLock       sync.RWMutex
+	// Lock for reading all the subscribed connection outside the channel
+	connectionsLock sync.RWMutex
 	// Read-only property, e.g. name
 	metadata string
 	data     *ChannelData
@@ -272,15 +273,6 @@ func (ch *Channel) tickMessages(tickStart time.Time) {
 }
 
 func (ch *Channel) tickConnections() {
-
-	// Tick connections
-	/*
-		if ch.ownerConnection != nil {
-			if ch.ownerConnection.IsRemoving() {
-				ch.ownerConnection = nil
-			}
-		}
-	*/
 	for conn := range ch.subscribedConnections {
 		if conn.IsRemoving() {
 			// Unsub the connection from the channel

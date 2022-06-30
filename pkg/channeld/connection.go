@@ -82,20 +82,6 @@ func InitConnections(serverFsmPath string, clientFsmPath string) {
 			zap.String("currentState", clientFsm.CurrentState().Name),
 		)
 	}
-
-	/* Split each Connection.Flush into a goroutine (see AddConnection)
-	go func() {
-		for {
-			t := time.Now()
-			for _, c := range allConnections {
-				if !<-c.removing {
-					c.Flush()
-				}
-			}
-			time.Sleep(FlushInterval - time.Since(t))
-		}
-	}()
-	*/
 }
 
 func GetConnection(id ConnectionId) *Connection {
@@ -164,28 +150,26 @@ func StartListening(t channeldpb.ConnectionType, network string, address string)
 	}
 }
 
-func generateNextConnId() {
-
+func generateNextConnId(c net.Conn, maxConnId uint32) {
+	if GlobalSettings.Development {
+		atomic.AddUint32(&nextConnectionId, 1)
+		if nextConnectionId >= maxConnId {
+			// For now, we don't consider re-using the ConnectionId. Even if there are 100 incoming connections per sec, channeld can run over a year.
+			rootLogger.Panic("connectionId reached the limit", zap.Uint32("maxConnId", maxConnId))
+		}
+	} else {
+		// In non-dev mode, hash the (remote address + timestamp) to get a less guessable ID
+		hash := HashString(c.RemoteAddr().String())
+		hash = hash ^ uint32(time.Now().UnixNano())
+		nextConnectionId = hash & maxConnId
+	}
 }
 
 func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 	maxConnId := uint32(1)<<GlobalSettings.MaxConnectionIdBits - 1
 
 	for tries := 0; ; tries++ {
-		if GlobalSettings.Development {
-			atomic.AddUint32(&nextConnectionId, 1)
-			if nextConnectionId >= maxConnId {
-				// For now, we don't consider re-using the ConnectionId. Even if there are 100 incoming connections per sec, channeld can run over a year.
-				rootLogger.Panic("connectionId reached the limit", zap.Uint32("maxConnId", maxConnId))
-				return nil
-			}
-		} else {
-			// In non-dev mode, hash the (remote address + timestamp) to get a less guessable ID
-			hash := HashString(c.RemoteAddr().String())
-			hash = hash ^ uint32(time.Now().UnixNano())
-			nextConnectionId = hash & maxConnId
-		}
-
+		generateNextConnId(c, maxConnId)
 		if _, exists := allConnections.Load(nextConnectionId); !exists {
 			break
 		}
@@ -211,6 +195,7 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 		)},
 		removing: 0,
 	}
+
 	// IMPORTANT: always make a value copy
 	var fsm fsm.FiniteStateMachine
 	switch t {

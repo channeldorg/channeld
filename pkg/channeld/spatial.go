@@ -441,47 +441,6 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 			ChannelId: uint32(dstChannelId),
 		})
 	}
-
-	/* Broadcast in both channels can cause duplicate sending
-	srcChannel.Broadcast(MessageContext{
-		MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
-		Msg:       handoverMsg,
-		Broadcast: channeldpb.BroadcastType_ALL,
-		StubId:    0,
-		ChannelId: uint32(srcChannelId),
-	})
-
-	var broadcastType = channeldpb.BroadcastType_ALL
-	// Don't send the spatial server twice (if it's the owner of both channels)
-	if dstChannel.ownerConnection == srcChannel.ownerConnection {
-		broadcastType = channeldpb.BroadcastType_ALL_BUT_OWNER
-	}
-	dstChannel.Broadcast(MessageContext{
-		MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
-		Msg:       handoverMsg,
-		Broadcast: broadcastType,
-		StubId:    0,
-		ChannelId: uint32(dstChannelId),
-	})
-	*/
-
-	/* Unsub and Sub is controlled by server/client, and has nothing to do with src/dst channel in most cases.
-	// Unsub from srcChannel & Sub to dstChannel
-	clientConn := GetConnection(ConnectionId(ctl.contextConnId))
-	if clientConn != nil {
-		subOptions, err := clientConn.UnsubscribeFromChannel(srcChannel)
-		if err != nil {
-			rootLogger.Error("failed to unsub from channel",
-				zap.String("channelType", srcChannel.channelType.String()),
-				zap.Uint32("channelId", uint32(srcChannel.id)),
-				zap.Error(err))
-		}
-		clientConn.sendUnsubscribed(MessageContext{}, srcChannel, clientConn, 0)
-
-		clientConn.SubscribeToChannel(dstChannel, subOptions)
-		clientConn.sendSubscribed(MessageContext{}, dstChannel, clientConn, 0, subOptions)
-	}
-	*/
 }
 
 func (ctl *StaticGrid2DSpatialController) initServerConnections() {

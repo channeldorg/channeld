@@ -29,11 +29,12 @@
 - [ ] Scale tests
 
 # SDKs
-- [ ] Web SDK
-- [x] Unity SDK
-- [ ] Unreal SDK
+- [ ] Javascript SDK
+- [x] Unity C# SDK
+- [ ] Unreal C++ SDK
 
 # Tools
+- [x] Simulated client (Go)
 - [ ] Web inspector
 
 # Example projects

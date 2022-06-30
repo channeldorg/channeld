@@ -111,17 +111,7 @@ func (ch *Channel) tickData(t ChannelTime) {
 	if ch.data == nil || ch.data.msg == nil {
 		return
 	}
-	/*
-		for connId, cs := range ch.subscribedConnections {
-			if cs.options.FanOutInterval <= 0 || time.Since(cs.lastFanOutTime) >= cs.options.FanOutInterval {
-				c := GetConnection(connId)
-				if c == nil {
-					continue
-				}
-				ch.FanOutDataUpdate(c, cs)
-			}
-		}
-	*/
+
 	focp := ch.fanOutQueue.Front()
 
 	for foci := 0; foci < ch.fanOutQueue.Len(); foci++ {
@@ -210,16 +200,6 @@ func (ch *Channel) fanOutDataUpdate(conn ConnectionInChannel, cs *ChannelSubscri
 	// cs.fanOutDataMsg = nil
 }
 
-/* Experiment: extending protobuf to make the merge more efficient
-func postMergeMapKV(dst, src protoreflect.Map, k protoreflect.MapKey, v protoreflect.Value, fd protoreflect.FieldDescriptor) bool {
-	removable, ok := v.Message().Interface().(removableMapField)
-	if ok && removable.GetRemoved() {
-		dst.Clear(k)
-	}
-	return true
-}
-*/
-
 // Implement this interface to manually merge the channel data. In most cases it can be MUCH more efficient than the default reflection-based merge.
 type MergeableChannelData interface {
 	Message
@@ -250,11 +230,7 @@ func mergeWithOptions(dst Message, src Message, options *channeldpb.ChannelDataM
 
 // Use protoreflect to merge. No need to write custom merge code but less efficient.
 func reflectMerge(dst Message, src Message, options *channeldpb.ChannelDataMergeOptions) {
-	// if options == nil {
 	proto.Merge(dst, src)
-	// } else {
-	// 	proto.MergeWithOptions(dst, src, proto.MergeOptions{PostMergeMapKV: postMergeMapKV})
-	// }
 
 	if options != nil {
 		//logger.Debug("merged with options", zap.Any("src", src), zap.Any("dst", dst))
