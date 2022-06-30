@@ -50,7 +50,7 @@ type Connection struct {
 }
 
 var allConnections sync.Map // map[ConnectionId]*Connection
-var nextConnectionId uint64 = 0
+var nextConnectionId uint32 = 0
 var serverFsm fsm.FiniteStateMachine
 var clientFsm fsm.FiniteStateMachine
 
@@ -164,13 +164,38 @@ func StartListening(t channeldpb.ConnectionType, network string, address string)
 	}
 }
 
+func generateNextConnId() {
+
+}
+
 func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
-	// TODO: In non-dev mode, hash the (remote address + timestamp) to get a less guessable ID
-	atomic.AddUint64(&nextConnectionId, 1)
-	if nextConnectionId >= uint64(GlobalSettings.MaxConnectionId) {
-		// For now, we don't consider re-using the ConnectionId. Even if there are 100 incoming connections per sec, channeld can run over a year.
-		return nil
+	maxConnId := uint32(1)<<GlobalSettings.MaxConnectionIdBits - 1
+
+	for tries := 0; ; tries++ {
+		if GlobalSettings.Development {
+			atomic.AddUint32(&nextConnectionId, 1)
+			if nextConnectionId >= maxConnId {
+				// For now, we don't consider re-using the ConnectionId. Even if there are 100 incoming connections per sec, channeld can run over a year.
+				rootLogger.Panic("connectionId reached the limit", zap.Uint32("maxConnId", maxConnId))
+				return nil
+			}
+		} else {
+			// In non-dev mode, hash the (remote address + timestamp) to get a less guessable ID
+			hash := HashString(c.RemoteAddr().String())
+			hash = hash ^ uint32(time.Now().UnixNano())
+			nextConnectionId = hash & maxConnId
+		}
+
+		if _, exists := allConnections.Load(nextConnectionId); !exists {
+			break
+		}
+
+		rootLogger.Warn("there's a same connId existing, will try to generate a new one", zap.Uint32("connId", nextConnectionId))
+		if tries >= 100 {
+			rootLogger.Panic("could not find non-duplicate connId")
+		}
 	}
+
 	connection := &Connection{
 		id:              ConnectionId(nextConnectionId),
 		connectionType:  t,
@@ -182,7 +207,7 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 		sendQueue:       make(chan MessageContext, 128),
 		logger: &Logger{rootLogger.With(
 			zap.String("connType", t.String()),
-			zap.Uint32("connId", uint32(nextConnectionId)),
+			zap.Uint32("connId", nextConnectionId),
 		)},
 		removing: 0,
 	}
@@ -424,7 +449,7 @@ func (c *Connection) Flush() {
 	p := channeldpb.Packet{Messages: make([]*channeldpb.MessagePack, 0, len(c.sendQueue))}
 	size := 0
 
-	// TODO: should we limit the message numbers per packet?
+	// For now we don't limit the message numbers per packet
 	for len(c.sendQueue) > 0 {
 		mc := <-c.sendQueue
 		// The packet size should not exceed the capacity of 3 bytes

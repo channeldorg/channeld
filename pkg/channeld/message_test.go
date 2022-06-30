@@ -115,7 +115,7 @@ func TestMessageTypeConversion(t *testing.T) {
 
 func BenchmarkProtobufMessagePack(b *testing.B) {
 	mp := &channeldpb.MessagePack{
-		Broadcast: channeldpb.BroadcastType_ALL,
+		Broadcast: uint32(channeldpb.BroadcastType_ALL),
 		StubId:    0,
 		MsgType:   8,
 		//BodySize:  0,

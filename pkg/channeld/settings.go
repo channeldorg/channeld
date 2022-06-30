@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"math"
 	"strconv"
 	"strings"
 
@@ -30,7 +29,7 @@ type GlobalSettingsType struct {
 
 	CompressionType channeldpb.CompressionType
 
-	MaxConnectionId ConnectionId
+	MaxConnectionIdBits uint8
 
 	SpatialChannelIdStart ChannelId
 
@@ -48,7 +47,7 @@ var GlobalSettings = GlobalSettingsType{
 	LogFile:         &NullableString{},
 	CompressionType: channeldpb.CompressionType_NO_COMPRESSION,
 	// Mirror uses int32 as the connId
-	MaxConnectionId:       math.MaxInt32,
+	MaxConnectionIdBits:   31,
 	SpatialChannelIdStart: 65536,
 	ChannelSettings: map[channeldpb.ChannelType]ChannelSettingsType{
 		channeldpb.ChannelType_GLOBAL: {
@@ -126,7 +125,7 @@ func (s *GlobalSettingsType) ParseFlag() error {
 
 	ct := flag.Uint("ct", 0, "the compression type, 0 = No, 1 = Snappy")
 	scs := flag.Uint("scs", uint(s.SpatialChannelIdStart), "start ChannelId of spatial channels")
-	mcid := flag.Uint("mcid", uint(s.MaxConnectionId), "max ConnectionId")
+	mcb := flag.Uint("mcb", uint(s.MaxConnectionIdBits), "max bits of ConnectionId (e.g. 16 means max ConnectionId = 1<<16 - 1). Up to 32.")
 
 	chs := flag.String("chs", "config/channel_settings_hifi.json", "the path to the channel settings file")
 
@@ -140,8 +139,8 @@ func (s *GlobalSettingsType) ParseFlag() error {
 		s.SpatialChannelIdStart = ChannelId(*scs)
 	}
 
-	if mcid != nil {
-		s.MaxConnectionId = ConnectionId(*mcid)
+	if mcb != nil {
+		s.MaxConnectionIdBits = uint8(*mcb)
 	}
 
 	chsData, err := ioutil.ReadFile(*chs)

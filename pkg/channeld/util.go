@@ -33,3 +33,11 @@ func GetNextIdSync(m *sync.Map, start ChannelId, min ChannelId, max ChannelId) (
 
 	return 0, false
 }
+
+func HashString(s string) uint32 {
+	hash := uint32(17)
+	for c := range s {
+		hash = hash*31 + uint32(c)
+	}
+	return hash
+}
