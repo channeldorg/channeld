@@ -12,6 +12,7 @@ type ChannelSubscription struct {
 	options channeldpb.ChannelSubscriptionOptions
 	//fanOutDataMsg  Message
 	//lastFanOutTime time.Time
+	subTime       ChannelTime
 	fanOutElement *list.Element
 }
 
@@ -29,6 +30,7 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.Channel
 	cs := &ChannelSubscription{
 		// Send the whole data to the connection when subscribed
 		//fanOutDataMsg: ch.Data().msg,
+		subTime: ch.GetTime(),
 	}
 	if options != nil {
 		cs.options = channeldpb.ChannelSubscriptionOptions{
@@ -46,7 +48,8 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.Channel
 		}
 	}
 	cs.fanOutElement = ch.fanOutQueue.PushFront(&fanOutConnection{
-		conn: c,
+		conn:           c,
+		hadFirstFanOut: false,
 		// Make sure the connection won't be fanned-out in 2x FanOutIntervalMs, to solve the spawn & update order issue in Mirror.
 		lastFanOutTime: ch.GetTime().OffsetMs(-int32(cs.options.FanOutIntervalMs) + cs.options.FanOutDelayMs), //ch.GetTime().AddMs(cs.options.FanOutIntervalMs)
 	})

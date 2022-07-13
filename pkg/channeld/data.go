@@ -28,6 +28,7 @@ type RemovableMapField interface {
 
 type fanOutConnection struct {
 	conn           ConnectionInChannel
+	hadFirstFanOut bool
 	lastFanOutTime ChannelTime
 }
 
@@ -129,6 +130,12 @@ func (ch *Channel) tickData(t ChannelTime) {
 			continue
 		}
 
+		/*
+			----------------------------------------------------
+			   ^                       ^                    ^
+			   |------FanOutDelay------|---FanOutInterval---|
+			   subTime                 firstFanOutTime      secondFanOutTime
+		*/
 		nextFanOutTime := foc.lastFanOutTime.AddMs(cs.options.FanOutIntervalMs)
 		if t >= nextFanOutTime {
 
@@ -136,9 +143,11 @@ func (ch *Channel) tickData(t ChannelTime) {
 			bufp := ch.data.updateMsgBuffer.Front()
 			var accumulatedUpdateMsg common.ChannelDataMessage = nil
 
-			if foc.lastFanOutTime <= 0 {
+			//if foc.lastFanOutTime <= cs.subTime {
+			if !foc.hadFirstFanOut {
 				// Send the whole data for the first time
 				ch.fanOutDataUpdate(conn, cs, ch.data.msg)
+				foc.hadFirstFanOut = true
 			} else if bufp != nil {
 				if foc.lastFanOutTime >= lastUpdateTime {
 					lastUpdateTime = foc.lastFanOutTime
