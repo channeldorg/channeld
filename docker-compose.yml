@@ -4,7 +4,7 @@ services:
     build: .
     image: channeld/channeld
     volumes:
-      - channeld-vol:/var/log/channeld
+    - channeld-vol:/var/log/channeld
     depends_on:
       - grafana
     ports:
@@ -29,11 +29,13 @@ services:
     entrypoint: ["./server.x86_64", "-sa", "channeld", "-spawnai", "500"]
   chat:
     profiles:
-      - donotstart
-    build: ./examples/chat-rooms
+     - donotstart
+    build:
+      context: .
+      dockerfile: /examples/chat-rooms/Dockerfile
     image: channeld/chat
     volumes:
-      - chat-vol:/var/log/chat
+     - chat-vol:/var/log/chat
     depends_on:
       - grafana
     deploy:

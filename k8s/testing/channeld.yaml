@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: channeld
+  labels:
+    io.kompose.service: chat
+  name: chat
+spec:
+  ports:
+    - name: "web"
+      port: 8080
+      targetPort: 8080
+    - name: "client-ws"
+      port: 12108
+      targetPort: 12108
+  selector:
+    io.kompose.service: chat
+  type: LoadBalancer
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: channeld
+  labels:
+    io.kompose.service: chat
+  name: chat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: chat
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        io.kompose.service: chat
+    spec:
+      containers:
+        - command:
+            - ./app
+            - -ct=0
+            - -chs=../../config/channel_settings_lofi.json
+          image: channeld/chat:v0.2.0
+          name: chat
+          ports:
+            - containerPort: 8080
+            - containerPort: 12108
+          resources:
+            limits:
+              cpu: 3500m
+            requests:
+              cpu: "2"
+      restartPolicy: Always
