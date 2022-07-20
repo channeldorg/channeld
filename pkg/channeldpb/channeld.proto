@@ -13,8 +13,9 @@ message Packet {
 
 // The serialized message and the context of it.
 message MessagePack {
-    // The channel that the message is sent to.
-    // 0 means the message should be handled in the global channel (e.g. a @CreateChannel message)
+    // The ID of the channel that the message is sent to, or received from channeld.
+    // 0 is the GLOBAL channel; 1-65535 are for non-spatial channels;
+    // beyond (0xffff-0xffffffff) are reserved for spatial channels.
     uint32 channelId = 1;
 
     // How the message will be broadcasted to all connections in the channel? 
@@ -207,7 +208,7 @@ message ChannelDataMergeOptions {
 }
 
 // The message should have channelId = 0 in order to be handled.
-// Response: @CreateChannelResultMessage, if the MessageType is CREATE_CHANNEL and the channelType is not SPATIAL. The channelId in the response MessagePack corresponds to the created channel. The GLOBAL channel owner will also receive this message.
+// Response: @CreateChannelResultMessage, if the MessageType is CREATE_CHANNEL and the channelType is not SPATIAL. The GLOBAL channel owner will also receive this message.
 // Response: @CreateSpatialChannelsResultMessage, if the MessageType is CREATE_SPATIAL_CHANNEL and the channelType is SPATIAL. The GLOBAL channel owner will also receive this message.
 // Response: @SubscribedToChannelResultMessage. The channel creator will also be subscripbed to the channel immediately after the creation.
 message CreateChannelMessage {
@@ -222,6 +223,8 @@ message CreateChannelResultMessage {
     ChannelType channelType = 1;
     string metadata = 2;
     uint32 ownerConnId = 3;
+    // The ID of the newly-created channel. Add this field to differentiate it from MessagePack.channelId.
+    uint32 channelId = 4;
 }
 
 // The message should have channelId = 0 in order to be handled.
@@ -249,7 +252,8 @@ message ListChannelResultMessage {
 // Response: @SubscribedToChannelResultMessage. The message sender, the subscribed connection (if not the sender), and the channel owner will receive the message respectively.
 // If the connection has already been subscripbed to the channel, the subOptions will be merged, but no response message will be sent.
 message SubscribedToChannelMessage {
-    // The connection to be added to the channel is not necessarily the one sends the message 
+    // The connection to be added to the channel is not necessarily the one sends the message.
+    // Remarks: only the channel owner can sub another connection to the channel.
     uint32 connId = 1;
     ChannelSubscriptionOptions subOptions = 2;
 }

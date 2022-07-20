@@ -253,13 +253,11 @@ func handleCreateChannel(ctx MessageContext) {
 		newChannel.InitData(nil, msg.MergeOptions)
 	}
 
-	// Make sure the response message has the channelId = newChannel.id, not always 0.
-	ctx.ChannelId = uint32(newChannel.id)
-
 	ctx.Msg = &channeldpb.CreateChannelResultMessage{
 		ChannelType: newChannel.channelType,
 		Metadata:    newChannel.metadata,
 		OwnerConnId: uint32(ctx.Connection.Id()),
+		ChannelId:   uint32(newChannel.id),
 	}
 	ctx.Connection.Send(ctx)
 	// Also send the response to the GLOBAL channel owner.
@@ -399,7 +397,7 @@ func handleListChannel(ctx MessageContext) {
 	}
 
 	result := make([]*channeldpb.ListChannelResultMessage_ChannelInfo, 0)
-	allChannels.Range(func(k interface{}, v interface{}) bool {
+	allChannels.Range(func(_, v interface{}) bool {
 		channel := v.(*Channel)
 		if msg.TypeFilter != channeldpb.ChannelType_UNKNOWN && msg.TypeFilter != channel.channelType {
 			return true

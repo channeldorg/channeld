@@ -173,7 +173,7 @@ window.addEventListener("load", function(evt) {
     };
 
     var handleCreateChannel = function(msg, channelId) {
-        appendLog("Created channel(" + proto.ChannelType.valuesById[msg.channelType] + " " + channelId + "), owner: " + msg.ownerConnId);
+        appendLog("Created channel(" + proto.ChannelType.valuesById[msg.channelType] + " " + msg.channelId + "), owner: " + msg.ownerConnId);
     };
 
 
