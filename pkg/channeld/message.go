@@ -493,7 +493,7 @@ func handleUnsubFromChannel(ctx MessageContext) {
 		return
 	}
 
-	if connToUnsub.id != ctx.Connection.Id() && !connToUnsub.HasAuthorityOver(ctx.Channel) {
+	if connToUnsub.id != ctx.Connection.Id() && !ctx.Connection.HasAuthorityOver(ctx.Channel) {
 		ctx.Connection.Logger().Error("illegal attemp to unsub another connection as the sender has no authority",
 			zap.Uint32("unsubConnId", msg.ConnId),
 			zap.String("channelType", ctx.Channel.channelType.String()),
