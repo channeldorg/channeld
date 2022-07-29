@@ -58,6 +58,18 @@ func RegisterMessageHandler(msgType uint32, msg Message, handler MessageHandlerF
 }
 
 func handleClientToServerUserMessage(ctx MessageContext) {
+	msg, ok := ctx.Msg.(*channeldpb.ServerForwardMessage)
+	if !ok {
+		ctx.Connection.Logger().Error("message is not a ServerForwardMessage, will not be handled.")
+		return
+	}
+	ctx.Connection.Logger().Debug("forward user-space message from client to server",
+		zap.Uint32("msgType", uint32(ctx.MsgType)),
+		zap.Uint32("clientConnId", msg.ClientConnId),
+		zap.Uint32("channelId", uint32(ctx.Channel.id)),
+		zap.Int("payloadSize", len(msg.Payload)),
+	)
+
 	if ctx.Channel.HasOwner() {
 		ctx.Channel.ownerConnection.Send(ctx)
 	} else if !channeldpb.BroadcastType_NO_BROADCAST.Check(ctx.Broadcast) {
@@ -85,7 +97,7 @@ func handleServerToClientUserMessage(ctx MessageContext) {
 		return
 	}
 
-	ctx.Connection.Logger().Trace("forward user-space message",
+	ctx.Connection.Logger().Debug("forward user-space message from server to client",
 		zap.Uint32("msgType", uint32(ctx.MsgType)),
 		zap.Uint32("clientConnId", msg.ClientConnId),
 		zap.Uint32("channelId", uint32(ctx.Channel.id)),

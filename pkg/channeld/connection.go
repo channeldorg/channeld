@@ -390,7 +390,11 @@ func (c *Connection) receiveMessage(mp *channeldpb.MessagePack) {
 		} else {
 			// server -> channeld -> client
 			msg = &channeldpb.ServerForwardMessage{}
-			proto.Unmarshal(mp.MsgBody, msg)
+			err := proto.Unmarshal(mp.MsgBody, msg)
+			if err != nil {
+				c.Logger().Error("unmarshalling ServerForwardMessage", zap.Error(err))
+				return
+			}
 			handler = handleServerToClientUserMessage
 		}
 	} else {

@@ -156,7 +156,7 @@ func createChannelWithId(channelId ChannelId, t channeldpb.ChannelType, owner Co
 
 func CreateChannel(t channeldpb.ChannelType, owner ConnectionInChannel) (*Channel, error) {
 	if t == channeldpb.ChannelType_GLOBAL && globalChannel != nil {
-		return nil, errors.New("failed to create WORLD channel as it already exists")
+		return nil, errors.New("failed to create GLOBAL channel as it already exists")
 	}
 
 	var channelId ChannelId
