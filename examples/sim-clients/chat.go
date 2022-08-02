@@ -17,13 +17,7 @@ var ChatClientActions = []*clientAction{
 		probability: 1,
 		minInterval: time.Millisecond * 20000, //2000
 		perform: func(c *client.ChanneldClient, data *clientData) bool {
-			c.Send(0, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_LIST_CHANNEL), &channeldpb.ListChannelMessage{},
-				func(c *client.ChanneldClient, channelId uint32, m client.Message) {
-					data.listedChannels = map[uint32]struct{}{}
-					for _, info := range m.(*channeldpb.ListChannelResultMessage).Channels {
-						data.listedChannels[info.ChannelId] = struct{}{}
-					}
-				})
+			c.Send(0, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_LIST_CHANNEL), &channeldpb.ListChannelMessage{}, nil)
 			return true
 		},
 	},
@@ -32,7 +26,7 @@ var ChatClientActions = []*clientAction{
 		probability: 0.05,
 		minInterval: time.Millisecond * 10000,
 		perform: func(c *client.ChanneldClient, data *clientData) bool {
-			if len(data.listedChannels) >= MaxChannelNum {
+			if len(c.ListedChannels) >= MaxChannelNum {
 				return false
 			}
 
@@ -45,7 +39,6 @@ var ChatClientActions = []*clientAction{
 					FanOutIntervalMs: 100,
 				},
 			}, func(_ *client.ChanneldClient, channelId uint32, m client.Message) {
-				data.createdChannelIds[channelId] = struct{}{}
 				//log.Printf("Client(%d) created channel %d, data clientId: %d", client.Id, channelId, data.clientId)
 			})
 			return true
@@ -56,10 +49,10 @@ var ChatClientActions = []*clientAction{
 		probability: 0,
 		minInterval: time.Millisecond * 12000,
 		perform: func(client *client.ChanneldClient, data *clientData) bool {
-			if len(data.createdChannelIds) == 0 {
+			if len(client.CreatedChannels) == 0 {
 				return false
 			}
-			channelToRemove := randUint32(data.createdChannelIds)
+			channelToRemove := randUint32(client.CreatedChannels)
 			client.Send(0,
 				channeldpb.BroadcastType_NO_BROADCAST,
 				uint32(channeldpb.MessageType_REMOVE_CHANNEL),
@@ -68,8 +61,6 @@ var ChatClientActions = []*clientAction{
 				},
 				nil,
 			)
-			// Remove the channel id from the list
-			delete(data.createdChannelIds, channelToRemove)
 			//log.Printf("Client(%d) CREATE_CHANNEL", client.Id)
 			return true
 		},
@@ -79,7 +70,7 @@ var ChatClientActions = []*clientAction{
 		probability: 0.1,
 		minInterval: time.Millisecond * 3000,
 		perform: func(client *client.ChanneldClient, data *clientData) bool {
-			if list := data.listedChannels; len(list) > 1 {
+			if list := client.ListedChannels; len(list) > 1 {
 				copy := make(map[uint32]struct{})
 				for chid := range list {
 					copy[chid] = struct{}{}

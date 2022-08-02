@@ -33,6 +33,8 @@ type ChanneldClient struct {
 	Id                 uint32
 	CompressionType    channeldpb.CompressionType
 	SubscribedChannels map[uint32]struct{}
+	CreatedChannels    map[uint32]struct{}
+	ListedChannels     map[uint32]struct{}
 	Conn               net.Conn
 	connected          bool
 	incomingQueue      chan messageQueueEntry
@@ -61,6 +63,8 @@ func NewClient(addr string) (*ChanneldClient, error) {
 	c := &ChanneldClient{
 		CompressionType:    channeldpb.CompressionType_NO_COMPRESSION,
 		SubscribedChannels: make(map[uint32]struct{}),
+		CreatedChannels:    make(map[uint32]struct{}),
+		ListedChannels:     make(map[uint32]struct{}),
 		Conn:               conn,
 		connected:          true,
 		incomingQueue:      make(chan messageQueueEntry, 128),
@@ -73,11 +77,11 @@ func NewClient(addr string) (*ChanneldClient, error) {
 	}
 
 	c.SetMessageEntry(uint32(channeldpb.MessageType_AUTH), &channeldpb.AuthResultMessage{}, handleAuth)
-	c.SetMessageEntry(uint32(channeldpb.MessageType_CREATE_CHANNEL), &channeldpb.CreateChannelResultMessage{}, defaultMessageHandler)
+	c.SetMessageEntry(uint32(channeldpb.MessageType_CREATE_CHANNEL), &channeldpb.CreateChannelResultMessage{}, handleCreateChannel)
 	c.SetMessageEntry(uint32(channeldpb.MessageType_REMOVE_CHANNEL), &channeldpb.RemoveChannelMessage{}, handleRemoveChannel)
 	c.SetMessageEntry(uint32(channeldpb.MessageType_SUB_TO_CHANNEL), &channeldpb.SubscribedToChannelResultMessage{}, handleSubToChannel)
 	c.SetMessageEntry(uint32(channeldpb.MessageType_UNSUB_FROM_CHANNEL), &channeldpb.UnsubscribedFromChannelResultMessage{}, handleUnsubToChannel)
-	c.SetMessageEntry(uint32(channeldpb.MessageType_LIST_CHANNEL), &channeldpb.ListChannelResultMessage{}, defaultMessageHandler)
+	c.SetMessageEntry(uint32(channeldpb.MessageType_LIST_CHANNEL), &channeldpb.ListChannelResultMessage{}, handleListChannel)
 	c.SetMessageEntry(uint32(channeldpb.MessageType_CHANNEL_DATA_UPDATE), &channeldpb.ChannelDataUpdateMessage{}, defaultMessageHandler)
 
 	return c, nil
@@ -128,9 +132,15 @@ func handleAuth(client *ChanneldClient, channelId uint32, m Message) {
 	}
 }
 
+func handleCreateChannel(c *ChanneldClient, channelId uint32, m Message) {
+	c.CreatedChannels[channelId] = struct{}{}
+}
+
 func handleRemoveChannel(client *ChanneldClient, channelId uint32, m Message) {
 	msg := m.(*channeldpb.RemoveChannelMessage)
 	delete(client.SubscribedChannels, msg.ChannelId)
+	delete(client.CreatedChannels, msg.ChannelId)
+	delete(client.ListedChannels, msg.ChannelId)
 }
 
 func handleSubToChannel(client *ChanneldClient, channelId uint32, m Message) {
@@ -139,6 +149,13 @@ func handleSubToChannel(client *ChanneldClient, channelId uint32, m Message) {
 
 func handleUnsubToChannel(c *ChanneldClient, channelId uint32, m Message) {
 	delete(c.SubscribedChannels, channelId)
+}
+
+func handleListChannel(c *ChanneldClient, channelId uint32, m Message) {
+	c.ListedChannels = map[uint32]struct{}{}
+	for _, info := range m.(*channeldpb.ListChannelResultMessage).Channels {
+		c.ListedChannels[info.ChannelId] = struct{}{}
+	}
 }
 
 func defaultMessageHandler(client *ChanneldClient, channelId uint32, m Message) {

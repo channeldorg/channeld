@@ -22,20 +22,6 @@ const (
 
 func TanksInitFunc(c *client.ChanneldClient, data *clientData) {
 	data.ctx[ctxKeyTanksChannelData] = &tankspb.TankGameChannelData{}
-	c.AddMessageHandler(uint32(channeldpb.MessageType_AUTH), func(c *client.ChanneldClient, channelId uint32, m client.Message) {
-		resultMsg := m.(*channeldpb.AuthResultMessage)
-		if resultMsg.Result == channeldpb.AuthResultMessage_SUCCESSFUL {
-			// Re-sub to GLOBAL channel to update the sub options
-			c.Send(0, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_SUB_TO_CHANNEL), &channeldpb.SubscribedToChannelMessage{
-				ConnId: resultMsg.ConnId,
-				SubOptions: &channeldpb.ChannelSubscriptionOptions{
-					DataAccess:       channeldpb.ChannelDataAccess_WRITE_ACCESS,
-					FanOutIntervalMs: 10,
-					DataFieldMasks:   []string{},
-				},
-			}, nil)
-		}
-	})
 	c.AddMessageHandler(uint32(channeldpb.MessageType_CHANNEL_DATA_UPDATE), wrapTanksChannelDataUpateHandle(data))
 }
 

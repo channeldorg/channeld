@@ -20,15 +20,14 @@ const (
 	ConnectInterval          time.Duration = 100 * time.Millisecond
 	MaxTickInterval          time.Duration = 100 * time.Millisecond
 	ActionIntervalMultiplier float64       = 0.2
+	SubToGlobalAfterAuth     bool          = true
 )
 
 type clientData struct {
-	clientId          uint32
-	rnd               *rand.Rand
-	activeChannelId   uint32
-	createdChannelIds map[uint32]struct{}
-	listedChannels    map[uint32]struct{}
-	ctx               map[interface{}]interface{}
+	clientId        uint32
+	rnd             *rand.Rand
+	activeChannelId uint32
+	ctx             map[interface{}]interface{}
 }
 
 type clientAction struct {
@@ -44,20 +43,6 @@ func removeChannelId(client *client.ChanneldClient, data *clientData, channelId 
 			data.activeChannelId = randUint32(client.SubscribedChannels)
 		} else {
 			data.activeChannelId = 0
-		}
-	}
-
-	for id := range data.createdChannelIds {
-		if id == channelId {
-			delete(data.createdChannelIds, id)
-			break
-		}
-	}
-
-	for id := range data.listedChannels {
-		if id == channelId {
-			delete(data.listedChannels, id)
-			break
 		}
 	}
 }
@@ -87,11 +72,26 @@ func runClient(clientActions []*clientAction, initFunc func(client *client.Chann
 	time.Sleep(100 * time.Millisecond)
 
 	data := &clientData{
-		clientId:          c.Id,
-		rnd:               rand.New(rand.NewSource(time.Now().Unix())),
-		activeChannelId:   0,
-		createdChannelIds: make(map[uint32]struct{}),
-		ctx:               make(map[interface{}]interface{}),
+		clientId:        c.Id,
+		rnd:             rand.New(rand.NewSource(time.Now().Unix())),
+		activeChannelId: 0,
+		ctx:             make(map[interface{}]interface{}),
+	}
+
+	if SubToGlobalAfterAuth {
+		c.AddMessageHandler(uint32(channeldpb.MessageType_AUTH), func(c *client.ChanneldClient, channelId uint32, m client.Message) {
+			resultMsg := m.(*channeldpb.AuthResultMessage)
+			if resultMsg.Result == channeldpb.AuthResultMessage_SUCCESSFUL {
+				c.Send(0, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_SUB_TO_CHANNEL), &channeldpb.SubscribedToChannelMessage{
+					ConnId: resultMsg.ConnId,
+					SubOptions: &channeldpb.ChannelSubscriptionOptions{
+						DataAccess:       channeldpb.ChannelDataAccess_WRITE_ACCESS,
+						FanOutIntervalMs: 10,
+						DataFieldMasks:   []string{},
+					},
+				}, nil)
+			}
+		})
 	}
 
 	c.AddMessageHandler(uint32(channeldpb.MessageType_SUB_TO_CHANNEL), func(client *client.ChanneldClient, channelId uint32, m client.Message) {
