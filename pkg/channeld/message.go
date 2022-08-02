@@ -183,19 +183,40 @@ func handleAuth(ctx MessageContext) {
 		ctx.Connection.Logger().Error("illegal attemp to authenticate outside the GLOBAL channel")
 		return
 	}
-	_, ok := ctx.Msg.(*channeldpb.AuthMessage)
+	msg, ok := ctx.Msg.(*channeldpb.AuthMessage)
 	if !ok {
 		ctx.Connection.Logger().Error("mssage is not an AuthMessage, will not be handled.")
 		return
 	}
 	//log.Printf("Auth PIT: %s, LT: %s\n", msg.PlayerIdentifierToken, msg.LoginToken)
 
-	// TODO: Authentication
+	if authProvider == nil && !GlobalSettings.Development {
+		rootLogger.Panic("no auth provider")
+		return
+	}
 
-	ctx.Connection.OnAuthenticated()
+	authResult := channeldpb.AuthResultMessage_SUCCESSFUL
+	if authProvider != nil {
+		go func() {
+			authResult, err := authProvider.DoAuth(msg.PlayerIdentifierToken, msg.LoginToken)
+			if err != nil {
+				ctx.Connection.Logger().Error("failed to do auth", zap.Error(err))
+			} else {
+				onAuthComplete(ctx, authResult)
+			}
+		}()
+	} else {
+		onAuthComplete(ctx, authResult)
+	}
+}
+
+func onAuthComplete(ctx MessageContext, authResult channeldpb.AuthResultMessage_AuthResult) {
+	if authResult == channeldpb.AuthResultMessage_SUCCESSFUL {
+		ctx.Connection.OnAuthenticated()
+	}
 
 	ctx.Msg = &channeldpb.AuthResultMessage{
-		Result:          channeldpb.AuthResultMessage_SUCCESSFUL,
+		Result:          authResult,
 		ConnId:          uint32(ctx.Connection.Id()),
 		CompressionType: GlobalSettings.CompressionType,
 	}
