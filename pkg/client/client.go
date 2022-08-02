@@ -72,10 +72,9 @@ func NewClient(addr string) (*ChanneldClient, error) {
 		},
 	}
 
-	c.SetMessageEntry(uint32(channeldpb.MessageType_AUTH), &channeldpb.AuthResultMessage{}, defaultMessageHandler)
+	c.SetMessageEntry(uint32(channeldpb.MessageType_AUTH), &channeldpb.AuthResultMessage{}, handleAuth)
 	c.SetMessageEntry(uint32(channeldpb.MessageType_CREATE_CHANNEL), &channeldpb.CreateChannelResultMessage{}, defaultMessageHandler)
 	c.SetMessageEntry(uint32(channeldpb.MessageType_REMOVE_CHANNEL), &channeldpb.RemoveChannelMessage{}, handleRemoveChannel)
-	c.SetMessageEntry(uint32(channeldpb.MessageType_AUTH), &channeldpb.AuthResultMessage{}, defaultMessageHandler)
 	c.SetMessageEntry(uint32(channeldpb.MessageType_SUB_TO_CHANNEL), &channeldpb.SubscribedToChannelResultMessage{}, handleSubToChannel)
 	c.SetMessageEntry(uint32(channeldpb.MessageType_UNSUB_FROM_CHANNEL), &channeldpb.UnsubscribedFromChannelResultMessage{}, handleUnsubToChannel)
 	c.SetMessageEntry(uint32(channeldpb.MessageType_LIST_CHANNEL), &channeldpb.ListChannelResultMessage{}, defaultMessageHandler)
@@ -110,18 +109,23 @@ func (client *ChanneldClient) Auth(lt string, pit string) {
 	client.Send(0, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_AUTH), &channeldpb.AuthMessage{
 		LoginToken:            lt,
 		PlayerIdentifierToken: pit,
-	}, func(_ *ChanneldClient, channelId uint32, m Message) {
-		msg := m.(*channeldpb.AuthResultMessage)
-		client.Id = msg.ConnId
-		client.CompressionType = msg.CompressionType
-		//result <- msg
-		if msg.Result == channeldpb.AuthResultMessage_SUCCESSFUL {
-			client.Send(0, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_SUB_TO_CHANNEL), &channeldpb.SubscribedToChannelMessage{
-				ConnId: client.Id,
-			}, nil)
-		}
-	})
+	}, nil)
 	//return result
+}
+
+func handleAuth(client *ChanneldClient, channelId uint32, m Message) {
+	msg := m.(*channeldpb.AuthResultMessage)
+
+	if msg.Result == channeldpb.AuthResultMessage_SUCCESSFUL {
+		if client.Id == 0 {
+			client.Id = msg.ConnId
+			client.CompressionType = msg.CompressionType
+		}
+
+		// client.Send(0, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_SUB_TO_CHANNEL), &channeldpb.SubscribedToChannelMessage{
+		// 	ConnId: client.Id,
+		// }, nil)
+	}
 }
 
 func handleRemoveChannel(client *ChanneldClient, channelId uint32, m Message) {
