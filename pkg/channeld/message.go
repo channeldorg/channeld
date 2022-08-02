@@ -72,7 +72,7 @@ func handleClientToServerUserMessage(ctx MessageContext) {
 
 	if ctx.Channel.HasOwner() {
 		ctx.Channel.ownerConnection.Send(ctx)
-	} else if !channeldpb.BroadcastType_NO_BROADCAST.Check(ctx.Broadcast) {
+	} else if ctx.Broadcast > 0 {
 		if ctx.Channel.enableClientBroadcast {
 			ctx.Channel.Broadcast(ctx)
 		} else {
