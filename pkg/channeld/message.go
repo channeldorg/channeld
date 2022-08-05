@@ -196,7 +196,9 @@ func handleAuth(ctx MessageContext) {
 	}
 
 	authResult := channeldpb.AuthResultMessage_SUCCESSFUL
-	if authProvider != nil {
+	if ctx.Connection.GetConnectionType() == channeldpb.ConnectionType_SERVER && GlobalSettings.ServerBypassAuth {
+		onAuthComplete(ctx, authResult)
+	} else if authProvider != nil {
 		go func() {
 			authResult, err := authProvider.DoAuth(msg.PlayerIdentifierToken, msg.LoginToken)
 			if err != nil {
