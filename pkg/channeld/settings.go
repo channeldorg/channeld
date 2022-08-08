@@ -32,6 +32,8 @@ type GlobalSettingsType struct {
 
 	MaxConnectionIdBits uint8
 
+	ConnectionAuthTimeoutMs int64
+
 	SpatialChannelIdStart ChannelId
 
 	ChannelSettings map[channeldpb.ChannelType]ChannelSettingsType
@@ -48,8 +50,9 @@ var GlobalSettings = GlobalSettingsType{
 	LogFile:         &NullableString{},
 	CompressionType: channeldpb.CompressionType_NO_COMPRESSION,
 	// Mirror uses int32 as the connId
-	MaxConnectionIdBits:   31,
-	SpatialChannelIdStart: 65536,
+	MaxConnectionIdBits:     31,
+	ConnectionAuthTimeoutMs: 5000,
+	SpatialChannelIdStart:   65536,
 	ChannelSettings: map[channeldpb.ChannelType]ChannelSettingsType{
 		channeldpb.ChannelType_GLOBAL: {
 			TickIntervalMs:                 10,
@@ -126,8 +129,9 @@ func (s *GlobalSettingsType) ParseFlag() error {
 	flag.StringVar(&s.ClientFSM, "cfsm", "config/client_non_authoratative_fsm.json", "the path to the client FSM config")
 
 	ct := flag.Uint("ct", 0, "the compression type, 0 = No, 1 = Snappy")
-	scs := flag.Uint("scs", uint(s.SpatialChannelIdStart), "start ChannelId of spatial channels")
+	scs := flag.Uint("scs", uint(s.SpatialChannelIdStart), "start ChannelId of spatial channels. Default is 65535.")
 	mcb := flag.Uint("mcb", uint(s.MaxConnectionIdBits), "max bits of ConnectionId (e.g. 16 means max ConnectionId = 1<<16 - 1). Up to 32.")
+	cat := flag.Uint("cat", uint(s.ConnectionAuthTimeoutMs), "the duration to allow a connection stay unauthenticated before closing it. Default is 5000.")
 
 	chs := flag.String("chs", "config/channel_settings_hifi.json", "the path to the channel settings file")
 
@@ -143,6 +147,10 @@ func (s *GlobalSettingsType) ParseFlag() error {
 
 	if mcb != nil {
 		s.MaxConnectionIdBits = uint8(*mcb)
+	}
+
+	if cat != nil {
+		s.ConnectionAuthTimeoutMs = int64(*cat)
 	}
 
 	chsData, err := ioutil.ReadFile(*chs)

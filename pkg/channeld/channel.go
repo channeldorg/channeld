@@ -17,9 +17,9 @@ import (
 type ChannelState uint8
 
 const (
-	INIT     ChannelState = 0
-	OPEN     ChannelState = 1
-	HANDOVER ChannelState = 2
+	ChannelState_INIT     ChannelState = 0
+	ChannelState_OPEN     ChannelState = 1
+	ChannelState_HANDOVER ChannelState = 2
 )
 
 // Each channel uses a goroutine and we can have at most millions of goroutines at the same time.
@@ -48,7 +48,8 @@ type ConnectionInChannel interface {
 	GetConnectionType() channeldpb.ConnectionType
 	OnAuthenticated()
 	HasAuthorityOver(ch *Channel) bool
-	IsRemoving() bool
+	Close()
+	IsClosing() bool
 	Send(ctx MessageContext)
 	SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) *ChannelSubscription
 	UnsubscribeFromChannel(ch *Channel) (*channeldpb.ChannelSubscriptionOptions, error)
@@ -141,9 +142,9 @@ func createChannelWithId(channelId ChannelId, t channeldpb.ChannelType, owner Co
 	}
 
 	if ch.HasOwner() {
-		ch.state = OPEN
+		ch.state = ChannelState_OPEN
 	} else {
-		ch.state = INIT
+		ch.state = ChannelState_INIT
 	}
 
 	allChannels.Store(ch.id, ch)
@@ -274,7 +275,7 @@ func (ch *Channel) tickMessages(tickStart time.Time) {
 
 func (ch *Channel) tickConnections() {
 	for conn := range ch.subscribedConnections {
-		if conn.IsRemoving() {
+		if conn.IsClosing() {
 			// Unsub the connection from the channel
 			delete(ch.subscribedConnections, conn)
 			conn.Logger().Info("removed subscription of a disconnected endpoint", zap.Uint32("channelId", uint32(ch.id)))
@@ -374,7 +375,7 @@ func (ch *Channel) Logger() *Logger {
 
 func (ch *Channel) HasOwner() bool {
 	conn, ok := ch.ownerConnection.(*Connection)
-	return ok && conn != nil && !conn.IsRemoving()
+	return ok && conn != nil && !conn.IsClosing()
 }
 
 // Implementation for ConnectionInChannel interface

@@ -22,7 +22,18 @@ func (provider *LoggingAuthProvider) DoAuth(pit string, lt string) (channeldpb.A
 	return channeldpb.AuthResultMessage_SUCCESSFUL, nil
 }
 
-var authProvider AuthProvider //= &LoggingAuthProvider{
+// Always return AuthResultMessage_INVALID_LT
+type AlwaysFailAuthProvider struct{}
+
+func (provider *AlwaysFailAuthProvider) DoAuth(pit string, lt string) (channeldpb.AuthResultMessage_AuthResult, error) {
+	return channeldpb.AuthResultMessage_INVALID_LT, nil
+}
+
+var authProvider AuthProvider
+
+// = &AlwaysFailAuthProvider{}
+
+//= &LoggingAuthProvider{
 // 	Logger: zap.NewExample(),
 // 	Msg:    "do auth",
 // }

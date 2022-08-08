@@ -22,6 +22,14 @@ import (
 
 type ConnectionId uint32
 
+//type ConnectionState int32
+
+const (
+	ConnectionState_UNAUTHENTICATED int32 = 0
+	ConnectionState_AUTHENTICATED   int32 = 1
+	ConnectionState_CLOSING         int32 = 2
+)
+
 // Add an interface before the underlying network layer for the test purpose.
 type MessageSender interface {
 	Send(c *Connection, ctx MessageContext) //(c *Connection, channelId ChannelId, msgType channeldpb.MessageType, msg Message)
@@ -46,10 +54,12 @@ type Connection struct {
 	sendQueue       chan MessageContext
 	fsm             *fsm.FiniteStateMachine
 	logger          *Logger
-	removing        int32 // Don't put the removing state into the FSM as 1) the FSM's states are user-defined. 2) the FSM doesn't have the race condition.
+	state           int32 // Don't put the connection state into the FSM as 1) the FSM's states are user-defined. 2) the FSM is not goroutine-safe.
+	connTime        time.Time
 }
 
 var allConnections sync.Map // map[ConnectionId]*Connection
+var unauthenticatedConnections sync.Map
 var nextConnectionId uint32 = 0
 var serverFsm fsm.FiniteStateMachine
 var clientFsm fsm.FiniteStateMachine
@@ -82,13 +92,30 @@ func InitConnections(serverFsmPath string, clientFsmPath string) {
 			zap.String("currentState", clientFsm.CurrentState().Name),
 		)
 	}
+
+	go checkUnauthConns()
+}
+
+func checkUnauthConns() {
+	for {
+		unauthenticatedConnections.Range(func(_, v interface{}) bool {
+			conn := v.(*Connection)
+			if conn.state == ConnectionState_UNAUTHENTICATED &&
+				time.Since(conn.connTime).Milliseconds() >= GlobalSettings.ConnectionAuthTimeoutMs {
+				conn.Close()
+			}
+			return true
+		})
+
+		time.Sleep(time.Millisecond * 500)
+	}
 }
 
 func GetConnection(id ConnectionId) *Connection {
 	v, ok := allConnections.Load(id)
 	if ok {
 		c := v.(*Connection)
-		if c.IsRemoving() {
+		if c.IsClosing() {
 			return nil
 		}
 		return c
@@ -98,15 +125,17 @@ func GetConnection(id ConnectionId) *Connection {
 }
 
 func startGoroutines(connection *Connection) {
+	// receive goroutine
 	go func() {
-		for !connection.IsRemoving() {
-			connection.ReceivePacket()
+		for !connection.IsClosing() {
+			connection.receivePacket()
 		}
 	}()
 
+	// flush goroutine
 	go func() {
-		for !connection.IsRemoving() {
-			connection.Flush()
+		for !connection.IsClosing() {
+			connection.flush()
 			time.Sleep(time.Millisecond)
 		}
 	}()
@@ -193,7 +222,8 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 			zap.String("connType", t.String()),
 			zap.Uint32("connId", nextConnectionId),
 		)},
-		removing: 0,
+		state:    ConnectionState_UNAUTHENTICATED,
+		connTime: time.Now(),
 	}
 
 	// IMPORTANT: always make a value copy
@@ -212,29 +242,32 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 
 	allConnections.Store(connection.id, connection)
 
+	unauthenticatedConnections.Store(connection.id, connection)
+
 	connectionNum.WithLabelValues(t.String()).Inc()
 
 	return connection
 }
 
-func RemoveConnection(c *Connection) {
+func (c *Connection) Close() {
 	defer func() {
 		recover()
 	}()
-	if c.IsRemoving() {
-		c.Logger().Warn("connection is already removed")
+	if c.IsClosing() {
+		c.Logger().Warn("connection is already closed")
 		return
 	}
-	atomic.AddInt32(&c.removing, 1)
+	atomic.StoreInt32(&c.state, ConnectionState_CLOSING)
 	c.conn.Close()
 	close(c.sendQueue)
 	allConnections.Delete(c.id)
+	unauthenticatedConnections.Delete(c.id)
 
 	connectionNum.WithLabelValues(c.connectionType.String()).Dec()
 }
 
-func (c *Connection) IsRemoving() bool {
-	return c.removing > 0
+func (c *Connection) IsClosing() bool {
+	return c.state > ConnectionState_AUTHENTICATED
 }
 
 type closeError struct {
@@ -255,13 +288,13 @@ func readBytes(c *Connection, len uint) ([]byte, error) {
 				zap.String("remoteAddr", c.conn.RemoteAddr().String()),
 				zap.Error(err),
 			)
-			RemoveConnection(c)
+			c.Close()
 			return nil, &closeError{err}
 		case *websocket.CloseError:
 			c.Logger().Info("disconnected",
 				zap.String("remoteAddr", c.conn.RemoteAddr().String()),
 			)
-			RemoveConnection(c)
+			c.Close()
 			return nil, &closeError{err}
 		}
 
@@ -269,7 +302,7 @@ func readBytes(c *Connection, len uint) ([]byte, error) {
 			c.Logger().Info("disconnected",
 				zap.String("remoteAddr", c.conn.RemoteAddr().String()),
 			)
-			RemoveConnection(c)
+			c.Close()
 			return nil, &closeError{err}
 		}
 		return nil, err
@@ -286,7 +319,8 @@ func _(c *Connection) (uint32, error) {
 	}
 }
 
-func (c *Connection) ReceivePacket() {
+func (c *Connection) receivePacket() {
+	// TODO: use a per-connection buffer instead of allocating it in every receive()
 	// FIXME: read all bytes once into a buffer
 	tag, err := readBytes(c, 5)
 	if err != nil {
@@ -422,7 +456,7 @@ func (c *Connection) receiveMessage(mp *channeldpb.MessagePack) {
 }
 
 func (c *Connection) Send(ctx MessageContext) {
-	if c.IsRemoving() {
+	if c.IsClosing() {
 		return
 	}
 
@@ -430,7 +464,7 @@ func (c *Connection) Send(ctx MessageContext) {
 }
 
 // Should NOT be called outside the flush goroutine!
-func (c *Connection) Flush() {
+func (c *Connection) flush() {
 	if len(c.sendQueue) == 0 {
 		return
 	}
@@ -519,6 +553,8 @@ func (c *Connection) GetConnectionType() channeldpb.ConnectionType {
 }
 
 func (c *Connection) OnAuthenticated() {
+	c.state = ConnectionState_AUTHENTICATED
+	unauthenticatedConnections.Delete(c.id)
 	c.fsm.MoveToNextState()
 }
 

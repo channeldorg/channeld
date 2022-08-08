@@ -452,7 +452,7 @@ func (ctl *StaticGrid2DSpatialController) initServerConnections() {
 func (ctl *StaticGrid2DSpatialController) nextServerIndex() uint32 {
 	var i int = 0
 	for i = 0; i < len(ctl.serverConnections); i++ {
-		if ctl.serverConnections[i] == nil || ctl.serverConnections[i].IsRemoving() {
+		if ctl.serverConnections[i] == nil || ctl.serverConnections[i].IsClosing() {
 			break
 		}
 	}
@@ -462,7 +462,7 @@ func (ctl *StaticGrid2DSpatialController) nextServerIndex() uint32 {
 func (ctl *StaticGrid2DSpatialController) Tick() {
 	ctl.initServerConnections()
 	for i := 0; i < len(ctl.serverConnections); i++ {
-		if ctl.serverConnections[i] != nil && ctl.serverConnections[i].IsRemoving() {
+		if ctl.serverConnections[i] != nil && ctl.serverConnections[i].IsClosing() {
 			ctl.serverConnections[i] = nil
 			rootLogger.Info("reset spatial server connection", zap.Int("serverIndex", i))
 		}

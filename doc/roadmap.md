@@ -3,7 +3,8 @@
 - [x] Data update and fan-out
 - [x] FSM-based message filtering
 - [x] Message broadcasting
-- [ ] Authentication
+- [x] Authentication
+- [ ] DDoS Protection
 - [ ] Health check
 - [ ] Front-end load-balancing
 - [x] Spatial-based pub/sub
@@ -53,7 +54,11 @@
     - [x] Multi-server support
 - [ ] Unreal seamless world travelling
     - [x] Implement the C++ client library
-    - [ ] Integrate with Unreal's networking stack
+    - [x] Blueprint support
+    - [x] Integrate with Unreal's networking stack
     - [ ] Integrate with Unreal's Replication system
+    - [ ] Replication codegen
     - [ ] Multi-server support
+    - [ ] KCP support
+    - [ ] Data traffic compression
 - [ ] Dynamic region load-balancing

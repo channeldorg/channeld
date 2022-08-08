@@ -29,7 +29,7 @@ type MessageContext struct {
 
 func (ctx *MessageContext) HasConnection() bool {
 	conn, ok := ctx.Connection.(*Connection)
-	return ok && conn != nil && !conn.IsRemoving()
+	return ok && conn != nil && !conn.IsClosing()
 }
 
 type MessageHandlerFunc func(ctx MessageContext)
@@ -181,11 +181,13 @@ func handleServerToClientUserMessage(ctx MessageContext) {
 func handleAuth(ctx MessageContext) {
 	if ctx.Channel != globalChannel {
 		ctx.Connection.Logger().Error("illegal attemp to authenticate outside the GLOBAL channel")
+		ctx.Connection.Close()
 		return
 	}
 	msg, ok := ctx.Msg.(*channeldpb.AuthMessage)
 	if !ok {
 		ctx.Connection.Logger().Error("mssage is not an AuthMessage, will not be handled.")
+		ctx.Connection.Close()
 		return
 	}
 	//log.Printf("Auth PIT: %s, LT: %s\n", msg.PlayerIdentifierToken, msg.LoginToken)
@@ -203,6 +205,7 @@ func handleAuth(ctx MessageContext) {
 			authResult, err := authProvider.DoAuth(msg.PlayerIdentifierToken, msg.LoginToken)
 			if err != nil {
 				ctx.Connection.Logger().Error("failed to do auth", zap.Error(err))
+				ctx.Connection.Close()
 			} else {
 				onAuthComplete(ctx, authResult)
 			}
@@ -638,7 +641,7 @@ func handleDisconnect(ctx MessageContext) {
 			zap.String("targetConnType", connToDisconnect.connectionType.String()),
 		)
 	}
-	RemoveConnection(connToDisconnect)
+	connToDisconnect.Close()
 }
 
 func handleQuerySpatialChannel(ctx MessageContext) {

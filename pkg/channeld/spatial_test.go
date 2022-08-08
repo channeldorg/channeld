@@ -79,11 +79,11 @@ func TestCreateSpatialChannels3(t *testing.T) {
 	}
 	assert.Empty(t, testConn.subscribedChannels)
 
-	testConn.removed = true
+	testConn.closing = true
 	ctl.Tick()
 	assert.EqualValues(t, 0, ctl.nextServerIndex())
 
-	testConn.removed = false
+	testConn.closing = false
 	channels, err := ctl.CreateChannels(ctx)
 	assert.NoError(t, err)
 	assert.EqualValues(t, channels[0].id, GlobalSettings.SpatialChannelIdStart)
@@ -118,11 +118,11 @@ func TestCreateSpatialChannels2(t *testing.T) {
 	assert.Len(t, channels, 1)
 	assert.Empty(t, testConn.subscribedChannels)
 
-	testConn.removed = true
+	testConn.closing = true
 	ctl.Tick()
 	assert.EqualValues(t, 0, ctl.nextServerIndex())
 
-	testConn.removed = false
+	testConn.closing = false
 	channels, err = ctl.CreateChannels(ctx)
 	assert.NoError(t, err)
 	assert.EqualValues(t, channels[0].id, GlobalSettings.SpatialChannelIdStart)
@@ -206,7 +206,7 @@ func TestCreateSpatialChannels1(t *testing.T) {
 type testConnection struct {
 	sentMsgs           []MessageContext
 	subscribedChannels map[ChannelId]*Channel
-	removed            bool
+	closing            bool
 }
 
 func createTestConnection() *testConnection {
@@ -232,12 +232,12 @@ func (c *testConnection) HasAuthorityOver(ch *Channel) bool {
 	return false
 }
 
-func (c *testConnection) Remove() {
-	c.removed = true
+func (c *testConnection) Close() {
+	c.closing = true
 }
 
-func (c *testConnection) IsRemoving() bool {
-	return c.removed
+func (c *testConnection) IsClosing() bool {
+	return c.closing
 }
 
 func (c *testConnection) Send(ctx MessageContext) {
