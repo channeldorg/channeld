@@ -202,7 +202,7 @@ func handleAuth(ctx MessageContext) {
 		onAuthComplete(ctx, authResult)
 	} else if authProvider != nil {
 		go func() {
-			authResult, err := authProvider.DoAuth(msg.PlayerIdentifierToken, msg.LoginToken)
+			authResult, err := authProvider.DoAuth(ctx.Connection.Id(), msg.PlayerIdentifierToken, msg.LoginToken)
 			if err != nil {
 				ctx.Connection.Logger().Error("failed to do auth", zap.Error(err))
 				ctx.Connection.Close()

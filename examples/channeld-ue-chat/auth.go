@@ -14,13 +14,14 @@ import (
 )
 
 type APIServerAuthProvider struct {
-	BaseURL string
+	BaseURL                  string
+	authenticatedConnections map[string]channeld.ConnectionId
 }
 
 var logger *zap.Logger
 
 // PIT = Username, LT = AccessToken
-func (provider *APIServerAuthProvider) DoAuth(pit string, lt string) (channeldpb.AuthResultMessage_AuthResult, error) {
+func (provider *APIServerAuthProvider) DoAuth(connId channeld.ConnectionId, pit string, lt string) (channeldpb.AuthResultMessage_AuthResult, error) {
 	url := fmt.Sprintf("%s/users/%s", provider.BaseURL, pit)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -57,6 +58,13 @@ func (provider *APIServerAuthProvider) DoAuth(pit string, lt string) (channeldpb
 		}
 
 		if code == "000000" {
+			provider.authenticatedConnections[lt] = connId
+			conn := channeld.GetConnection(connId)
+			if conn != nil {
+				conn.AddCloseHandler(func() {
+					delete(provider.authenticatedConnections, lt)
+				})
+			}
 			return channeldpb.AuthResultMessage_SUCCESSFUL, nil
 		}
 	}
@@ -64,7 +72,15 @@ func (provider *APIServerAuthProvider) DoAuth(pit string, lt string) (channeldpb
 	return channeldpb.AuthResultMessage_INVALID_LT, nil
 }
 
-func SetupAuth() {
+func (provider *APIServerAuthProvider) GetAuthenticatedConnId(lt string) channeld.ConnectionId {
+	connId, exists := provider.authenticatedConnections[lt]
+	if !exists {
+		connId = 0
+	}
+	return connId
+}
+
+func SetupAuth() *APIServerAuthProvider {
 	if channeld.GlobalSettings.Development {
 		logger, _ = zap.NewDevelopment()
 	} else {
@@ -83,4 +99,5 @@ func SetupAuth() {
 	}
 
 	channeld.SetAuthProvider(authProvider)
+	return authProvider
 }

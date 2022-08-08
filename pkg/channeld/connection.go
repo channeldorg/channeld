@@ -56,6 +56,7 @@ type Connection struct {
 	logger          *Logger
 	state           int32 // Don't put the connection state into the FSM as 1) the FSM's states are user-defined. 2) the FSM is not goroutine-safe.
 	connTime        time.Time
+	closeHandlers   []func()
 }
 
 var allConnections sync.Map // map[ConnectionId]*Connection
@@ -222,8 +223,9 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 			zap.String("connType", t.String()),
 			zap.Uint32("connId", nextConnectionId),
 		)},
-		state:    ConnectionState_UNAUTHENTICATED,
-		connTime: time.Now(),
+		state:         ConnectionState_UNAUTHENTICATED,
+		connTime:      time.Now(),
+		closeHandlers: make([]func(), 0),
 	}
 
 	// IMPORTANT: always make a value copy
@@ -249,6 +251,10 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 	return connection
 }
 
+func (c *Connection) AddCloseHandler(handlerFunc func()) {
+	c.closeHandlers = append(c.closeHandlers, handlerFunc)
+}
+
 func (c *Connection) Close() {
 	defer func() {
 		recover()
@@ -257,6 +263,11 @@ func (c *Connection) Close() {
 		c.Logger().Warn("connection is already closed")
 		return
 	}
+
+	for _, handlerFunc := range c.closeHandlers {
+		handlerFunc()
+	}
+
 	atomic.StoreInt32(&c.state, ConnectionState_CLOSING)
 	c.conn.Close()
 	close(c.sendQueue)

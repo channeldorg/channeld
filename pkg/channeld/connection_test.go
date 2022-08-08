@@ -16,9 +16,12 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func TestDropPacket(t *testing.T) {
+func init() {
 	GlobalSettings.Development = true
 	InitLogs()
+}
+
+func TestDropPacket(t *testing.T) {
 	pipeReader, pipeWriter := io.Pipe()
 	c := &Connection{
 		reader: bufio.NewReader(pipeReader),
@@ -52,7 +55,6 @@ func TestDropPacket(t *testing.T) {
 }
 
 func TestKCPConnection(t *testing.T) {
-	InitLogs()
 	const addr string = "localhost:12108"
 	go func() {
 		StartListening(channeldpb.ConnectionType_CLIENT, "kcp", addr)
@@ -62,7 +64,6 @@ func TestKCPConnection(t *testing.T) {
 }
 
 func TestWebSocketConnection(t *testing.T) {
-	InitLogs()
 	const addr string = "ws://localhost:8080"
 	go func() {
 		StartListening(channeldpb.ConnectionType_CLIENT, "ws", addr)
@@ -72,7 +73,6 @@ func TestWebSocketConnection(t *testing.T) {
 }
 
 func TestConcurrentAccessConnections(t *testing.T) {
-	InitLogs()
 	wg := sync.WaitGroup{}
 
 	wg.Add(1)

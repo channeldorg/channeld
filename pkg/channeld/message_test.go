@@ -92,14 +92,15 @@ func TestHandleListChannels(t *testing.T) {
 
 func TestMessageHandlers(t *testing.T) {
 	for name, value := range channeldpb.MessageType_value {
-		msgType := channeldpb.MessageType(value)
-		if msgType == channeldpb.MessageType_INVALID {
+		switch msgType := channeldpb.MessageType(value); {
+		case msgType == channeldpb.MessageType_INVALID:
+		case msgType == channeldpb.MessageType_CHANNEL_DATA_HANDOVER:
+		case msgType == channeldpb.MessageType_SPATIAL_REGIONS_UPDATE:
+		case value >= int32(channeldpb.MessageType_USER_SPACE_START):
 			continue
+		default:
+			assert.NotNil(t, MessageMap[msgType], "Missing handler func for message type %s", name)
 		}
-		if msgType >= channeldpb.MessageType_USER_SPACE_START {
-			continue
-		}
-		assert.NotNil(t, MessageMap[msgType], "Missing handler func for message type %s", name)
 	}
 }
 

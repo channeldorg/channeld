@@ -6,7 +6,7 @@ import (
 )
 
 type AuthProvider interface {
-	DoAuth(pit string, lt string) (channeldpb.AuthResultMessage_AuthResult, error)
+	DoAuth(connId ConnectionId, pit string, lt string) (channeldpb.AuthResultMessage_AuthResult, error)
 }
 
 // Do nothing but logging
@@ -15,9 +15,9 @@ type LoggingAuthProvider struct {
 	Msg    string
 }
 
-func (provider *LoggingAuthProvider) DoAuth(pit string, lt string) (channeldpb.AuthResultMessage_AuthResult, error) {
+func (provider *LoggingAuthProvider) DoAuth(connId ConnectionId, pit string, lt string) (channeldpb.AuthResultMessage_AuthResult, error) {
 	if provider.Logger != nil {
-		provider.Logger.Info(provider.Msg, zap.String("pit", pit), zap.String("lt", lt))
+		provider.Logger.Info(provider.Msg, zap.Uint32("connId", uint32(connId)), zap.String("pit", pit), zap.String("lt", lt))
 	}
 	return channeldpb.AuthResultMessage_SUCCESSFUL, nil
 }
@@ -25,7 +25,7 @@ func (provider *LoggingAuthProvider) DoAuth(pit string, lt string) (channeldpb.A
 // Always return AuthResultMessage_INVALID_LT
 type AlwaysFailAuthProvider struct{}
 
-func (provider *AlwaysFailAuthProvider) DoAuth(pit string, lt string) (channeldpb.AuthResultMessage_AuthResult, error) {
+func (provider *AlwaysFailAuthProvider) DoAuth(connId ConnectionId, pit string, lt string) (channeldpb.AuthResultMessage_AuthResult, error) {
 	return channeldpb.AuthResultMessage_INVALID_LT, nil
 }
 
