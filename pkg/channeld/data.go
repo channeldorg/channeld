@@ -148,6 +148,8 @@ func (ch *Channel) tickData(t ChannelTime) {
 				// Send the whole data for the first time
 				ch.fanOutDataUpdate(conn, cs, ch.data.msg)
 				foc.hadFirstFanOut = true
+				// Use a hacky way to prevent the first update msg being fanned out twice (only happens when the channel doesn't have init data)
+				t++
 			} else if bufp != nil {
 				if foc.lastFanOutTime >= lastUpdateTime {
 					lastUpdateTime = foc.lastFanOutTime
