@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package chatpb;
+
+option go_package = "/examples/channeld-ue-chat/chatpb";
+
+message ChatMessage {
+    string sender = 1;
+    int64 sendTime = 2;
+    string content = 3;
+    SlateColor  color = 4;
+    string recipient = 5;
+    uint32 recipientConnId = 6;
+    bool isSender = 7;
+    bool showTimestamp = 8;
+    uint32 kooolChatSysChannel = 9;
+}
+
+message RGBA{
+    float r = 1;
+    float g = 2;
+    float b = 3;
+    float a = 4;
+}
+
+message SlateColor {
+    RGBA specifiedColor = 1;
+    uint32 colorUserRule = 2;
+}
+
+message ChatChannelData {
+    repeated ChatMessage chatMessages = 1;
+}

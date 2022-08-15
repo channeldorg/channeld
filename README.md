@@ -1,75 +1,65 @@
 # Overview
-channeld is an open source, light-weight and efficient **messaging gateway** server designed for **distributed game servers** (typically MMO) 
-and other backend applications that require real-time, subscription-based user interaction with high concurrency (e.g. instance messenger server).
 
-![architecture](doc/architecture.png)
-See the concepts in the [design doc](doc/design.md).
+Kooola的Channeld服务器，现阶段仅作为聊天服务器使用
 
-## Applications:
-There are three major types of application benifit from channeld's architecture design:
-### Relay Servers:
-![](doc/relay.png)
+# 1. 端口需求
+* 客户端用端口：**12108/TCP**
+* 服务器用端口：**11288/TCP**
 
-channeld can be used as the relay server to forward/broadcast messages between game clients.
+# 2. 开发
 
-### Dedicated Server Gateway:
-![](doc/dedicated.png)
+程序由主程、Master Server和Channeld组成
+* 主程提供客户端登录校验、记录Kooola用户体系对应ConnId的映射等
+* Master Server负责管理Global频道
 
-channeld can be used as the gateway server to route messages to different dedicated servers.
+# 3. 配置
+* k8s 环境变量：`CHANNELD_ADDR=<KooolaChanneldHost>:<ServerPort>`
+	+ `<KooolaChanneldHost>`为`kooola-channeld-chat[-server]`，**生产环境需要带`-server`**
+	+ `<ServerPort>`默认为11288
 
-### Seamless Distributed Server:
-![](doc/seamless.png)
+* Kooola启动器command line参数：`-channeldAddr=<KooolaChanneldIP>:<ClientPort>`
+	+ `<KooolaChanneldIP>`为`service/kooola-channeld-chat`分配的`EXTERNAL-IP`
+	+ `<ClientPort>`默认为12108
 
-The ultimate purpose of channeld is to enable distributed composition of dedicated servers, together to form a seamless large virtual world.
+# 4. 部署
 
-## Key features:
-* Protobuf-based binary protocol over TCP, KCP or WebSocket
-* FSM-based message filtering
-* Fanout-based data pub/sub of any type defined with Protobuf
-* Area of interest management based on channel and data pub/sub
-* [WIP] Backend servers load-balancing with auto-scaling
-* [WIP] Integration with the mainstream game engines ([Unity](https://github.com/indiest/channeld-unity-mirror), Unreal Engine)
+## 1. 构建docker镜像
 
-## Performance
-channeld is aimmed to support 10Ks connections and 100Ks mps(messages per second) on a single node (uplink + downlink), and 10Ms mps in a distributed system.
+执行 `./cmd/DockerBuildAndRun.bat` 构建docker镜像到本地
 
-## Roadmap
-Currently, the completeness of the project is 40%.
+若想测试构建的docker，执行 `docker run --rm -d --name kooola-channeld-chat -p 11288:11288/tcp -p 12108:12108/tcp kooola/kooola-channeld-chat`
 
-There is a [dedicated roadmap documentation](doc/roadmap.md).
+## 2. 上传docker镜像
 
-Keep in mind that the requirements of the real-life projects will decide the priority of the development.
+执行 `./cmd/UploadImage.bat <VERSION>` 上传docker镜像到到阿里云镜像仓库，默认版本号为latest
 
-# Getting Started
-## 1. Clone the source code
-## 2. Docker
-The fastest way to run the server is with [Docker Compose](https://docs.docker.com/compose/).
+## 3. 部署到阿里云K8s
 
-There's a [docker-compose file](docker-compose.yml) set up for running the chat rooms demo. Navigate to the root of the repo and run the command:
+部署时需要做出生产环境和测试环境的区分，主要体现在创建Service时使用的配置不同
 
-`docker-compose up chat -d`
+* ### 创建Deployment
+	+ 修改**channeld-deployment.yaml**中的`spec.template.spec.containers.image`的版本号为[上传时](#2-上传docker镜像)设置的版本号
+	+ 执行 `kubectl apply -f ./k8s/channeld-deployment.yaml` 使阿里云k8s从镜像仓库拉取镜像，并创建Deployment
 
-## 3. The chat rooms demo
-After starting the server, browse to http://localhost:8080.
+* ### 创建Service
+	+ **测试环境：** Service会把client和server端口都暴露到外网
+`kubectl apply -f ./k8s/channeld-service-dev.yaml`
 
-Use the input box at the bottom to send messages, to the GLOBAL channel by default. The input box can also be used to send commands, which are started with '/'. The supported commands are:
+	+ **生产环境：** Service只会暴露client端口到外网
+`kubectl apply -f ./k8s/channeld-service-prod.yaml`
 
-* `list [typeFilter] [metadataFilter1],[metadataFilter2],...` // the result format is `Channel(<ChannelTypeName> <ChannelId>)`
-* `create <channelType> <metadata>` // the channelType is an integer. See the ChannelType enum value defined in [the proto](pkg/channeldpb/channeld.proto) file
-* `remove <channelId>` // only the channel creator has the permission to remove the channel.
-* `sub <channelId>` // subscribe to the channel
-* `unsub <channelId>` // unsubscribe from the channel
-* `switch <channelId>` // switch the active channel. Only the active channel displays the new chat messages.
+## 4. 更新
+* [构建docker镜像](#1-构建docker镜像)
+* 设置版本号并[上传docker镜像](#2-上传docker镜像)
+* 修改channeld-deployment.yaml中的spec.template.spec.containers.image的版本号为上传时设置的版本号
+* 执行 `kubectl replace --force -f ./k8s/channeld-deployment.yaml` ，替换K8s的Deployment
 
-## 4. The Unity tank demo
-Follow these steps if the docker image has not been built for the tanks service yet:
-1. Check out the [unity-mirror-channeld](https://github.com/indiest/channeld-unity-mirror) repo
-2. Create the Unity project following the [instruction](https://github.com/indiest/channeld-unity-mirror#how-to-run-the-tank-demo)
-3. Either build the Linux player from Unity Editor (Build -> Linux Server), or via the command: `Unity -batchmode -nographics -projectPath <PATH_TO_YOUR_UNITY_PROJECT> -executeMethod BuildScript.BuildLinuxServer -logFile build.log -quit`. The path to the Unity Editor needs to added to the PATH environment argument in order to run the command.
-4. Build the docker image: `docker build -t channeld/tanks .`
+# 5. 运维
 
-Running the Unity tanks demo with Docker is similar to running the chat rooms demo. Navigate to the root of the repo and run the command:
+* K8s中所有的内容`kubectl get all -A`
 
-`docker-compose up tanks -d`
+* 只查询channeld相关`kubectl get all -A --field-selector metadata.namespace=channeld`
 
-Then you can the play the game in Unity Editor. See the [full instruction here](https://github.com/indiest/channeld-unity-mirror#how-to-run-the-tank-demo).
+* 打印服务的日志`kubectl logs service/kooola-channeld-chat -n channeld --tail 30 -f` 
+
+* ssh`kubectl exec -it service/kooola-channeld-chat -n channeld -- bash` 

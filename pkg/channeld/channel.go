@@ -362,6 +362,9 @@ func (c *Connection) HasAuthorityOver(ch *Channel) bool {
 	if ch.ownerConnection == c {
 		return true
 	}
+	if c.connectionType == channeldpb.ConnectionType_SERVER {
+		return true
+	}
 	return false
 }
 

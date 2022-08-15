@@ -88,7 +88,9 @@ func SetupAuth() *APIServerAuthProvider {
 	}
 	defer logger.Sync()
 
-	authProvider := &APIServerAuthProvider{}
+	authProvider := &APIServerAuthProvider{
+		authenticatedConnections: make(map[string]channeld.ConnectionId),
+	}
 
 	if arg := flag.Lookup("--apiBaseUrl"); arg != nil {
 		authProvider.BaseURL = arg.Value.String()

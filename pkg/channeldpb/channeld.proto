@@ -125,6 +125,18 @@ enum MessageType {
 
     // Start of any user-space defined message
     USER_SPACE_START = 100;
+
+    KOOOLA_GET_USERCONNECTION = 101;
+
+    KOOOLA_PRIVATE_CHAT = 102;
+}
+
+message Kooola_GetUserConnnectionMessage {
+    string loginToken = 1;
+}
+
+message Kooola_GetUserConnnectionResultMessage {
+    uint32 clientConnId = 1;
 }
 
 // The message that is used to carries user-space message and communicate between channeld and backend servers.
