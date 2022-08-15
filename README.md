@@ -16,7 +16,7 @@ Kooola的Channeld服务器，现阶段仅作为聊天服务器使用
 # 2. 开发
 
 ## main.go
-用于初始化 Channeld & Master serve，并且包含Master serve代码
+用于初始化 Channeld & Master Serve，并且包含Master serve代码
 
 ## Channeld
 用于消息的广播、转发和合并
@@ -31,10 +31,10 @@ Kooola的Channeld服务器，现阶段仅作为聊天服务器使用
 Master server 会拥有 Global channel 并订阅 Channeld 的 auth 事件，当其他 server 连接 Channeld 并 auth 成功后，会为其订阅 Global channel
 
 ## auth.go
-提供client登录校验、记录Kooola用户体系对应ConnId的映射功能。
+提供 client 登录校验、记录 Kooola 用户 Kooola AccessToken 对应 ConnId 的映射功能。
 
 client 尝试连接时需要提供 pit(kooola Username) 和 lt(kooola AccessToken)，通过访问 APIServer 来验证是否为合法 client，若合法则将 AccessToken 和 connId 关系记录下，之后 UE Server 可以通过 AccessToken 获取到此客户端的connId
-# 3. 配置
+# 3. 配置Channeld地址
 
 * 在UEServer的k8s.yaml中添加环境变量：`CHANNELD_ADDR=<KooolaChanneldHost>:<ServerPort>`
 	+ `<KooolaChanneldHost>`为`kooola-channeld-chat[-server]`，**生产环境需要带`-server`**
@@ -57,10 +57,15 @@ spec:
 ...
 ```
 
-// TODO 替换为UE客户端配置文件
-* Kooola启动器command line参数：`-channeldAddr=<KooolaChanneldIP>:<ClientPort>`
-	+ `<KooolaChanneldIP>`为`service/kooola-channeld-chat`分配的`EXTERNAL-IP`
-	+ `<ClientPort>`默认为12108
+*  UEClient的DefaultGame.ini文件中添加配置项
+	* `<KooolaChanneldIP>`为`service/kooola-channeld-chat`分配的`EXTERNAL-IP`
+	* `<ClientPort>`默认为12108
+```
+[/Script/KooolaMusic.ChanneldGameInstanceSubsystem]
+ChanneldAddrConfiguration=<KooolaChanneldIP>:<ClientPort>
+```
+
+
 
 # 4. 部署
 

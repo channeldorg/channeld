@@ -79,7 +79,7 @@ func main() {
 	channeld.StartProfiling()
 	channeld.InitLogs()
 	channeld.InitMetrics()
-	channeld.InitConnections("./config/server_authoratative_fsm.json", "./config/client_authoratative_fsm.json")
+	channeld.InitConnections("./config/server_authoratative_fsm.json", "./config/client_non_authoratative_fsm.json")
 	channeld.InitChannels()
 	channeld.GetChannel(channeld.GlobalChannelId).InitData(
 		&chatpb.ChatChannelData{ChatMessages: []*chatpb.ChatMessage{
@@ -99,6 +99,7 @@ func main() {
 		func(ctx channeld.MessageContext) {
 			if ctx.Connection.GetConnectionType() != channeldpb.ConnectionType_SERVER {
 				ctx.Connection.Logger().Error("Not server connection")
+				return
 			}
 			msg, ok := ctx.Msg.(*channeldpb.Kooola_GetUserConnnectionMessage)
 			if !ok {
