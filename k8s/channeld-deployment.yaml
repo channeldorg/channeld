@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: channeld
+  labels:
+    io.kompose.service: kooola-channeld-chat
+  name: kooola-channeld-chat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: kooola-channeld-chat
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        io.kompose.service: kooola-channeld-chat
+    spec:
+      containers:
+        - command:
+            - ./app
+            - -ct=0
+            - -chs=../../config/channel_settings_lofi.json
+          image: kooola-registry.ap-southeast-1.cr.aliyuncs.com/kooola/channeld-chat:latest
+          name: kooola-channeld-chat
+          ports:
+            - containerPort: 11288
+              name: server-port
+            - containerPort: 12108
+              name: client-port
+          resources:
+            limits:
+              cpu: 3500m
+            requests:
+              cpu: "2"
+      imagePullSecrets:
+        - name: channeld-registry
+      restartPolicy: Always

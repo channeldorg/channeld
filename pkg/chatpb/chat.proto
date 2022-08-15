@@ -2,13 +2,13 @@ syntax = "proto3";
 
 package chatpb;
 
-option go_package = "/kooola/chatpb";
+option go_package = "/examples/channeld-ue-chat/chatpb";
 
 message ChatMessage {
     string sender = 1;
     int64 sendTime = 2;
     string content = 3;
-    SlateColor color = 4;
+    SlateColor  color = 4;
     string recipient = 5;
     uint32 recipientConnId = 6;
     bool isSender = 7;
