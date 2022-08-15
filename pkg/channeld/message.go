@@ -559,7 +559,7 @@ func handleUnsubFromChannel(ctx MessageContext) {
 	}
 	// Notify the channel owner.
 	if ctx.Channel.HasOwner() {
-		if ctx.Channel.ownerConnection != ctx.Connection {
+		if ctx.Channel.ownerConnection != connToUnsub {
 			ctx.Channel.ownerConnection.sendUnsubscribed(ctx, ctx.Channel, connToUnsub, 0)
 		} else {
 			// Reset the owner if it unsubscribed
