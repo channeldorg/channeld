@@ -5,9 +5,9 @@ import (
 	"log"
 	"time"
 
+	"channeld.clewcat.com/channeld/kooola/chatpb"
 	"channeld.clewcat.com/channeld/pkg/channeld"
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
-	"channeld.clewcat.com/channeld/pkg/chatpb"
 	"channeld.clewcat.com/channeld/pkg/client"
 	"google.golang.org/protobuf/types/known/anypb"
 )
