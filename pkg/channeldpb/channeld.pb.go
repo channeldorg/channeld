@@ -1380,6 +1380,8 @@ type UnsubscribedFromChannelMessage struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// The connection to be removed from the channel is not necessarily the one sends the message.
+	// Remarks: only the channel owner can unsub another connection from the channel.
 	ConnId uint32 `protobuf:"varint,1,opt,name=connId,proto3" json:"connId,omitempty"`
 }
 

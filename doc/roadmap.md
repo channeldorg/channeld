@@ -4,6 +4,7 @@
 - [x] FSM-based message filtering
 - [x] Message broadcasting
 - [x] Authentication
+- [ ] Channel ACL
 - [ ] DDoS Protection
 - [ ] Health check
 - [ ] Front-end load-balancing
@@ -17,6 +18,7 @@
 - [x] [Snappy](https://github.com/golang/snappy) compression
 - [ ] [Markov-chain](https://en.wikipedia.org/wiki/Markov_chain) compression
 - [ ] Encryption
+- [ ] Replay
 - [x] Prometheus integration
 
 # Optimizations
@@ -58,7 +60,7 @@
     - [x] Integrate with Unreal's networking stack
     - [ ] Integrate with Unreal's Replication system
     - [ ] Replication codegen
-    - [ ] Multi-server support
+    - [x] Multi-server support
     - [ ] KCP support
     - [ ] Data traffic compression
 - [ ] Dynamic region load-balancing

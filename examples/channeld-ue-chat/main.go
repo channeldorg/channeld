@@ -85,8 +85,6 @@ func main() {
 
 	channeld.RegisterChannelDataType(channeldpb.ChannelType_SUBWORLD, &chatpb.ChatChannelData{})
 
-	SetupAuth()
-
 	// Setup Prometheus
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(":8080", nil)

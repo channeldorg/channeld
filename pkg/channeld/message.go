@@ -67,6 +67,7 @@ func handleClientToServerUserMessage(ctx MessageContext) {
 		zap.Uint32("msgType", uint32(ctx.MsgType)),
 		zap.Uint32("clientConnId", msg.ClientConnId),
 		zap.Uint32("channelId", uint32(ctx.Channel.id)),
+		zap.Uint32("broadcastType", ctx.Broadcast),
 		zap.Int("payloadSize", len(msg.Payload)),
 	)
 
@@ -101,6 +102,7 @@ func handleServerToClientUserMessage(ctx MessageContext) {
 		zap.Uint32("msgType", uint32(ctx.MsgType)),
 		zap.Uint32("clientConnId", msg.ClientConnId),
 		zap.Uint32("channelId", uint32(ctx.Channel.id)),
+		zap.Uint32("broadcastType", ctx.Broadcast),
 		zap.Int("payloadSize", len(msg.Payload)),
 	)
 
