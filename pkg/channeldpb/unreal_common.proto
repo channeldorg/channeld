@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package channeldpb;
+
+option go_package = "channeld.clewcat.com/channeld/pkg/channeldpb";
+
+message FVector {
+    float x = 1;
+    float y = 2;
+    float z = 3;
+}
+
+message SceneComponentState {
+    // Marks that the state should be removed from the containing map
+    bool removed = 1;
+    FVector relativeLocation = 2;
+    FVector relativeRotation = 3;
+    FVector relativeScale = 4;
+    bool isVisible = 5;
+    string attachSocketName = 6;
+}

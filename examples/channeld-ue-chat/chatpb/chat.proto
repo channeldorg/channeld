@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package chatpb;
 
+option go_package = "/examples/channeld-ue-chat/chatpb";
+
 message ChatMessage {
     string sender = 1;
     int64 sendTime = 2;
