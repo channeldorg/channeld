@@ -495,8 +495,8 @@ func handleSubToChannel(ctx MessageContext) {
 		if msg.SubOptions != nil {
 			proto.Merge(&cs.options, msg.SubOptions)
 		}
-		//// Do not send the SubscribedToChannelResultMessage if already subed.
 		connToSub.sendSubscribed(ctx, ctx.Channel, connToSub, 0, &cs.options)
+		// Do not send the SubscribedToChannelResultMessage to the sender or channel owner if already subed.
 		return
 	}
 
@@ -559,10 +559,10 @@ func handleUnsubFromChannel(ctx MessageContext) {
 	}
 	// Notify the channel owner.
 	if ctx.Channel.HasOwner() {
-		if ctx.Channel.ownerConnection != connToUnsub {
+		if ctx.Channel.ownerConnection != ctx.Connection && ctx.Channel.ownerConnection != connToUnsub {
 			ctx.Channel.ownerConnection.sendUnsubscribed(ctx, ctx.Channel, connToUnsub, 0)
-		} else {
-			// Reset the owner if it unsubscribed
+		} else if ctx.Channel.ownerConnection == connToUnsub {
+			// Reset the owner if it unsubscribed itself
 			ctx.Channel.ownerConnection = nil
 		}
 	}
