@@ -259,7 +259,7 @@ message ListChannelResultMessage {
 // If the connection has already been subscripbed to the channel, the subOptions will be merged, but no response message will be sent.
 message SubscribedToChannelMessage {
     // The connection to be added to the channel is not necessarily the one sends the message.
-    // Remarks: only the channel owner can sub another connection to the channel.
+    // Remarks: only the channel owner or the GLOBAL channel owner can sub another connection to the channel.
     uint32 connId = 1;
     ChannelSubscriptionOptions subOptions = 2;
 }
@@ -275,7 +275,7 @@ message SubscribedToChannelResultMessage {
 // Response: @UnsubscribedFromChannelResultMessage. The message sender, the subscribed connection, and the channel owner will receive the message respectively.
 message UnsubscribedFromChannelMessage {
     // The connection to be removed from the channel is not necessarily the one sends the message.
-    // Remarks: only the channel owner can unsub another connection from the channel.
+    // Remarks: only the channel owner or the GLOBAL channel can unsub another connection from the channel.
     uint32 connId = 1;
 }
 

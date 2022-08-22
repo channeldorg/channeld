@@ -5,7 +5,6 @@ go 1.16
 require (
 	github.com/golang/snappy v0.0.4
 	github.com/gorilla/websocket v1.4.2
-	github.com/iancoleman/strcase v0.2.0
 	github.com/indiest/fmutils v0.1.2
 	github.com/klauspost/reedsolomon v1.9.14 // indirect
 	github.com/mennanov/fmutils v0.1.1 // indirect
