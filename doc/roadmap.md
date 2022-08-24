@@ -38,6 +38,7 @@
 
 # Tools
 - [x] Simulated client (Go)
+- [ ] Replication code generators
 - [ ] Web inspector
 
 # Example projects

@@ -148,7 +148,7 @@ const (
 	// A game "room" in a session-based game, or a "dungeon" in an MMORPG. Subworlds are spatially divided thus the interests are isolated.
 	ChannelType_SUBWORLD ChannelType = 3
 	// Spatial channels are spatailly connected. Using this type of channel to implement a seamless open world which consists of servers, and each server simulates a part of the world.
-	// Only server connections can create the spatail channel.
+	// Only server connections can create the spatial channel.
 	ChannelType_SPATIAL ChannelType = 4
 	// The following are for tests.
 	ChannelType_TEST  ChannelType = 100
@@ -1251,7 +1251,7 @@ type SubscribedToChannelMessage struct {
 	unknownFields protoimpl.UnknownFields
 
 	// The connection to be added to the channel is not necessarily the one sends the message.
-	// Remarks: only the channel owner can sub another connection to the channel.
+	// Remarks: only the channel owner or the GLOBAL channel owner can sub another connection to the channel.
 	ConnId     uint32                      `protobuf:"varint,1,opt,name=connId,proto3" json:"connId,omitempty"`
 	SubOptions *ChannelSubscriptionOptions `protobuf:"bytes,2,opt,name=subOptions,proto3" json:"subOptions,omitempty"`
 }
@@ -1381,7 +1381,7 @@ type UnsubscribedFromChannelMessage struct {
 	unknownFields protoimpl.UnknownFields
 
 	// The connection to be removed from the channel is not necessarily the one sends the message.
-	// Remarks: only the channel owner can unsub another connection from the channel.
+	// Remarks: only the channel owner or the GLOBAL channel can unsub another connection from the channel.
 	ConnId uint32 `protobuf:"varint,1,opt,name=connId,proto3" json:"connId,omitempty"`
 }
 

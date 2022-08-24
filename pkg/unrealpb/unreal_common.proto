@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package channeldpb;
+package unrealpb;
 
-option go_package = "channeld.clewcat.com/channeld/pkg/channeldpb";
+option go_package = "channeld.clewcat.com/channeld/pkg/unrealpb";
 
 message FVector {
     float x = 1;

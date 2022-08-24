@@ -2,10 +2,10 @@ syntax = "proto3";
 
 package tpspb;
 
-import "pkg/channeldpb/unreal_common.proto";
+import "unrealpb/unreal_common.proto";
 
 option go_package = "channeld.clewcat.com/examples/channeld-ue-tps/tpspb";
 
 message TestRepChannelData {
-    map<uint32, channeldpb.SceneComponentState> sceneComponentStates = 1;
+    map<uint32, unrealpb.SceneComponentState> sceneComponentStates = 1;
 }

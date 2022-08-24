@@ -1,0 +1,2 @@
+# Why add a separate package for Unreal's proto
+Both generated C++ code of channeld.proto and unreal_common.proto will have 'schemas' and 'file_default_instances' fields. If they exist in the same namespace (channeldpb), Unreal Engine will give compilation error. In order to work around this, we need to put each proto in an unique package/namespace.

@@ -77,7 +77,7 @@ enum ChannelType {
     // A game "room" in a session-based game, or a "dungeon" in an MMORPG. Subworlds are spatially divided thus the interests are isolated.
     SUBWORLD = 3;
     // Spatial channels are spatailly connected. Using this type of channel to implement a seamless open world which consists of servers, and each server simulates a part of the world. 
-    // Only server connections can create the spatail channel.
+    // Only server connections can create the spatial channel.
     SPATIAL = 4;
     // The following are for tests.
     TEST = 100;

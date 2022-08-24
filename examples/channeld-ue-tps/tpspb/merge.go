@@ -5,6 +5,7 @@ import (
 
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"channeld.clewcat.com/channeld/pkg/common"
+	"channeld.clewcat.com/channeld/pkg/unrealpb"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -16,7 +17,7 @@ func (dst *TestRepChannelData) Merge(src proto.Message, options *channeldpb.Chan
 	}
 
 	if dst.SceneComponentStates == nil {
-		dst.SceneComponentStates = make(map[uint32]*channeldpb.SceneComponentState)
+		dst.SceneComponentStates = make(map[uint32]*unrealpb.SceneComponentState)
 	}
 
 	for k, v := range srcMsg.SceneComponentStates {
