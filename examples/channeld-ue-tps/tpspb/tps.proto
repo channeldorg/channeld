@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package tpspb;
 
-import "unrealpb/unreal_common.proto";
+import "unreal_common.proto";
 
 option go_package = "channeld.clewcat.com/examples/channeld-ue-tps/tpspb";
 
