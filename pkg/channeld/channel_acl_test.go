@@ -85,8 +85,8 @@ func createChannelForTestACL(t channeldpb.ChannelType, owner ConnectionInChannel
 	}
 }
 
-func setChannelACLSettings(cTypes []channeldpb.ChannelType, acl ChannelAccessLevel) {
-	for _, t := range cTypes {
+func setChannelACLSettings(chTypes []channeldpb.ChannelType, acl ChannelAccessLevel) {
+	for _, t := range chTypes {
 		GlobalSettings.ChannelSettings[t] = ChannelSettingsType{
 			ACLSettings: ACLSettingsType{
 				Sub:    acl,
@@ -100,7 +100,7 @@ func setChannelACLSettings(cTypes []channeldpb.ChannelType, acl ChannelAccessLev
 func TestCheckACL(t *testing.T) {
 	InitLogs()
 
-	operations := []ChannelAccessType{ChannelAccessType_Sub, ChannelAccessType_Unsub, ChannelAccessType_Remove}
+	accessTypes := []ChannelAccessType{ChannelAccessType_Sub, ChannelAccessType_Unsub, ChannelAccessType_Remove}
 
 	const ChannelType_Test1 channeldpb.ChannelType = 201
 	allChannelTypesForTest := []channeldpb.ChannelType{channeldpb.ChannelType_GLOBAL, channeldpb.ChannelType_SUBWORLD, channeldpb.ChannelType_PRIVATE, ChannelType_Test1}
@@ -111,40 +111,40 @@ func TestCheckACL(t *testing.T) {
 	var hasAccess bool
 	var err error
 
-	for _, o := range operations {
+	for _, accessType := range accessTypes {
 
 		setChannelACLSettings(allChannelTypesForTest, ChannelAccessLevel_None)
 
 		// CA01
-		func(cTypes []channeldpb.ChannelType) {
-			for _, cType := range cTypes {
-				ch, _ = createChannelForTestACL(cType, createACLTestConnection())
-				hasAccess, err = ch.CheckACL(createACLTestConnection(), o)
-				assert.EqualError(t, err, "none can access")
+		func(chTypes []channeldpb.ChannelType) {
+			for _, chType := range chTypes {
+				ch, _ = createChannelForTestACL(chType, createACLTestConnection())
+				hasAccess, err = ch.CheckACL(createACLTestConnection(), accessType)
+				assert.Error(t, err, ChannelACL_Error_None)
 				assert.EqualValues(t, hasAccess, false)
 			}
 		}(allChannelTypesForTest)
 
 		// CA02
-		func(cTypes []channeldpb.ChannelType) {
-			for _, cType := range cTypes {
+		func(chTypes []channeldpb.ChannelType) {
+			for _, chType := range chTypes {
 				channelOwner = createACLTestConnection()
-				ch, _ = createChannelForTestACL(cType, channelOwner)
-				hasAccess, err = ch.CheckACL(channelOwner, o)
-				assert.EqualError(t, err, "none can access")
+				ch, _ = createChannelForTestACL(chType, channelOwner)
+				hasAccess, err = ch.CheckACL(channelOwner, accessType)
+				assert.Error(t, err, ChannelACL_Error_None)
 				assert.EqualValues(t, hasAccess, false)
 			}
 		}(allChannelTypesForTest)
 
 		// CA03
-		func(cTypes []channeldpb.ChannelType) {
+		func(chTypes []channeldpb.ChannelType) {
 			// set global channel and owner
 			globalOwner := createACLTestConnection()
 			createChannelForTestACL(channeldpb.ChannelType_GLOBAL, globalOwner)
-			for _, cType := range cTypes {
-				ch, _ := createChannelForTestACL(cType, createACLTestConnection())
-				hasAccess, err := ch.CheckACL(globalOwner, o)
-				assert.EqualError(t, err, "none can access")
+			for _, chType := range chTypes {
+				ch, _ := createChannelForTestACL(chType, createACLTestConnection())
+				hasAccess, err := ch.CheckACL(globalOwner, accessType)
+				assert.Error(t, err, ChannelACL_Error_None)
 				assert.EqualValues(t, hasAccess, false)
 			}
 		}(allChannelTypesForTestWithoutGlobal)
@@ -152,45 +152,45 @@ func TestCheckACL(t *testing.T) {
 		setChannelACLSettings(allChannelTypesForTest, ChannelAccessLevel_OwnerOnly)
 
 		// CA04
-		func(cTypes []channeldpb.ChannelType) {
-			for _, cType := range cTypes {
-				ch, _ := createChannelForTestACL(cType, createACLTestConnection())
-				hasAccess, err := ch.CheckACL(createACLTestConnection(), o)
-				assert.EqualError(t, err, "only the channel owenr can access")
+		func(chTypes []channeldpb.ChannelType) {
+			for _, chType := range chTypes {
+				ch, _ := createChannelForTestACL(chType, createACLTestConnection())
+				hasAccess, err := ch.CheckACL(createACLTestConnection(), accessType)
+				assert.Error(t, err, ChannelACL_Error_OwnerOnly)
 				assert.EqualValues(t, hasAccess, false)
 			}
 		}(allChannelTypesForTest)
 
 		// CA05
-		func(cTypes []channeldpb.ChannelType) {
-			for _, cType := range cTypes {
+		func(chTypes []channeldpb.ChannelType) {
+			for _, chType := range chTypes {
 				channelOwner := createACLTestConnection()
-				ch, _ := createChannelForTestACL(cType, channelOwner)
-				hasAccess, err := ch.CheckACL(channelOwner, o)
+				ch, _ := createChannelForTestACL(chType, channelOwner)
+				hasAccess, err := ch.CheckACL(channelOwner, accessType)
 				assert.NoError(t, err)
 				assert.EqualValues(t, hasAccess, true)
 			}
 		}(allChannelTypesForTest)
 
 		// CA06
-		func(cTypes []channeldpb.ChannelType) {
+		func(chTypes []channeldpb.ChannelType) {
 			// set global channel and owner
 			globalOwner := createACLTestConnection()
 			createChannelForTestACL(channeldpb.ChannelType_GLOBAL, globalOwner)
-			for _, cType := range cTypes {
-				ch, _ := createChannelForTestACL(cType, createACLTestConnection())
-				hasAccess, err := ch.CheckACL(globalOwner, o)
-				assert.EqualError(t, err, "only the channel owenr can access")
+			for _, chType := range chTypes {
+				ch, _ := createChannelForTestACL(chType, createACLTestConnection())
+				hasAccess, err := ch.CheckACL(globalOwner, accessType)
+				assert.Error(t, err, ChannelACL_Error_OwnerOnly)
 				assert.EqualValues(t, hasAccess, false)
 			}
 		}(allChannelTypesForTestWithoutGlobal)
 
 		// CA07
-		func(cTypes []channeldpb.ChannelType) {
-			for _, cType := range cTypes {
-				ch, _ := createChannelForTestACL(cType, nil)
-				hasAccess, err := ch.CheckACL(createACLTestConnection(), o)
-				assert.EqualError(t, err, "only the channel owenr can access")
+		func(chTypes []channeldpb.ChannelType) {
+			for _, chType := range chTypes {
+				ch, _ := createChannelForTestACL(chType, nil)
+				hasAccess, err := ch.CheckACL(createACLTestConnection(), accessType)
+				assert.Error(t, err, ChannelACL_Error_OwnerOnly)
 				assert.EqualValues(t, hasAccess, false)
 			}
 		}(allChannelTypesForTest)
@@ -198,47 +198,47 @@ func TestCheckACL(t *testing.T) {
 		setChannelACLSettings(allChannelTypesForTest, ChannelAccessLevel_OwnerAndGlobalOwner)
 
 		// CA08
-		func(cTypes []channeldpb.ChannelType) {
-			for _, cType := range cTypes {
-				ch, _ = createChannelForTestACL(cType, createACLTestConnection())
-				hasAccess, err = ch.CheckACL(createACLTestConnection(), o)
-				assert.EqualError(t, err, "only the channel owenr or global channel owner can access")
+		func(chTypes []channeldpb.ChannelType) {
+			for _, chType := range chTypes {
+				ch, _ = createChannelForTestACL(chType, createACLTestConnection())
+				hasAccess, err = ch.CheckACL(createACLTestConnection(), accessType)
+				assert.Error(t, err, ChannelACL_Error_OwnerAndGlobalOwner)
 				assert.EqualValues(t, hasAccess, false)
 			}
 		}(allChannelTypesForTest)
 
 		// CA09
-		func(cTypes []channeldpb.ChannelType) {
-			for _, cType := range cTypes {
+		func(chTypes []channeldpb.ChannelType) {
+			for _, chType := range chTypes {
 				channelOwner := createACLTestConnection()
-				ch, _ := createChannelForTestACL(cType, channelOwner)
-				hasAccess, err := ch.CheckACL(channelOwner, o)
+				ch, _ := createChannelForTestACL(chType, channelOwner)
+				hasAccess, err := ch.CheckACL(channelOwner, accessType)
 				assert.NoError(t, err)
 				assert.EqualValues(t, hasAccess, true)
 			}
 		}(allChannelTypesForTest)
 
 		// CA10
-		func(cTypes []channeldpb.ChannelType) {
+		func(chTypes []channeldpb.ChannelType) {
 			// set global channel and owner
 			globalOwner := createACLTestConnection()
 			createChannelForTestACL(channeldpb.ChannelType_GLOBAL, globalOwner)
-			for _, cType := range cTypes {
-				ch, _ := createChannelForTestACL(cType, createACLTestConnection())
-				hasAccess, err := ch.CheckACL(globalOwner, o)
+			for _, chType := range chTypes {
+				ch, _ := createChannelForTestACL(chType, createACLTestConnection())
+				hasAccess, err := ch.CheckACL(globalOwner, accessType)
 				assert.NoError(t, err)
 				assert.EqualValues(t, hasAccess, true)
 			}
 		}(allChannelTypesForTestWithoutGlobal)
 
 		// CA11
-		func(cTypes []channeldpb.ChannelType) {
+		func(chTypes []channeldpb.ChannelType) {
 			// set global channel and owner
 			globalOwner := createACLTestConnection()
 			createChannelForTestACL(channeldpb.ChannelType_GLOBAL, globalOwner)
-			for _, cType := range cTypes {
-				ch, _ := createChannelForTestACL(cType, nil)
-				hasAccess, err := ch.CheckACL(globalOwner, o)
+			for _, chType := range chTypes {
+				ch, _ := createChannelForTestACL(chType, nil)
+				hasAccess, err := ch.CheckACL(globalOwner, accessType)
 				assert.NoError(t, err)
 				assert.EqualValues(t, hasAccess, true)
 			}
@@ -247,47 +247,47 @@ func TestCheckACL(t *testing.T) {
 		setChannelACLSettings(allChannelTypesForTest, ChannelAccessLevel_Any)
 
 		//CA12
-		func(cTypes []channeldpb.ChannelType) {
-			for _, cType := range cTypes {
-				ch, _ = createChannelForTestACL(cType, createACLTestConnection())
-				hasAccess, err = ch.CheckACL(createACLTestConnection(), o)
+		func(chTypes []channeldpb.ChannelType) {
+			for _, chType := range chTypes {
+				ch, _ = createChannelForTestACL(chType, createACLTestConnection())
+				hasAccess, err = ch.CheckACL(createACLTestConnection(), accessType)
 				assert.NoError(t, err)
 				assert.EqualValues(t, hasAccess, true)
 			}
 		}(allChannelTypesForTest)
 
 		// CA13
-		func(cTypes []channeldpb.ChannelType) {
-			for _, cType := range cTypes {
+		func(chTypes []channeldpb.ChannelType) {
+			for _, chType := range chTypes {
 				channelOwner := createACLTestConnection()
-				ch, _ := createChannelForTestACL(cType, channelOwner)
-				hasAccess, err := ch.CheckACL(channelOwner, o)
+				ch, _ := createChannelForTestACL(chType, channelOwner)
+				hasAccess, err := ch.CheckACL(channelOwner, accessType)
 				assert.NoError(t, err)
 				assert.EqualValues(t, hasAccess, true)
 			}
 		}(allChannelTypesForTest)
 
 		// CA14
-		func(cTypes []channeldpb.ChannelType) {
+		func(chTypes []channeldpb.ChannelType) {
 			// set global channel and owner
 			globalOwner := createACLTestConnection()
 			createChannelForTestACL(channeldpb.ChannelType_GLOBAL, globalOwner)
-			for _, cType := range cTypes {
-				ch, _ := createChannelForTestACL(cType, nil)
-				hasAccess, err := ch.CheckACL(globalOwner, o)
+			for _, chType := range chTypes {
+				ch, _ := createChannelForTestACL(chType, createACLTestConnection())
+				hasAccess, err := ch.CheckACL(globalOwner, accessType)
 				assert.NoError(t, err)
 				assert.EqualValues(t, hasAccess, true)
 			}
 		}(allChannelTypesForTestWithoutGlobal)
 
 		// CA15
-		func(cTypes []channeldpb.ChannelType) {
+		func(chTypes []channeldpb.ChannelType) {
 			// set global channel and owner
 			globalOwner := createACLTestConnection()
 			createChannelForTestACL(channeldpb.ChannelType_GLOBAL, globalOwner)
-			for _, cType := range cTypes {
-				ch, _ := createChannelForTestACL(cType, nil)
-				hasAccess, err := ch.CheckACL(globalOwner, o)
+			for _, chType := range chTypes {
+				ch, _ := createChannelForTestACL(chType, nil)
+				hasAccess, err := ch.CheckACL(globalOwner, accessType)
 				assert.NoError(t, err)
 				assert.EqualValues(t, hasAccess, true)
 			}
