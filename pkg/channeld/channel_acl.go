@@ -22,10 +22,10 @@ const (
 )
 
 var (
-	ChannelACL_Error_None                = errors.New("none can access")
-	ChannelACL_Error_OwnerOnly           = errors.New("only the channel owenr can access")
-	ChannelACL_Error_OwnerAndGlobalOwner = errors.New("only the channel owenr or global channel owner can access")
-	ChannelACL_Error_Any                 = errors.New("illegal channel access level")
+	ErrNoneAccess                = errors.New("none can access")
+	ErrOwnerOnlyAccess           = errors.New("only the channel owenr can access")
+	ErrOwnerAndGlobalOwnerAccess = errors.New("only the channel owenr or global channel owner can access")
+	ErrIllegalAccessLevel        = errors.New("illegal channel access level")
 )
 
 func (ch *Channel) CheckACL(c ConnectionInChannel, accessType ChannelAccessType) (bool, error) {
@@ -51,24 +51,24 @@ func (ch *Channel) CheckACL(c ConnectionInChannel, accessType ChannelAccessType)
 
 	switch level {
 	case ChannelAccessLevel_None:
-		return false, ChannelACL_Error_None
+		return false, ErrNoneAccess
 
 	case ChannelAccessLevel_OwnerOnly:
 		if ch.ownerConnection == c {
 			return true, nil
 		} else {
-			return false, ChannelACL_Error_OwnerOnly
+			return false, ErrOwnerOnlyAccess
 		}
 	case ChannelAccessLevel_OwnerAndGlobalOwner:
 		if ch.ownerConnection == c || globalChannel.ownerConnection == c {
 			return true, nil
 		} else {
-			return false, ChannelACL_Error_OwnerAndGlobalOwner
+			return false, ErrOwnerAndGlobalOwnerAccess
 		}
 	case ChannelAccessLevel_Any:
 		return true, nil
 	default:
-		return false, ChannelACL_Error_Any
+		return false, ErrIllegalAccessLevel
 	}
 
 }

@@ -120,7 +120,7 @@ func TestCheckACL(t *testing.T) {
 			for _, chType := range chTypes {
 				ch, _ = createChannelForTestACL(chType, createACLTestConnection())
 				hasAccess, err = ch.CheckACL(createACLTestConnection(), accessType)
-				assert.Error(t, err, ChannelACL_Error_None)
+				assert.Error(t, err, ErrNoneAccess)
 				assert.EqualValues(t, hasAccess, false)
 			}
 		}(allChannelTypesForTest)
@@ -131,7 +131,7 @@ func TestCheckACL(t *testing.T) {
 				channelOwner = createACLTestConnection()
 				ch, _ = createChannelForTestACL(chType, channelOwner)
 				hasAccess, err = ch.CheckACL(channelOwner, accessType)
-				assert.Error(t, err, ChannelACL_Error_None)
+				assert.Error(t, err, ErrNoneAccess)
 				assert.EqualValues(t, hasAccess, false)
 			}
 		}(allChannelTypesForTest)
@@ -144,7 +144,7 @@ func TestCheckACL(t *testing.T) {
 			for _, chType := range chTypes {
 				ch, _ := createChannelForTestACL(chType, createACLTestConnection())
 				hasAccess, err := ch.CheckACL(globalOwner, accessType)
-				assert.Error(t, err, ChannelACL_Error_None)
+				assert.Error(t, err, ErrNoneAccess)
 				assert.EqualValues(t, hasAccess, false)
 			}
 		}(allChannelTypesForTestWithoutGlobal)
@@ -156,7 +156,7 @@ func TestCheckACL(t *testing.T) {
 			for _, chType := range chTypes {
 				ch, _ := createChannelForTestACL(chType, createACLTestConnection())
 				hasAccess, err := ch.CheckACL(createACLTestConnection(), accessType)
-				assert.Error(t, err, ChannelACL_Error_OwnerOnly)
+				assert.Error(t, err, ErrOwnerOnlyAccess)
 				assert.EqualValues(t, hasAccess, false)
 			}
 		}(allChannelTypesForTest)
@@ -180,7 +180,7 @@ func TestCheckACL(t *testing.T) {
 			for _, chType := range chTypes {
 				ch, _ := createChannelForTestACL(chType, createACLTestConnection())
 				hasAccess, err := ch.CheckACL(globalOwner, accessType)
-				assert.Error(t, err, ChannelACL_Error_OwnerOnly)
+				assert.Error(t, err, ErrOwnerOnlyAccess)
 				assert.EqualValues(t, hasAccess, false)
 			}
 		}(allChannelTypesForTestWithoutGlobal)
@@ -190,7 +190,7 @@ func TestCheckACL(t *testing.T) {
 			for _, chType := range chTypes {
 				ch, _ := createChannelForTestACL(chType, nil)
 				hasAccess, err := ch.CheckACL(createACLTestConnection(), accessType)
-				assert.Error(t, err, ChannelACL_Error_OwnerOnly)
+				assert.Error(t, err, ErrOwnerOnlyAccess)
 				assert.EqualValues(t, hasAccess, false)
 			}
 		}(allChannelTypesForTest)
@@ -202,7 +202,7 @@ func TestCheckACL(t *testing.T) {
 			for _, chType := range chTypes {
 				ch, _ = createChannelForTestACL(chType, createACLTestConnection())
 				hasAccess, err = ch.CheckACL(createACLTestConnection(), accessType)
-				assert.Error(t, err, ChannelACL_Error_OwnerAndGlobalOwner)
+				assert.Error(t, err, ErrOwnerAndGlobalOwnerAccess)
 				assert.EqualValues(t, hasAccess, false)
 			}
 		}(allChannelTypesForTest)
