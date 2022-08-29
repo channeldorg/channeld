@@ -10,12 +10,24 @@ message FVector {
     float z = 3;
 }
 
+message UnrealObjectRef {
+    uint32 NetGUID = 1;
+}
+
 message SceneComponentState {
     // Marks that the state should be removed from the containing map
     bool removed = 1;
-    FVector relativeLocation = 2;
-    FVector relativeRotation = 3;
-    FVector relativeScale = 4;
-    bool isVisible = 5;
-    string attachSocketName = 6;
+    bool bAbsoluteLocation = 2;
+    bool bAbsoluteRotation = 3;
+    bool bAbsoluteScale = 4;
+    bool bVisible = 5;
+    bool bShouldBeAttached = 6;
+    string bShouldSnapLocationWhenAttached = 7;
+    string bShouldSnapRotationWhenAttached = 8;
+    UnrealObjectRef attachParent = 9;
+    repeated UnrealObjectRef attachChildren = 10;
+    string attachSocketName = 11;
+    FVector relativeLocation = 12;
+    FVector relativeRotation = 13;
+    FVector relativeScale = 14;
 }
