@@ -374,10 +374,6 @@ func handleCreateSpatialChannel(ctx MessageContext, msg *channeldpb.CreateChanne
 }
 
 func handleRemoveChannel(ctx MessageContext) {
-	if ctx.Channel != globalChannel {
-		ctx.Connection.Logger().Error("illegal attemp to remove channel outside the GLOBAL channel")
-		return
-	}
 
 	msg, ok := ctx.Msg.(*channeldpb.RemoveChannelMessage)
 	if !ok {
@@ -390,18 +386,20 @@ func handleRemoveChannel(ctx MessageContext) {
 		ctx.Connection.Logger().Error("invalid channelId for removing", zap.Uint32("channelId", msg.ChannelId))
 		return
 	}
-	// Only the channel owner or GLOBAL owner can remove the channel
+
+	// Check ACL from settings
 	// If ctx.Connection == nil, the removal is triggered internally (e.g. ChannelSettings.RemoveChannelAfterOwnerRemoved)
-	if ctx.HasConnection() && !ctx.Connection.HasAuthorityOver(channelToRemove) {
+	hasAccess, err := channelToRemove.CheckACL(ctx.Connection, ChannelAccessType_Remove)
+	if ctx.HasConnection() && !hasAccess {
 		ownerConnId := uint32(0)
 		if channelToRemove.HasOwner() {
 			ownerConnId = uint32(channelToRemove.ownerConnection.Id())
 		}
-		ctx.Connection.Logger().Error("illegal attemp to remove channel as the connection is not the channel owner",
+		ctx.Connection.Logger().Error("connection doesn't have access to remove channel",
 			zap.String("channelType", channelToRemove.channelType.String()),
 			zap.Uint32("channelId", uint32(channelToRemove.id)),
 			zap.Uint32("ownerConnId", ownerConnId),
-		)
+			zap.Error(err))
 		return
 	}
 
@@ -479,11 +477,13 @@ func handleSubToChannel(ctx MessageContext) {
 		return
 	}
 
-	if connToSub.id != ctx.Connection.Id() && !ctx.Connection.HasAuthorityOver(ctx.Channel) {
-		ctx.Connection.Logger().Error("illegal attemp to sub another connection as the sender has no authority",
+	hasAccess, err := ctx.Channel.CheckACL(ctx.Connection, ChannelAccessType_Sub)
+	if connToSub.id != ctx.Connection.Id() && !hasAccess {
+		ctx.Connection.Logger().Error("connection doesn't have access to sub connection to this channel",
 			zap.Uint32("subConnId", msg.ConnId),
 			zap.String("channelType", ctx.Channel.channelType.String()),
 			zap.Uint32("channelId", uint32(ctx.Channel.id)),
+			zap.Error(err),
 		)
 		return
 	}
@@ -497,8 +497,8 @@ func handleSubToChannel(ctx MessageContext) {
 		if msg.SubOptions != nil {
 			proto.Merge(&cs.options, msg.SubOptions)
 		}
-		//// Do not send the SubscribedToChannelResultMessage if already subed.
 		connToSub.sendSubscribed(ctx, ctx.Channel, connToSub, 0, &cs.options)
+		// Do not send the SubscribedToChannelResultMessage to the sender or channel owner if already subed.
 		return
 	}
 
@@ -533,11 +533,13 @@ func handleUnsubFromChannel(ctx MessageContext) {
 		return
 	}
 
-	if connToUnsub.id != ctx.Connection.Id() && !ctx.Connection.HasAuthorityOver(ctx.Channel) {
-		ctx.Connection.Logger().Error("illegal attemp to unsub another connection as the sender has no authority",
+	hasAccess, accessErr := ctx.Channel.CheckACL(ctx.Connection, ChannelAccessType_Unsub)
+	if connToUnsub.id != ctx.Connection.Id() && !hasAccess {
+		ctx.Connection.Logger().Error("connection dosen't have access to unsub connection from this channel",
 			zap.Uint32("unsubConnId", msg.ConnId),
 			zap.String("channelType", ctx.Channel.channelType.String()),
 			zap.Uint32("channelId", uint32(ctx.Channel.id)),
+			zap.Error(accessErr),
 		)
 		return
 	}
@@ -561,10 +563,10 @@ func handleUnsubFromChannel(ctx MessageContext) {
 	}
 	// Notify the channel owner.
 	if ctx.Channel.HasOwner() {
-		if ctx.Channel.ownerConnection != ctx.Connection {
+		if ctx.Channel.ownerConnection != ctx.Connection && ctx.Channel.ownerConnection != connToUnsub {
 			ctx.Channel.ownerConnection.sendUnsubscribed(ctx, ctx.Channel, connToUnsub, 0)
-		} else {
-			// Reset the owner if it unsubscribed
+		} else if ctx.Channel.ownerConnection == connToUnsub {
+			// Reset the owner if it unsubscribed itself
 			ctx.Channel.ownerConnection = nil
 		}
 	}
