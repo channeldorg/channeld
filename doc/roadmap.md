@@ -4,7 +4,7 @@
 - [x] FSM-based message filtering
 - [x] Message broadcasting
 - [x] Authentication
-- [ ] Channel ACL
+- [x] Channel ACL
 - [ ] DDoS Protection
 - [ ] Health check
 - [ ] Front-end load-balancing

@@ -10,12 +10,51 @@ message FVector {
     float z = 3;
 }
 
+message UnrealObjectRef {
+    uint32 NetGUID = 1;
+}
+
 message SceneComponentState {
     // Marks that the state should be removed from the containing map
     bool removed = 1;
-    FVector relativeLocation = 2;
-    FVector relativeRotation = 3;
-    FVector relativeScale = 4;
-    bool isVisible = 5;
-    string attachSocketName = 6;
+    bool bAbsoluteLocation = 2;
+    bool bAbsoluteRotation = 3;
+    bool bAbsoluteScale = 4;
+    bool bVisible = 5;
+    bool bShouldBeAttached = 6;
+    bool bShouldSnapLocationWhenAttached = 7;
+    bool bShouldSnapRotationWhenAttached = 8;
+    UnrealObjectRef attachParent = 9;
+    repeated UnrealObjectRef attachChildren = 10;
+    string attachSocketName = 11;
+    FVector relativeLocation = 12;
+    FVector relativeRotation = 13;
+    FVector relativeScale = 14;
+}
+
+message RootMotionMontage {
+
+}
+
+message BasedMovementInfo {
+    UnrealObjectRef movementBase = 1;
+    string boneName = 2;
+    FVector location = 3;
+    FVector rotation = 4;
+    bool bServerHasBaseComponent = 5;
+    bool bRelativeRotation = 6;
+    bool bServerHasVelocity = 7;
+}
+
+message CharacterState {
+    // Marks that the state should be removed from the containing map
+    bool removed = 1;
+    RootMotionMontage rootMotion = 2;
+    BasedMovementInfo basedMovement = 3;
+    float serverLastTransformUpdateTimeStamp = 4;
+    uint32 movementMode = 5;
+    bool bIsCrouched = 6;
+    bool bProxyIsJumpForceApplied = 7;
+    float animRootMotionTranslationScale = 8;
+    float replayLastTransformUpdateTimeStamp = 9;
 }

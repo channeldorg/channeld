@@ -39,10 +39,17 @@ type GlobalSettingsType struct {
 	ChannelSettings map[channeldpb.ChannelType]ChannelSettingsType
 }
 
+type ACLSettingsType struct {
+	Sub    ChannelAccessLevel
+	Unsub  ChannelAccessLevel
+	Remove ChannelAccessLevel
+}
+
 type ChannelSettingsType struct {
 	TickIntervalMs                 uint
 	DefaultFanOutIntervalMs        uint32
 	RemoveChannelAfterOwnerRemoved bool
+	ACLSettings                    ACLSettingsType
 }
 
 var GlobalSettings = GlobalSettingsType{
