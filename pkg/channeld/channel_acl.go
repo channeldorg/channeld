@@ -39,13 +39,10 @@ func (ch *Channel) CheckACL(c ConnectionInChannel, accessType ChannelAccessType)
 		switch accessType {
 		case ChannelAccessType_Sub:
 			level = aclSettings.Sub
-			break
 		case ChannelAccessType_Unsub:
 			level = aclSettings.Unsub
-			break
 		case ChannelAccessType_Remove:
 			level = aclSettings.Remove
-			break
 		}
 	}
 

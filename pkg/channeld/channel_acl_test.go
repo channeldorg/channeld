@@ -103,8 +103,8 @@ func TestCheckACL(t *testing.T) {
 	accessTypes := []ChannelAccessType{ChannelAccessType_Sub, ChannelAccessType_Unsub, ChannelAccessType_Remove}
 
 	const ChannelType_Test1 channeldpb.ChannelType = 201
-	allChannelTypesForTest := []channeldpb.ChannelType{channeldpb.ChannelType_GLOBAL, channeldpb.ChannelType_SUBWORLD, channeldpb.ChannelType_PRIVATE, ChannelType_Test1}
-	allChannelTypesForTestWithoutGlobal := []channeldpb.ChannelType{channeldpb.ChannelType_SUBWORLD, channeldpb.ChannelType_PRIVATE, ChannelType_Test1}
+	allChannelTypesForTest := []channeldpb.ChannelType{channeldpb.ChannelType_GLOBAL, channeldpb.ChannelType_SUBWORLD, channeldpb.ChannelType_PRIVATE, channeldpb.ChannelType_SPATIAL, ChannelType_Test1}
+	allChannelTypesForTestWithoutGlobal := []channeldpb.ChannelType{channeldpb.ChannelType_SUBWORLD, channeldpb.ChannelType_PRIVATE, channeldpb.ChannelType_SPATIAL, ChannelType_Test1}
 
 	var channelOwner ConnectionInChannel
 	var ch *Channel

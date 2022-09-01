@@ -32,6 +32,11 @@
     "4": {
         "TickIntervalMs": 10,
         "DefaultFanOutIntervalMs": 20,
-        "RemoveChannelAfterOwnerRemoved": true
+        "RemoveChannelAfterOwnerRemoved": true,
+        "ACLSettings": {
+            "Sub": 3,
+            "Unsub": 3,
+            "Remove": 2
+        }
     }
 }
