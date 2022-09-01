@@ -22,12 +22,39 @@ message SceneComponentState {
     bool bAbsoluteScale = 4;
     bool bVisible = 5;
     bool bShouldBeAttached = 6;
-    string bShouldSnapLocationWhenAttached = 7;
-    string bShouldSnapRotationWhenAttached = 8;
+    bool bShouldSnapLocationWhenAttached = 7;
+    bool bShouldSnapRotationWhenAttached = 8;
     UnrealObjectRef attachParent = 9;
     repeated UnrealObjectRef attachChildren = 10;
     string attachSocketName = 11;
     FVector relativeLocation = 12;
     FVector relativeRotation = 13;
     FVector relativeScale = 14;
+}
+
+message RootMotionMontage {
+
+}
+
+message BasedMovementInfo {
+    UnrealObjectRef movementBase = 1;
+    string boneName = 2;
+    FVector location = 3;
+    FVector rotation = 4;
+    bool bServerHasBaseComponent = 5;
+    bool bRelativeRotation = 6;
+    bool bServerHasVelocity = 7;
+}
+
+message CharacterState {
+    // Marks that the state should be removed from the containing map
+    bool removed = 1;
+    RootMotionMontage rootMotion = 2;
+    BasedMovementInfo basedMovement = 3;
+    float serverLastTransformUpdateTimeStamp = 4;
+    uint32 movementMode = 5;
+    bool bIsCrouched = 6;
+    bool bProxyIsJumpForceApplied = 7;
+    float animRootMotionTranslationScale = 8;
+    float replayLastTransformUpdateTimeStamp = 9;
 }
