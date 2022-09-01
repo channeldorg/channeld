@@ -32,7 +32,7 @@ services:
      - donotstart
     build:
       context: .
-      dockerfile: /examples/chat-rooms/Dockerfile
+      dockerfile: examples/chat-rooms/Dockerfile
     image: channeld/chat
     volumes:
      - chat-vol:/var/log/chat
@@ -50,7 +50,7 @@ services:
     expose:
       - "8080"
       - "12108"
-    entrypoint: ["./app", "-profile=cpu", "-profilepath=/var/log/chat", "-ct=0", "-chs=../../config/channel_settings_lofi.json"]
+    entrypoint: ["./app", "-profile=cpu", "-dev", "-profilepath=/var/log/chat", "-ct=0", "-chs=../../config/channel_settings_lofi.json"]
   grafana:
     image: grafana/grafana
     depends_on:
