@@ -595,7 +595,7 @@ func (x *MessagePack) GetMsgBody() []byte {
 }
 
 // The message that is used to carries user-space message and communicate between channeld and backend servers.
-// Users don't have to have this message if they are using a client library.
+// Users don't need to use this message directly if they are using a client library.
 type ServerForwardMessage struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
