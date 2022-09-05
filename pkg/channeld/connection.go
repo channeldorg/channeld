@@ -5,14 +5,17 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"channeld.clewcat.com/channeld/pkg/fsm"
+	"channeld.clewcat.com/channeld/pkg/replaypb"
 	"github.com/golang/snappy"
 	"github.com/gorilla/websocket"
 	"github.com/xtaci/kcp-go"
@@ -57,6 +60,7 @@ type Connection struct {
 	state           int32 // Don't put the connection state into the FSM as 1) the FSM's states are user-defined. 2) the FSM is not goroutine-safe.
 	connTime        time.Time
 	closeHandlers   []func()
+	replaySession   *replaypb.ReplaySession
 }
 
 var allConnections sync.Map // map[ConnectionId]*Connection
@@ -228,6 +232,12 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 		closeHandlers: make([]func(), 0),
 	}
 
+	if connection.isPacketRecordingEnabled() {
+		connection.replaySession = &replaypb.ReplaySession{
+			Packets: make([]*replaypb.ReplayPacket, 0, 1024),
+		}
+	}
+
 	// IMPORTANT: always make a value copy
 	var fsm fsm.FiniteStateMachine
 	switch t {
@@ -392,12 +402,20 @@ func (c *Connection) receivePacket() {
 		return
 	}
 
+	if c.isPacketRecordingEnabled() {
+		c.recordPacket(&p)
+	}
+
 	for _, mp := range p.Messages {
 		c.receiveMessage(mp)
 	}
 
 	//c.Logger().Debug("received packet", zap.Int("size", packetSize))
 	packetReceived.WithLabelValues(c.connectionType.String()).Inc()
+}
+
+func (c *Connection) isPacketRecordingEnabled() bool {
+	return c.connectionType == channeldpb.ConnectionType_CLIENT && GlobalSettings.EnableRecordPacket
 }
 
 func (c *Connection) receiveMessage(mp *channeldpb.MessagePack) {
@@ -575,4 +593,72 @@ func (c *Connection) String() string {
 
 func (c *Connection) Logger() *Logger {
 	return c.logger
+}
+
+func (c *Connection) recordPacket(p *channeldpb.Packet) {
+
+	recordedPacket := &channeldpb.Packet{
+		Messages: make([]*channeldpb.MessagePack, len(p.Messages)),
+	}
+	proto.Merge(recordedPacket, p)
+
+	c.replaySession.Packets = append(c.replaySession.Packets, &replaypb.ReplayPacket{
+		OffsetTime: time.Now().UnixNano(),
+		Packet:     recordedPacket,
+	})
+}
+
+func (c *Connection) persistReplaySession() {
+
+	var firstPacketTime int64
+	if len(c.replaySession.Packets) > 0 {
+		firstPacketTime = c.replaySession.Packets[0].OffsetTime
+	} else {
+		c.Logger().Error("replay session is empty")
+		return
+	}
+
+	for _, packet := range c.replaySession.Packets {
+		packet.OffsetTime -= firstPacketTime
+	}
+
+	data, err := proto.Marshal(c.replaySession)
+	if err != nil {
+		c.Logger().Error("marshal replay session failed", zap.Error(err))
+		return
+	}
+
+	var dir string
+	if GlobalSettings.ReplaySessionPersistenceDir != "" {
+		dir = GlobalSettings.ReplaySessionPersistenceDir
+	} else {
+		dir = filepath.Join("../../", "record")
+	}
+
+	_, err = os.Stat(dir)
+	if err == nil || !os.IsExist(err) {
+		os.MkdirAll(dir, 0777)
+	}
+
+	path := filepath.Join(dir, fmt.Sprintf("session_%d_%s.cpr", c.id, time.Now().Local().Format("06-01-02_15-03-04")))
+	err = ioutil.WriteFile(path, data, 0777)
+	if err != nil {
+		c.Logger().Error("write replay session to location failed", zap.Error(err))
+	}
+
+}
+
+func readReplaySession(path string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+
+	var rs replaypb.ReplaySession
+	if err := proto.Unmarshal(data, &rs); err != nil {
+		return
+	}
+
+	// TODO
+
 }

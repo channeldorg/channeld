@@ -37,6 +37,10 @@ type GlobalSettingsType struct {
 	SpatialChannelIdStart ChannelId
 
 	ChannelSettings map[channeldpb.ChannelType]ChannelSettingsType
+
+	EnableRecordPacket bool
+
+	ReplaySessionPersistenceDir string
 }
 
 type ACLSettingsType struct {
@@ -134,6 +138,9 @@ func (s *GlobalSettingsType) ParseFlag() error {
 	flag.StringVar(&s.ClientNetwork, "cn", "tcp", "the network type for the client connections")
 	flag.StringVar(&s.ClientAddress, "ca", ":12108", "the network address for the client connections")
 	flag.StringVar(&s.ClientFSM, "cfsm", "config/client_non_authoratative_fsm.json", "the path to the client FSM config")
+
+	flag.BoolVar(&s.EnableRecordPacket, "erp", false, "enable record message packets send from clients")
+	flag.StringVar(&s.ReplaySessionPersistenceDir, "rspd", "", "the path to write packet recording")
 
 	ct := flag.Uint("ct", 0, "the compression type, 0 = No, 1 = Snappy")
 	scs := flag.Uint("scs", uint(s.SpatialChannelIdStart), "start ChannelId of spatial channels. Default is 65535.")
