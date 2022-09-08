@@ -274,6 +274,10 @@ func (c *Connection) Close() {
 		return
 	}
 
+	if c.isPacketRecordingEnabled() {
+		c.persistReplaySession()
+	}
+
 	for _, handlerFunc := range c.closeHandlers {
 		handlerFunc()
 	}
@@ -598,7 +602,7 @@ func (c *Connection) Logger() *Logger {
 func (c *Connection) recordPacket(p *channeldpb.Packet) {
 
 	recordedPacket := &channeldpb.Packet{
-		Messages: make([]*channeldpb.MessagePack, len(p.Messages)),
+		Messages: make([]*channeldpb.MessagePack, 0, len(p.Messages)),
 	}
 	proto.Merge(recordedPacket, p)
 
@@ -610,21 +614,23 @@ func (c *Connection) recordPacket(p *channeldpb.Packet) {
 
 func (c *Connection) persistReplaySession() {
 
-	var firstPacketTime int64
+	var prevPacketTime int64
 	if len(c.replaySession.Packets) > 0 {
-		firstPacketTime = c.replaySession.Packets[0].OffsetTime
+		prevPacketTime = c.replaySession.Packets[0].OffsetTime
 	} else {
 		c.Logger().Error("replay session is empty")
 		return
 	}
 
 	for _, packet := range c.replaySession.Packets {
-		packet.OffsetTime -= firstPacketTime
+		t := packet.OffsetTime
+		packet.OffsetTime -= prevPacketTime
+		prevPacketTime = t
 	}
 
 	data, err := proto.Marshal(c.replaySession)
 	if err != nil {
-		c.Logger().Error("marshal replay session failed", zap.Error(err))
+		c.Logger().Error("failed to marshal replay session", zap.Error(err))
 		return
 	}
 
@@ -640,25 +646,10 @@ func (c *Connection) persistReplaySession() {
 		os.MkdirAll(dir, 0777)
 	}
 
-	path := filepath.Join(dir, fmt.Sprintf("session_%d_%s.cpr", c.id, time.Now().Local().Format("06-01-02_15-03-04")))
+	path := filepath.Join(dir, fmt.Sprintf("session_%d_%s.cpr", c.id, time.Now().Local().Format("06-01-02_15-04-03")))
 	err = ioutil.WriteFile(path, data, 0777)
 	if err != nil {
-		c.Logger().Error("write replay session to location failed", zap.Error(err))
+		c.Logger().Error("failed to write replay session to location", zap.Error(err))
 	}
-
-}
-
-func readReplaySession(path string) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return
-	}
-
-	var rs replaypb.ReplaySession
-	if err := proto.Unmarshal(data, &rs); err != nil {
-		return
-	}
-
-	// TODO
 
 }
