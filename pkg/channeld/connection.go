@@ -195,7 +195,10 @@ func generateNextConnId(c net.Conn, maxConnId uint32) {
 	}
 }
 
+var addConnectionMutex sync.Mutex
+
 func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
+	addConnectionMutex.Lock()
 	maxConnId := uint32(1)<<GlobalSettings.MaxConnectionIdBits - 1
 
 	for tries := 0; ; tries++ {
@@ -227,6 +230,7 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 		connTime:      time.Now(),
 		closeHandlers: make([]func(), 0),
 	}
+	addConnectionMutex.Unlock()
 
 	// IMPORTANT: always make a value copy
 	var fsm fsm.FiniteStateMachine
