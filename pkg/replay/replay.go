@@ -16,30 +16,25 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type JSON_MockClientSetting struct {
-	Concurrent               int
-	CprFilePath              string
-	RunningTime              string
-	MaxTickInterval          string
-	ActionIntervalMultiplier float64
-	WaitAuthSuccess          bool
-	AuthOnlyOnce             bool
-}
-
-type JSON_ReplayMockSetting struct {
-	ChanneldAddr   string
-	ClientSettings []JSON_MockClientSetting
-}
+type Duration time.Duration
 
 type MockClientSetting struct {
-	Concurrent               int
-	CprFilePath              string
-	Session                  *replaypb.ReplaySession
-	RunningTime              time.Duration
-	MaxTickInterval          time.Duration
-	ActionIntervalMultiplier float64
-	WaitAuthSuccess          bool
-	AuthOnlyOnce             bool
+	Concurrent               int      `json:"concurrent"`
+	CprFilePath              string   `json:"cprFilePath"`
+	RunningTime              Duration `json:"runningTime"`
+	SleepEndOfSession        Duration `json:"sleepEndOfSession"`
+	MaxTickInterval          Duration `json:"maxTickInterval"`
+	ActionIntervalMultiplier float64  `json:"actionIntervalMultiplier"`
+	WaitAuthSuccess          bool     `json:"waitAuthSuccess"`
+	AuthOnlyOnce             bool     `json:"authOnlyOnce"`
+	session                  *replaypb.ReplaySession
+}
+
+var DefaultMockClientSettings = MockClientSetting{
+	Concurrent:               1,
+	ActionIntervalMultiplier: 1,
+	WaitAuthSuccess:          true,
+	AuthOnlyOnce:             true,
 }
 
 type PreSendChannelIdHandlerFunc func(channelId uint32, msgType channeldpb.MessageType, msgPack *channeldpb.MessagePack, c *client.ChanneldClient) (chId uint32, needToSend bool)
@@ -75,50 +70,61 @@ func CreateReplayMockBySetting(settingPath string) (*ReplayMock, error) {
 	return rm, nil
 }
 
+func (c *MockClientSetting) UnmarshalJSON(b []byte) error {
+	type XMockClientSetting MockClientSetting
+	xc := XMockClientSetting(DefaultMockClientSettings)
+	if err := json.Unmarshal(b, &xc); err != nil {
+		return err
+	}
+
+	*c = MockClientSetting(xc)
+
+	if s, err := ReadReplaySession(c.CprFilePath); err != nil {
+		return err
+	} else {
+		c.session = s
+	}
+
+	return nil
+}
+
+func (d *Duration) UnmarshalJSON(b []byte) error {
+	var v interface{}
+	if err := json.Unmarshal(b, &v); err != nil {
+		return err
+	}
+	switch value := v.(type) {
+	case float64:
+		*d = Duration(time.Duration(value))
+		return nil
+	case string:
+		tmp, err := time.ParseDuration(value)
+		if err != nil {
+			return err
+		}
+		*d = Duration(tmp)
+		return nil
+	default:
+		return errors.New("invalid duration")
+	}
+}
+
 func (rm *ReplayMock) LoadSetting(path string) error {
-	var jsonSetting JSON_ReplayMockSetting
+
 	config, err := ioutil.ReadFile(path)
 	if err == nil {
-		if err := json.Unmarshal(config, &jsonSetting); err != nil {
+		if err := json.Unmarshal(config, rm); err != nil {
 			return fmt.Errorf("failed to unmarshall channel settings: %v", err)
 		}
 	} else {
 		return fmt.Errorf("failed to read channel settings: %v", err)
 	}
 
-	for _, cs := range jsonSetting.ClientSettings {
-		if t, err := time.ParseDuration(cs.RunningTime); err != nil {
-			return fmt.Errorf("failed to parse running time to time.Duration: %v", err)
-		} else if s, err := ReadReplaySession(cs.CprFilePath); err != nil {
-			return fmt.Errorf("failed to read channeld packet recording file: %v", err)
-		} else {
-
-			mti := time.Millisecond * 100
-			if cs.MaxTickInterval != "" {
-				if t, err := time.ParseDuration(cs.MaxTickInterval); err != nil {
-					return fmt.Errorf("failed to parse max tick interval to time.Duration: %v", err)
-				} else {
-					mti = t
-				}
-			}
-			aim := cs.ActionIntervalMultiplier
-			if aim <= 0 {
-				aim = 1
-			}
-			rm.ClientSettings = append(rm.ClientSettings, MockClientSetting{
-				Concurrent:               cs.Concurrent,
-				CprFilePath:              cs.CprFilePath,
-				Session:                  s,
-				RunningTime:              t,
-				MaxTickInterval:          mti,
-				ActionIntervalMultiplier: aim,
-				WaitAuthSuccess:          cs.WaitAuthSuccess,
-				AuthOnlyOnce:             cs.AuthOnlyOnce,
-			})
+	for _, cs := range rm.ClientSettings {
+		if cs.ActionIntervalMultiplier < 0 {
+			cs.ActionIntervalMultiplier = 1
 		}
 	}
-
-	rm.ChanneldAddr = jsonSetting.ChanneldAddr
 
 	return nil
 }
@@ -171,11 +177,13 @@ func (rm *ReplayMock) RunMock() {
 	channeldAddr := rm.ChanneldAddr
 	for _, clientSetting := range rm.ClientSettings {
 		wg.Add(1)
-		rs := clientSetting.Session
-		mti := clientSetting.MaxTickInterval
+		rs := clientSetting.session
+		mti := time.Duration(clientSetting.MaxTickInterval)
 		aim := clientSetting.ActionIntervalMultiplier
 		was := clientSetting.WaitAuthSuccess
 		aoo := clientSetting.AuthOnlyOnce
+		seos := clientSetting.SleepEndOfSession
+
 		stopFlag := make(chan struct{})
 		for ci := 0; ci < clientSetting.Concurrent; ci++ {
 			go func() {
@@ -221,12 +229,12 @@ func (rm *ReplayMock) RunMock() {
 					}
 				}()
 
-				rm.ReplaySession(c, rs, aim, was, aoo, stopFlag)
+				rm.ReplaySession(c, rs, aim, was, aoo, seos, stopFlag)
 			}()
 		}
 		t := clientSetting.RunningTime
 		go func() {
-			time.Sleep(t)
+			time.Sleep(time.Duration(t))
 			close(stopFlag)
 			wg.Done()
 		}()
@@ -235,7 +243,7 @@ func (rm *ReplayMock) RunMock() {
 	wg.Wait()
 }
 
-func (rm *ReplayMock) ReplaySession(c *client.ChanneldClient, rs *replaypb.ReplaySession, actionIntervalMultiplier float64, waitAuthSuccess bool, authOnlyOnce bool, stopFlag chan struct{}) error {
+func (rm *ReplayMock) ReplaySession(c *client.ChanneldClient, rs *replaypb.ReplaySession, actionIntervalMultiplier float64, waitAuthSuccess bool, authOnlyOnce bool, SleepEndOfSession Duration, stopFlag chan struct{}) error {
 	if !c.IsConnected() {
 		return errors.New("client not connected")
 	}
@@ -310,6 +318,16 @@ func (rm *ReplayMock) ReplaySession(c *client.ChanneldClient, rs *replaypb.Repla
 			}
 			log.Printf("v: %v", packet.Packet.String())
 			timer = time.NewTimer(time.Duration(actionIntervalMultiplier * float64(time.Duration(packet.OffsetTime)-time.Since(startTime))))
+			select {
+			case <-stopFlag:
+				return nil
+			case <-timer.C:
+			}
+		}
+
+		// End of session
+		if SleepEndOfSession > 0 {
+			timer := time.NewTimer(time.Duration(SleepEndOfSession))
 			select {
 			case <-stopFlag:
 				return nil
