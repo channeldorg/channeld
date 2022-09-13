@@ -195,6 +195,7 @@ func generateNextConnId(c net.Conn, maxConnId uint32) {
 	}
 }
 
+// NOT goroutine-safe. NEVER call AddConnection in different goroutines.
 func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 	maxConnId := uint32(1)<<GlobalSettings.MaxConnectionIdBits - 1
 
