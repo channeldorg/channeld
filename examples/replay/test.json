@@ -3,13 +3,14 @@
     "WarmUpTime": "2s",
     "ClientSettings": [
         {
-            "Concurrent": 10,
-            "CprFilePath": "session_1_22-09-07_14-41-02.cpr",
-            "RunningTime": "10s",
-            "MaxTickInterval": "100ms",
-            "ActionIntervalMultiplier": 1,
-            "WaitAuthSuccess": true,
-            "AuthOnlyOnce": true
+            "concurrent": 500,
+            "cprFilePath": "session_1_22-09-07_14-41-02.cpr",
+            "sleepEndOfSession": "10ms",
+            "runningTime": "10m",
+            "maxTickInterval": "100ms",
+            "actionIntervalMultiplier": 1,
+            "waitAuthSuccess": true,
+            "authOnlyOnce": true
         }
     ]
 }
