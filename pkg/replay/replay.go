@@ -18,7 +18,7 @@ import (
 
 type Duration time.Duration
 
-type MockClientSetting struct {
+type MockClientSettings struct {
 	Concurrent               int      `json:"concurrent"`
 	CprFilePath              string   `json:"cprFilePath"`
 	RunningTime              Duration `json:"runningTime"`
@@ -30,7 +30,7 @@ type MockClientSetting struct {
 	session                  *replaypb.ReplaySession
 }
 
-var DefaultMockClientSettings = MockClientSetting{
+var DefaultMockClientSettings = MockClientSettings{
 	Concurrent:               1,
 	ActionIntervalMultiplier: 1,
 	WaitAuthSuccess:          true,
@@ -53,7 +53,7 @@ type messageMapEntry struct {
 
 type ReplayMock struct {
 	ChanneldAddr            string
-	ClientSettings          []MockClientSetting
+	ClientSettings          []MockClientSettings
 	preSendChannelIdHandler PreSendChannelIdHandlerFunc
 	preSendMessageMap       map[channeldpb.MessageType]*preSendMessageMapEntry
 	messageMap              map[channeldpb.MessageType]*messageMapEntry
@@ -70,14 +70,14 @@ func CreateReplayMockBySetting(settingPath string) (*ReplayMock, error) {
 	return rm, nil
 }
 
-func (c *MockClientSetting) UnmarshalJSON(b []byte) error {
-	type XMockClientSetting MockClientSetting
-	xc := XMockClientSetting(DefaultMockClientSettings)
+func (c *MockClientSettings) UnmarshalJSON(b []byte) error {
+	type XMockClientSettings MockClientSettings
+	xc := XMockClientSettings(DefaultMockClientSettings)
 	if err := json.Unmarshal(b, &xc); err != nil {
 		return err
 	}
 
-	*c = MockClientSetting(xc)
+	*c = MockClientSettings(xc)
 
 	if s, err := ReadReplaySession(c.CprFilePath); err != nil {
 		return err
@@ -316,7 +316,7 @@ func (rm *ReplayMock) ReplaySession(c *client.ChanneldClient, rs *replaypb.Repla
 					}
 				}
 			}
-			log.Printf("v: %v", packet.Packet.String())
+			log.Printf("client: %v packet: %v", c.Id, packet.Packet.String())
 			timer = time.NewTimer(time.Duration(actionIntervalMultiplier * float64(time.Duration(packet.OffsetTime)-time.Since(startTime))))
 			select {
 			case <-stopFlag:
