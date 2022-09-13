@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"sync"
 
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"channeld.clewcat.com/channeld/pkg/client"
@@ -10,10 +11,14 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+var SubedChannelMapMutex sync.RWMutex
+
 type SubedChannelMap map[uint32]bool
 type ClientSubedChannelMap map[*client.ChanneldClient]SubedChannelMap
 
 func SubToChannel(cm ClientSubedChannelMap, c *client.ChanneldClient, chId uint32) {
+	SubedChannelMapMutex.Lock()
+	defer SubedChannelMapMutex.Unlock()
 	subedChannelMap, ok := cm[c]
 	if !ok {
 		subedChannelMap = make(SubedChannelMap)
@@ -23,6 +28,8 @@ func SubToChannel(cm ClientSubedChannelMap, c *client.ChanneldClient, chId uint3
 }
 
 func IsSubed(cm ClientSubedChannelMap, c *client.ChanneldClient, chId uint32) bool {
+	SubedChannelMapMutex.RLock()
+	defer SubedChannelMapMutex.RUnlock()
 	subedChannelMap, ok := cm[c]
 	if !ok {
 		return false
