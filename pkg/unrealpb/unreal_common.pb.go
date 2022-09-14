@@ -684,6 +684,116 @@ func (x *Character_ClientMoveResponsePacked_Params) GetPackedBits() []byte {
 	return nil
 }
 
+type PlayerControllerState struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	TargetViewRotation *FVector `protobuf:"bytes,1,opt,name=targetViewRotation,proto3" json:"targetViewRotation,omitempty"`
+	SpawnLocation      *FVector `protobuf:"bytes,2,opt,name=spawnLocation,proto3" json:"spawnLocation,omitempty"`
+}
+
+func (x *PlayerControllerState) Reset() {
+	*x = PlayerControllerState{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_unreal_common_proto_msgTypes[9]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *PlayerControllerState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PlayerControllerState) ProtoMessage() {}
+
+func (x *PlayerControllerState) ProtoReflect() protoreflect.Message {
+	mi := &file_unreal_common_proto_msgTypes[9]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PlayerControllerState.ProtoReflect.Descriptor instead.
+func (*PlayerControllerState) Descriptor() ([]byte, []int) {
+	return file_unreal_common_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *PlayerControllerState) GetTargetViewRotation() *FVector {
+	if x != nil {
+		return x.TargetViewRotation
+	}
+	return nil
+}
+
+func (x *PlayerControllerState) GetSpawnLocation() *FVector {
+	if x != nil {
+		return x.SpawnLocation
+	}
+	return nil
+}
+
+type PlayerController_ServerUpdateCamera_Params struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	CamLoc         *FVector `protobuf:"bytes,1,opt,name=camLoc,proto3" json:"camLoc,omitempty"`
+	CamPitchAndYaw int32    `protobuf:"varint,2,opt,name=camPitchAndYaw,proto3" json:"camPitchAndYaw,omitempty"`
+}
+
+func (x *PlayerController_ServerUpdateCamera_Params) Reset() {
+	*x = PlayerController_ServerUpdateCamera_Params{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_unreal_common_proto_msgTypes[10]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *PlayerController_ServerUpdateCamera_Params) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PlayerController_ServerUpdateCamera_Params) ProtoMessage() {}
+
+func (x *PlayerController_ServerUpdateCamera_Params) ProtoReflect() protoreflect.Message {
+	mi := &file_unreal_common_proto_msgTypes[10]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PlayerController_ServerUpdateCamera_Params.ProtoReflect.Descriptor instead.
+func (*PlayerController_ServerUpdateCamera_Params) Descriptor() ([]byte, []int) {
+	return file_unreal_common_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *PlayerController_ServerUpdateCamera_Params) GetCamLoc() *FVector {
+	if x != nil {
+		return x.CamLoc
+	}
+	return nil
+}
+
+func (x *PlayerController_ServerUpdateCamera_Params) GetCamPitchAndYaw() int32 {
+	if x != nil {
+		return x.CamPitchAndYaw
+	}
+	return 0
+}
+
 var File_unreal_common_proto protoreflect.FileDescriptor
 
 var file_unreal_common_proto_rawDesc = []byte{
@@ -818,11 +928,28 @@ var file_unreal_common_proto_rawDesc = []byte{
 	0x65, 0x6e, 0x74, 0x4d, 0x6f, 0x76, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x50,
 	0x61, 0x63, 0x6b, 0x65, 0x64, 0x5f, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x12, 0x1e, 0x0a, 0x0a,
 	0x50, 0x61, 0x63, 0x6b, 0x65, 0x64, 0x42, 0x69, 0x74, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c,
-	0x52, 0x0a, 0x50, 0x61, 0x63, 0x6b, 0x65, 0x64, 0x42, 0x69, 0x74, 0x73, 0x42, 0x2c, 0x5a, 0x2a,
-	0x63, 0x68, 0x61, 0x6e, 0x6e, 0x65, 0x6c, 0x64, 0x2e, 0x63, 0x6c, 0x65, 0x77, 0x63, 0x61, 0x74,
-	0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x68, 0x61, 0x6e, 0x6e, 0x65, 0x6c, 0x64, 0x2f, 0x70, 0x6b,
-	0x67, 0x2f, 0x75, 0x6e, 0x72, 0x65, 0x61, 0x6c, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x33,
+	0x52, 0x0a, 0x50, 0x61, 0x63, 0x6b, 0x65, 0x64, 0x42, 0x69, 0x74, 0x73, 0x22, 0x93, 0x01, 0x0a,
+	0x15, 0x50, 0x6c, 0x61, 0x79, 0x65, 0x72, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c, 0x6c, 0x65,
+	0x72, 0x53, 0x74, 0x61, 0x74, 0x65, 0x12, 0x41, 0x0a, 0x12, 0x74, 0x61, 0x72, 0x67, 0x65, 0x74,
+	0x56, 0x69, 0x65, 0x77, 0x52, 0x6f, 0x74, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x0b, 0x32, 0x11, 0x2e, 0x75, 0x6e, 0x72, 0x65, 0x61, 0x6c, 0x70, 0x62, 0x2e, 0x46, 0x56,
+	0x65, 0x63, 0x74, 0x6f, 0x72, 0x52, 0x12, 0x74, 0x61, 0x72, 0x67, 0x65, 0x74, 0x56, 0x69, 0x65,
+	0x77, 0x52, 0x6f, 0x74, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x37, 0x0a, 0x0d, 0x73, 0x70, 0x61,
+	0x77, 0x6e, 0x4c, 0x6f, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b,
+	0x32, 0x11, 0x2e, 0x75, 0x6e, 0x72, 0x65, 0x61, 0x6c, 0x70, 0x62, 0x2e, 0x46, 0x56, 0x65, 0x63,
+	0x74, 0x6f, 0x72, 0x52, 0x0d, 0x73, 0x70, 0x61, 0x77, 0x6e, 0x4c, 0x6f, 0x63, 0x61, 0x74, 0x69,
+	0x6f, 0x6e, 0x22, 0x7f, 0x0a, 0x2a, 0x50, 0x6c, 0x61, 0x79, 0x65, 0x72, 0x43, 0x6f, 0x6e, 0x74,
+	0x72, 0x6f, 0x6c, 0x6c, 0x65, 0x72, 0x5f, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x55, 0x70, 0x64,
+	0x61, 0x74, 0x65, 0x43, 0x61, 0x6d, 0x65, 0x72, 0x61, 0x5f, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73,
+	0x12, 0x29, 0x0a, 0x06, 0x63, 0x61, 0x6d, 0x4c, 0x6f, 0x63, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b,
+	0x32, 0x11, 0x2e, 0x75, 0x6e, 0x72, 0x65, 0x61, 0x6c, 0x70, 0x62, 0x2e, 0x46, 0x56, 0x65, 0x63,
+	0x74, 0x6f, 0x72, 0x52, 0x06, 0x63, 0x61, 0x6d, 0x4c, 0x6f, 0x63, 0x12, 0x26, 0x0a, 0x0e, 0x63,
+	0x61, 0x6d, 0x50, 0x69, 0x74, 0x63, 0x68, 0x41, 0x6e, 0x64, 0x59, 0x61, 0x77, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x05, 0x52, 0x0e, 0x63, 0x61, 0x6d, 0x50, 0x69, 0x74, 0x63, 0x68, 0x41, 0x6e, 0x64,
+	0x59, 0x61, 0x77, 0x42, 0x2c, 0x5a, 0x2a, 0x63, 0x68, 0x61, 0x6e, 0x6e, 0x65, 0x6c, 0x64, 0x2e,
+	0x63, 0x6c, 0x65, 0x77, 0x63, 0x61, 0x74, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x68, 0x61, 0x6e,
+	0x6e, 0x65, 0x6c, 0x64, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x75, 0x6e, 0x72, 0x65, 0x61, 0x6c, 0x70,
+	0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -837,17 +964,19 @@ func file_unreal_common_proto_rawDescGZIP() []byte {
 	return file_unreal_common_proto_rawDescData
 }
 
-var file_unreal_common_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_unreal_common_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_unreal_common_proto_goTypes = []interface{}{
-	(*FVector)(nil),                                   // 0: unrealpb.FVector
-	(*UnrealObjectRef)(nil),                           // 1: unrealpb.UnrealObjectRef
-	(*RemoteFunctionMessage)(nil),                     // 2: unrealpb.RemoteFunctionMessage
-	(*SceneComponentState)(nil),                       // 3: unrealpb.SceneComponentState
-	(*RootMotionMontage)(nil),                         // 4: unrealpb.RootMotionMontage
-	(*BasedMovementInfo)(nil),                         // 5: unrealpb.BasedMovementInfo
-	(*CharacterState)(nil),                            // 6: unrealpb.CharacterState
-	(*Character_ServerMovePacked_Params)(nil),         // 7: unrealpb.Character_ServerMovePacked_Params
-	(*Character_ClientMoveResponsePacked_Params)(nil), // 8: unrealpb.Character_ClientMoveResponsePacked_Params
+	(*FVector)(nil),                                    // 0: unrealpb.FVector
+	(*UnrealObjectRef)(nil),                            // 1: unrealpb.UnrealObjectRef
+	(*RemoteFunctionMessage)(nil),                      // 2: unrealpb.RemoteFunctionMessage
+	(*SceneComponentState)(nil),                        // 3: unrealpb.SceneComponentState
+	(*RootMotionMontage)(nil),                          // 4: unrealpb.RootMotionMontage
+	(*BasedMovementInfo)(nil),                          // 5: unrealpb.BasedMovementInfo
+	(*CharacterState)(nil),                             // 6: unrealpb.CharacterState
+	(*Character_ServerMovePacked_Params)(nil),          // 7: unrealpb.Character_ServerMovePacked_Params
+	(*Character_ClientMoveResponsePacked_Params)(nil),  // 8: unrealpb.Character_ClientMoveResponsePacked_Params
+	(*PlayerControllerState)(nil),                      // 9: unrealpb.PlayerControllerState
+	(*PlayerController_ServerUpdateCamera_Params)(nil), // 10: unrealpb.PlayerController_ServerUpdateCamera_Params
 }
 var file_unreal_common_proto_depIdxs = []int32{
 	1,  // 0: unrealpb.RemoteFunctionMessage.targetObj:type_name -> unrealpb.UnrealObjectRef
@@ -861,11 +990,14 @@ var file_unreal_common_proto_depIdxs = []int32{
 	0,  // 8: unrealpb.BasedMovementInfo.rotation:type_name -> unrealpb.FVector
 	4,  // 9: unrealpb.CharacterState.rootMotion:type_name -> unrealpb.RootMotionMontage
 	5,  // 10: unrealpb.CharacterState.basedMovement:type_name -> unrealpb.BasedMovementInfo
-	11, // [11:11] is the sub-list for method output_type
-	11, // [11:11] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	0,  // 11: unrealpb.PlayerControllerState.targetViewRotation:type_name -> unrealpb.FVector
+	0,  // 12: unrealpb.PlayerControllerState.spawnLocation:type_name -> unrealpb.FVector
+	0,  // 13: unrealpb.PlayerController_ServerUpdateCamera_Params.camLoc:type_name -> unrealpb.FVector
+	14, // [14:14] is the sub-list for method output_type
+	14, // [14:14] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_unreal_common_proto_init() }
@@ -982,6 +1114,30 @@ func file_unreal_common_proto_init() {
 				return nil
 			}
 		}
+		file_unreal_common_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*PlayerControllerState); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_unreal_common_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*PlayerController_ServerUpdateCamera_Params); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -989,7 +1145,7 @@ func file_unreal_common_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_unreal_common_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

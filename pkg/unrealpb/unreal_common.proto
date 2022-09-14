@@ -72,3 +72,13 @@ message Character_ServerMovePacked_Params {
 message Character_ClientMoveResponsePacked_Params {
     bytes PackedBits = 1;
 }
+
+message PlayerControllerState {
+    FVector targetViewRotation = 1;
+    FVector spawnLocation = 2;
+}
+
+message PlayerController_ServerUpdateCamera_Params {
+    FVector camLoc = 1;
+    int32 camPitchAndYaw = 2;
+}
