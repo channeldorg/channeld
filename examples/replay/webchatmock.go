@@ -19,7 +19,6 @@ var channelPool = make([]uint32, 0, channelNum)
 
 type ClientSubedChannel struct {
 	channelId uint32
-	m         sync.Mutex
 }
 type ClientSubedChannelMap map[*client.ChanneldClient]*ClientSubedChannel
 
@@ -50,8 +49,6 @@ func GetSubedChannelId(c *client.ChanneldClient) uint32 {
 	if !isExist {
 		return 0
 	}
-	subedChannel.m.Lock()
-	defer subedChannel.m.Unlock()
 	return subedChannel.channelId
 }
 
@@ -113,7 +110,7 @@ func runChatMock() {
 
 	time.Sleep(time.Millisecond * 1000)
 
-	rm.SetPreSendChannelIdHandler(
+	rm.SetBeforeSendChannelIdHandler(
 		func(channelId uint32, msgType channeldpb.MessageType, msgPack *channeldpb.MessagePack, c *client.ChanneldClient) (chId uint32, needToSend bool) {
 			switch msgType {
 			case channeldpb.MessageType_AUTH:
@@ -122,7 +119,6 @@ func runChatMock() {
 				if subedChannel, isExist := GetSubedChannel(c); isExist {
 					return 0, false
 				} else {
-					subedChannel.m.Lock()
 					return subedChannel.channelId, true
 				}
 			default:
@@ -131,7 +127,7 @@ func runChatMock() {
 		},
 	)
 
-	rm.SetPreSendMessageEntry(
+	rm.SetBeforeSendMessageEntry(
 		channeldpb.MessageType_SUB_TO_CHANNEL,
 		&channeldpb.SubscribedToChannelMessage{},
 		func(msg proto.Message, msgPack *channeldpb.MessagePack, c *client.ChanneldClient) (needToSend bool) {
@@ -152,9 +148,6 @@ func runChatMock() {
 			if !ok {
 				return
 			}
-			if subedChannel, isExist := GetSubedChannel(c); isExist {
-				subedChannel.m.Unlock()
-			}
 			log.Printf("client: %v sub to: %v", c.Id, createChMsg)
 		},
 	)
@@ -169,6 +162,14 @@ func runChatMock() {
 			log.Printf("created channeld: %v", createChMsg.ChannelId)
 		},
 	)
+
+	rm.SetNeedWaitMessageCallback(func(msgType channeldpb.MessageType, msgPack *channeldpb.MessagePack, c *client.ChanneldClient) bool {
+		if msgType == channeldpb.MessageType_SUB_TO_CHANNEL {
+			return true
+		}
+		return false
+	})
+
 	rm.RunMock()
 
 }

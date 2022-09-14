@@ -51,11 +51,14 @@ type messageMapEntry struct {
 	handlers []MessageHandlerFunc
 }
 
+type NeedWaitMessageCallbackFunc func(msgType channeldpb.MessageType, msgPack *channeldpb.MessagePack, c *client.ChanneldClient) bool
+
 type ReplayMock struct {
 	ChanneldAddr                    string
 	ClientSettings                  []MockClientSettings
 	alterChannelIdbeforeSendHandler AlterChannelIdBeforeSendHandlerFunc
 	beforeSendMessageMap            map[channeldpb.MessageType]*beforeSendMessageMapEntry
+	needWaitMessageCallback         NeedWaitMessageCallbackFunc
 	messageMap                      map[channeldpb.MessageType]*messageMapEntry
 }
 
@@ -149,6 +152,10 @@ func (rm *ReplayMock) SetMessageEntry(msgType uint32, msgTemp proto.Message, han
 		msg:      msgTemp,
 		handlers: handlers,
 	}
+}
+
+func (rm *ReplayMock) SetNeedWaitMessageCallback(handler NeedWaitMessageCallbackFunc) {
+	rm.needWaitMessageCallback = handler
 }
 
 func ReadReplaySession(cprPath string) (*replaypb.ReplaySession, error) {
@@ -267,11 +274,12 @@ func (rm *ReplayMock) ReplaySession(c *client.ChanneldClient, mcs *MockClientSet
 	} else {
 		close(hasAuth)
 	}
-	var timer *time.Timer
+
 	for {
 		for _, packet := range rs.Packets {
 			startTime := time.Now()
 			for _, msgPack := range packet.Packet.Messages {
+				waitMessageCallback := make(chan struct{})
 				msgType := channeldpb.MessageType(msgPack.MsgType)
 
 				if msgType == channeldpb.MessageType_AUTH {
@@ -296,7 +304,18 @@ func (rm *ReplayMock) ReplaySession(c *client.ChanneldClient, mcs *MockClientSet
 				}
 
 				entry, ok := rm.beforeSendMessageMap[msgType]
+				needWaitMessageCallback := false
+				if rm.needWaitMessageCallback != nil && rm.needWaitMessageCallback(msgType, msgPack, c) {
+					needWaitMessageCallback = true
+				} else {
+					close(waitMessageCallback)
+				}
 				var receiveCallback func(client *client.ChanneldClient, channelId uint32, m client.Message) = nil
+				if needWaitMessageCallback {
+					receiveCallback = func(client *client.ChanneldClient, channelId uint32, m client.Message) {
+						close(waitMessageCallback)
+					}
+				}
 
 				if !ok && entry == nil {
 					c.SendRaw(channelId, channeldpb.BroadcastType(msgPack.Broadcast), msgPack.MsgType, &msgPack.MsgBody, receiveCallback)
@@ -311,9 +330,16 @@ func (rm *ReplayMock) ReplaySession(c *client.ChanneldClient, mcs *MockClientSet
 						c.Send(channelId, channeldpb.BroadcastType(msgPack.Broadcast), msgPack.MsgType, msg, receiveCallback)
 					}
 				}
+				if needWaitMessageCallback {
+					select {
+					case <-stopFlag:
+						return nil
+					case <-waitMessageCallback:
+					}
+				}
 			}
 			log.Printf("client: %v packet: %v", c.Id, packet.Packet.String())
-			timer = time.NewTimer(time.Duration(actionIntervalMultiplier * float64(time.Duration(packet.OffsetTime)-time.Since(startTime))))
+			timer := time.NewTimer(time.Duration(actionIntervalMultiplier * float64(time.Duration(packet.OffsetTime)-time.Since(startTime))))
 			select {
 			case <-stopFlag:
 				return nil
