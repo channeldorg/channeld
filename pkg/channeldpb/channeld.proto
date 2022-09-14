@@ -134,7 +134,7 @@ enum MessageType {
 }
 
 // The message that is used to carries user-space message and communicate between channeld and backend servers.
-// Users don't have to have this message if they are using a client library.
+// Users don't need to use this message directly if they are using a client library.
 message ServerForwardMessage {
     // The client that sends the user-space message to server or server sends the user-space message to.
     uint32 clientConnId = 1;

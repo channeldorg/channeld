@@ -14,6 +14,12 @@ message UnrealObjectRef {
     uint32 NetGUID = 1;
 }
 
+message RemoteFunctionMessage {
+    UnrealObjectRef targetObj = 1;
+    string functionName = 2;
+    bytes paramsPayload = 3;
+}
+
 message SceneComponentState {
     // Marks that the state should be removed from the containing map
     bool removed = 1;
@@ -57,4 +63,22 @@ message CharacterState {
     bool bProxyIsJumpForceApplied = 7;
     float animRootMotionTranslationScale = 8;
     float replayLastTransformUpdateTimeStamp = 9;
+}
+
+message Character_ServerMovePacked_Params {
+    bytes PackedBits = 1;
+}
+
+message Character_ClientMoveResponsePacked_Params {
+    bytes PackedBits = 1;
+}
+
+message PlayerControllerState {
+    FVector targetViewRotation = 1;
+    FVector spawnLocation = 2;
+}
+
+message PlayerController_ServerUpdateCamera_Params {
+    FVector camLoc = 1;
+    int32 camPitchAndYaw = 2;
 }
