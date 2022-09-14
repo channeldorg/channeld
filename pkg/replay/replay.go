@@ -59,9 +59,9 @@ type ReplayMock struct {
 	messageMap              map[channeldpb.MessageType]*messageMapEntry
 }
 
-func CreateReplayMockBySetting(settingPath string) (*ReplayMock, error) {
+func CreateReplayMockByConfigFile(configPath string) (*ReplayMock, error) {
 	rm := &ReplayMock{}
-	err := rm.LoadSetting(settingPath)
+	err := rm.LoadConfig(configPath)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 	}
 }
 
-func (rm *ReplayMock) LoadSetting(path string) error {
+func (rm *ReplayMock) LoadConfig(path string) error {
 
 	config, err := ioutil.ReadFile(path)
 	if err == nil {
@@ -119,13 +119,6 @@ func (rm *ReplayMock) LoadSetting(path string) error {
 	} else {
 		return fmt.Errorf("failed to read channel settings: %v", err)
 	}
-
-	for _, cs := range rm.ClientSettings {
-		if cs.ActionIntervalMultiplier < 0 {
-			cs.ActionIntervalMultiplier = 1
-		}
-	}
-
 	return nil
 }
 
