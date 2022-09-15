@@ -17,39 +17,21 @@ var channelNum int = 6
 var channelPoolMutex sync.RWMutex
 var channelPool = make([]uint32, 0, channelNum)
 
-type ClientSubedChannel struct {
-	channelId uint32
+func GetRandChannelId() uint32 {
+	i := rand.Intn(channelNum)
+	channelPoolMutex.RLock()
+	chId := channelPool[i]
+	channelPoolMutex.RUnlock()
+	return chId
 }
-type ClientSubedChannelMap map[*client.ChanneldClient]*ClientSubedChannel
 
-var subToChannelMutexs = make([]sync.Mutex, 0)
-
-var subedChannelMapMutex sync.RWMutex
-var subedChannelMap = make(ClientSubedChannelMap)
-
-func GetSubedChannel(c *client.ChanneldClient) (subedChannel *ClientSubedChannel, isExist bool) {
-	subedChannelMapMutex.Lock()
-	defer subedChannelMapMutex.Unlock()
-	subedChannel, isExist = subedChannelMap[c]
-	if !isExist {
-		i := rand.Intn(channelNum)
-		chId := channelPool[i]
-		subedChannel = &ClientSubedChannel{
-			channelId: chId,
+func GetSubedChannelId(c *client.ChanneldClient) (channelId uint32, isExist bool) {
+	if len(c.SubscribedChannels) > 0 {
+		for chId := range c.SubscribedChannels {
+			return chId, true
 		}
-		subedChannelMap[c] = subedChannel
 	}
-	return subedChannel, isExist
-}
-
-func GetSubedChannelId(c *client.ChanneldClient) uint32 {
-	subedChannelMapMutex.RLock()
-	subedChannel, isExist := subedChannelMap[c]
-	subedChannelMapMutex.RUnlock()
-	if !isExist {
-		return 0
-	}
-	return subedChannel.channelId
+	return 0, false
 }
 
 func runChatMock() {
@@ -59,6 +41,8 @@ func runChatMock() {
 		return
 	}
 
+	var wg sync.WaitGroup
+	wg.Add(channelNum)
 	go func() {
 		c, err := client.NewClient(rm.ChanneldAddr)
 		if err != nil {
@@ -80,7 +64,7 @@ func runChatMock() {
 			resultMsg := m.(*channeldpb.AuthResultMessage)
 			if resultMsg.ConnId == c.Id {
 				if resultMsg.Result == channeldpb.AuthResultMessage_SUCCESSFUL {
-					for i := channelNum; i >= 0; i-- {
+					for i := channelNum; i > 0; i-- {
 						c.Send(uint32(channeld.GlobalChannelId), channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_CREATE_CHANNEL), &channeldpb.CreateChannelMessage{
 							ChannelType: channeldpb.ChannelType_SUBWORLD,
 							Data:        nil,
@@ -97,6 +81,7 @@ func runChatMock() {
 			channelPoolMutex.Lock()
 			channelPool = append(channelPool, resultMsg.ChannelId)
 			channelPoolMutex.Unlock()
+			wg.Done()
 		})
 
 		c.Auth("test_lt", "test_pit")
@@ -108,7 +93,7 @@ func runChatMock() {
 		}
 	}()
 
-	time.Sleep(time.Millisecond * 1000)
+	wg.Wait()
 
 	rm.SetBeforeSendChannelIdHandler(
 		func(channelId uint32, msgType channeldpb.MessageType, msgPack *channeldpb.MessagePack, c *client.ChanneldClient) (chId uint32, needToSend bool) {
@@ -116,13 +101,17 @@ func runChatMock() {
 			case channeldpb.MessageType_AUTH:
 				return 0, true
 			case channeldpb.MessageType_SUB_TO_CHANNEL:
-				if subedChannel, isExist := GetSubedChannel(c); isExist {
+				if _, isExist := GetSubedChannelId(c); isExist {
 					return 0, false
 				} else {
-					return subedChannel.channelId, true
+					return GetRandChannelId(), true
 				}
 			default:
-				return GetSubedChannelId(c), true
+				if chId, isExist := GetSubedChannelId(c); isExist {
+					return chId, false
+				} else {
+					return 0, false
+				}
 			}
 		},
 	)
@@ -138,28 +127,6 @@ func runChatMock() {
 			log.Printf("client: %v message: %v", c.Id, subMsg)
 			subMsg.ConnId = c.Id
 			return true
-		},
-	)
-
-	rm.AddMessageHandler(
-		channeldpb.MessageType_SUB_TO_CHANNEL,
-		func(c *client.ChanneldClient, channelId uint32, m proto.Message) {
-			createChMsg, ok := m.(*channeldpb.SubscribedToChannelResultMessage)
-			if !ok {
-				return
-			}
-			log.Printf("client: %v sub to: %v", c.Id, createChMsg)
-		},
-	)
-
-	rm.AddMessageHandler(
-		channeldpb.MessageType_CREATE_CHANNEL,
-		func(client *client.ChanneldClient, channelId uint32, m proto.Message) {
-			createChMsg, ok := m.(*channeldpb.CreateChannelResultMessage)
-			if !ok {
-				return
-			}
-			log.Printf("created channeld: %v", createChMsg.ChannelId)
 		},
 	)
 
