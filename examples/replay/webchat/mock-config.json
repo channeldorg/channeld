@@ -1,6 +1,6 @@
 {
-    "ChanneldAddr": "ws://127.0.0.1:12108",
-    "ClientSettings": [
+    "channeldAddr": "ws://127.0.0.1:12108",
+    "mockClients": [
         {
             "concurrent": 300,
             "connectInterval": "100ms",

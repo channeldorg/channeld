@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
@@ -18,7 +19,7 @@ import (
 
 type Duration time.Duration
 
-type MockClientSettings struct {
+type MockClient struct {
 	CprFilePath              string   `json:"cprFilePath"`
 	Concurrent               int      `json:"concurrent"`
 	ConnectInterval          Duration `json:"connectInterval"`
@@ -31,7 +32,7 @@ type MockClientSettings struct {
 	session                  *replaypb.ReplaySession
 }
 
-var DefaultMockClientSettings = MockClientSettings{
+var DefaultMockClient = MockClient{
 	Concurrent:               1,
 	ActionIntervalMultiplier: 1,
 	WaitAuthSuccess:          true,
@@ -54,34 +55,34 @@ type messageMapEntry struct {
 
 type NeedWaitMessageCallbackFunc func(msgType channeldpb.MessageType, msgPack *channeldpb.MessagePack, c *client.ChanneldClient) bool
 
-type ReplayMock struct {
-	ChanneldAddr                    string
-	ClientSettings                  []MockClientSettings
+type ReplayClient struct {
+	ChanneldAddr                    string       `json:"channeldAddr"`
+	MockClients                     []MockClient `json:"mockClients"`
 	alterChannelIdbeforeSendHandler AlterChannelIdBeforeSendHandlerFunc
 	beforeSendMessageMap            map[channeldpb.MessageType]*beforeSendMessageMapEntry
 	needWaitMessageCallback         NeedWaitMessageCallbackFunc
 	messageMap                      map[channeldpb.MessageType]*messageMapEntry
 }
 
-func CreateReplayMockByConfigFile(configPath string) (*ReplayMock, error) {
-	rm := &ReplayMock{}
-	err := rm.LoadConfig(configPath)
+func CreateReplayClientByConfigFile(configPath string) (*ReplayClient, error) {
+	rc := &ReplayClient{}
+	err := rc.LoadConfig(configPath)
 	if err != nil {
 		return nil, err
 	}
-	rm.beforeSendMessageMap = make(map[channeldpb.MessageType]*beforeSendMessageMapEntry)
-	rm.messageMap = make(map[channeldpb.MessageType]*messageMapEntry)
-	return rm, nil
+	rc.beforeSendMessageMap = make(map[channeldpb.MessageType]*beforeSendMessageMapEntry)
+	rc.messageMap = make(map[channeldpb.MessageType]*messageMapEntry)
+	return rc, nil
 }
 
-func (c *MockClientSettings) UnmarshalJSON(b []byte) error {
-	type XMockClientSettings MockClientSettings
-	xc := XMockClientSettings(DefaultMockClientSettings)
+func (c *MockClient) UnmarshalJSON(b []byte) error {
+	type XMockClient MockClient
+	xc := XMockClient(DefaultMockClient)
 	if err := json.Unmarshal(b, &xc); err != nil {
 		return err
 	}
 
-	*c = MockClientSettings(xc)
+	*c = MockClient(xc)
 
 	if s, err := ReadReplaySession(c.CprFilePath); err != nil {
 		return err
@@ -113,11 +114,11 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 	}
 }
 
-func (rm *ReplayMock) LoadConfig(path string) error {
+func (rc *ReplayClient) LoadConfig(path string) error {
 
 	config, err := ioutil.ReadFile(path)
 	if err == nil {
-		if err := json.Unmarshal(config, rm); err != nil {
+		if err := json.Unmarshal(config, rc); err != nil {
 			return fmt.Errorf("failed to unmarshall channel settings: %v", err)
 		}
 	} else {
@@ -126,37 +127,37 @@ func (rm *ReplayMock) LoadConfig(path string) error {
 	return nil
 }
 
-func (rm *ReplayMock) SetAlterChannelIdBeforeSendHandler(handler AlterChannelIdBeforeSendHandlerFunc) {
-	rm.alterChannelIdbeforeSendHandler = handler
+func (rc *ReplayClient) SetAlterChannelIdBeforeSendHandler(handler AlterChannelIdBeforeSendHandlerFunc) {
+	rc.alterChannelIdbeforeSendHandler = handler
 }
 
-func (rm *ReplayMock) SetBeforeSendMessageEntry(msgType channeldpb.MessageType, msgTemp proto.Message, handler BeforeSendMessageHandlerFunc) {
-	rm.beforeSendMessageMap[msgType] = &beforeSendMessageMapEntry{
+func (rc *ReplayClient) SetBeforeSendMessageEntry(msgType channeldpb.MessageType, msgTemp proto.Message, handler BeforeSendMessageHandlerFunc) {
+	rc.beforeSendMessageMap[msgType] = &beforeSendMessageMapEntry{
 		msgTemp:           msgTemp,
 		beforeSendHandler: handler,
 	}
 }
 
-func (rm *ReplayMock) AddMessageHandler(msgType channeldpb.MessageType, handlers ...MessageHandlerFunc) {
-	entry := rm.messageMap[msgType]
+func (rc *ReplayClient) AddMessageHandler(msgType channeldpb.MessageType, handlers ...MessageHandlerFunc) {
+	entry := rc.messageMap[msgType]
 	if entry != nil {
 		entry.handlers = append(entry.handlers, handlers...)
 	} else {
-		rm.messageMap[msgType] = &messageMapEntry{
+		rc.messageMap[msgType] = &messageMapEntry{
 			handlers: handlers,
 		}
 	}
 }
 
-func (rm *ReplayMock) SetMessageEntry(msgType uint32, msgTemp proto.Message, handlers ...MessageHandlerFunc) {
-	rm.messageMap[channeldpb.MessageType(msgType)] = &messageMapEntry{
+func (rc *ReplayClient) SetMessageEntry(msgType uint32, msgTemp proto.Message, handlers ...MessageHandlerFunc) {
+	rc.messageMap[channeldpb.MessageType(msgType)] = &messageMapEntry{
 		msg:      msgTemp,
 		handlers: handlers,
 	}
 }
 
-func (rm *ReplayMock) SetNeedWaitMessageCallback(handler NeedWaitMessageCallbackFunc) {
-	rm.needWaitMessageCallback = handler
+func (rc *ReplayClient) SetNeedWaitMessageCallback(handler NeedWaitMessageCallbackFunc) {
+	rc.needWaitMessageCallback = handler
 }
 
 func ReadReplaySession(cprPath string) (*replaypb.ReplaySession, error) {
@@ -173,192 +174,149 @@ func ReadReplaySession(cprPath string) (*replaypb.ReplaySession, error) {
 	return &rs, nil
 }
 
-func (rm *ReplayMock) RunMock() {
-	var wg sync.WaitGroup
-	channeldAddr := rm.ChanneldAddr
-	for _, clientSetting := range rm.ClientSettings {
-		wg.Add(1)
-		mti := time.Duration(clientSetting.MaxTickInterval)
-		connInterval := time.Duration(clientSetting.ConnectInterval)
-
-		stopFlag := make(chan struct{})
-		t := clientSetting.RunningTime
-		go func() {
-			time.Sleep(time.Duration(t))
-			close(stopFlag)
-			wg.Done()
-		}()
-
-		for ci := 0; ci < clientSetting.Concurrent; ci++ {
-			go func() {
-				c, err := client.NewClient(channeldAddr)
-				if err != nil {
-					log.Println(err)
-					return
-				}
-				defer c.Disconnect()
-
-				for msgType, entry := range rm.messageMap {
-					handlers := make([]client.MessageHandlerFunc, 0, len(entry.handlers))
-					for _, handler := range entry.handlers {
-						handlers = append(handlers, func(client *client.ChanneldClient, channelId uint32, m client.Message) {
-							handler(client, channelId, m)
-						})
-					}
-					err := c.AddMessageHandler(uint32(msgType), handlers...)
-					if err != nil {
-						c.SetMessageEntry(uint32(msgType), entry.msg, handlers...)
-					}
-				}
-
-				go func() {
-					for {
-						if err := c.Receive(); err != nil {
-							log.Println(err)
-							return
-						}
-					}
-				}()
-
-				go func() {
-					for {
-						tickStartTime := time.Now()
-						c.Tick()
-						timer := time.NewTimer(mti - time.Since(tickStartTime))
-						select {
-						case <-stopFlag:
-							return
-						case <-timer.C:
-						}
-					}
-				}()
-
-				rm.ReplaySession(c, &clientSetting, stopFlag)
-			}()
-			time.Sleep(connInterval)
-		}
+func (rc *ReplayClient) RunReplay() {
+	for _, mockClient := range rc.MockClients {
+		mockClient.RunMockClient(rc)
 	}
 
-	wg.Wait()
 }
 
-func (rm *ReplayMock) ReplaySession(c *client.ChanneldClient, mcs *MockClientSettings, stopFlag chan struct{}) error {
-	if !c.IsConnected() {
-		return errors.New("client not connected")
-	}
-	rs := mcs.session
-	actionIntervalMultiplier := mcs.ActionIntervalMultiplier
-	waitAuthSuccess := mcs.WaitAuthSuccess
-	authOnlyOnce := mcs.AuthOnlyOnce
-	sleepEndOfSession := mcs.SleepEndOfSession
+func (mc *MockClient) RunMockClient(rc *ReplayClient) {
+	concurrent := mc.Concurrent
+	maxTickInterval := time.Duration(mc.MaxTickInterval)
+	connInterval := time.Duration(mc.ConnectInterval)
+	runningTime := time.Duration(mc.RunningTime)
+	session := mc.session
+	authOnlyOnce := mc.AuthOnlyOnce
+	waitAuthSuccess := mc.WaitAuthSuccess
+	sleepEndOfSession := time.Duration(mc.SleepEndOfSession)
 
-	hasAuth := make(chan struct{})
-	firstAuth := true
-	if waitAuthSuccess {
-		c.AddMessageHandler(
-			uint32(channeldpb.MessageType_AUTH),
-			func(client *client.ChanneldClient, channelId uint32, m client.Message) {
-				resultMsg := m.(*channeldpb.AuthResultMessage)
-				if resultMsg.ConnId == c.Id {
-					if resultMsg.Result == channeldpb.AuthResultMessage_SUCCESSFUL {
-						close(hasAuth)
-					} else {
-						log.Panicln("mock client failed to auth")
+	packetsLen := len(session.Packets)
+
+	var wg sync.WaitGroup // wait all mock clients timeout
+	wg.Add(concurrent)
+
+	for ci := 0; ci < concurrent; ci++ {
+		go func() {
+			c, err := client.NewClient(rc.ChanneldAddr)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+
+			// Register msg handlers
+			for msgType, entry := range rc.messageMap {
+				handlers := make([]client.MessageHandlerFunc, 0, len(entry.handlers))
+				for _, handler := range entry.handlers {
+					handlers = append(handlers, func(client *client.ChanneldClient, channelId uint32, m client.Message) {
+						handler(client, channelId, m)
+					})
+				}
+				err := c.AddMessageHandler(uint32(msgType), handlers...)
+				if err != nil {
+					c.SetMessageEntry(uint32(msgType), entry.msg, handlers...)
+				}
+			}
+
+			go func() {
+				for {
+					if err := c.Receive(); err != nil {
+						log.Println(err)
+						return
 					}
 				}
-			},
-		)
-	} else {
-		close(hasAuth)
-	}
+			}()
 
-	for {
-		for _, packet := range rs.Packets {
-			startTime := time.Now()
-			for _, msgPack := range packet.Packet.Messages {
-				waitMessageCallback := make(chan struct{})
-				msgType := channeldpb.MessageType(msgPack.MsgType)
+			nextPacketsIndex := 0
+			nextPacketTime := time.Now()
+			firstAuth := true
 
-				if msgType == channeldpb.MessageType_AUTH {
-					if firstAuth {
-						firstAuth = false
-					} else if authOnlyOnce {
-						continue
-					}
-				} else {
-					if waitAuthSuccess {
-						<-hasAuth
-					}
+			var waitMessageCallback int32 // counter for messages that has not been callback
+
+			for t := time.Now(); time.Since(t) < runningTime && c.IsConnected(); {
+				tickStartTime := time.Now()
+
+				if nextPacketsIndex >= packetsLen {
+					// If end of the session, delay sleepEndOfSession and replay packet that start of the session
+					nextPacketsIndex = nextPacketsIndex % packetsLen
+					nextPacketTime = nextPacketTime.Add(sleepEndOfSession)
 				}
 
-				channelId := msgPack.ChannelId
-				if rm.alterChannelIdbeforeSendHandler != nil {
-					newChId, needToSend := rm.alterChannelIdbeforeSendHandler(channelId, msgType, msgPack, c)
-					if !needToSend {
-						log.Printf("client: %v pass packet: %v", c.Id, packet.Packet.String())
-						continue
-					}
-					channelId = newChId
-				}
+				replayPacket := session.Packets[nextPacketsIndex]
+				offsetTime := time.Duration(replayPacket.OffsetTime)
 
-				needWaitMessageCallback := false
-				if rm.needWaitMessageCallback != nil && rm.needWaitMessageCallback(msgType, msgPack, c) {
-					needWaitMessageCallback = true
-				} else {
-					close(waitMessageCallback)
-				}
-				var receiveCallback func(client *client.ChanneldClient, channelId uint32, m client.Message) = nil
-				if needWaitMessageCallback {
-					receiveCallback = func(client *client.ChanneldClient, channelId uint32, m client.Message) {
-						close(waitMessageCallback)
-					}
-				}
-				entry, ok := rm.beforeSendMessageMap[msgType]
+				if waitMessageCallback == 0 && time.Since(nextPacketTime) >= offsetTime {
 
-				if !ok && entry == nil {
-					log.Printf("client: %v packet: %v", c.Id, packet.Packet.String())
-					c.SendRaw(channelId, channeldpb.BroadcastType(msgPack.Broadcast), msgPack.MsgType, &msgPack.MsgBody, receiveCallback)
-				} else {
-					msg := proto.Clone(entry.msgTemp)
-					err := proto.Unmarshal(msgPack.MsgBody, msg)
-					if err != nil {
-						return err
-					}
-					needToSend := entry.beforeSendHandler(msg, msgPack, c)
-					if needToSend {
-						log.Printf("client: %v packet: %v", c.Id, packet.Packet.String())
-						c.Send(channelId, channeldpb.BroadcastType(msgPack.Broadcast), msgPack.MsgType, msg, receiveCallback)
-					} else {
-						if needWaitMessageCallback {
-							close(waitMessageCallback)
+					nextPacketTime = nextPacketTime.Add(offsetTime)
+					nextPacketsIndex++
+
+					for _, msgPack := range replayPacket.Packet.Messages {
+
+						msgType := channeldpb.MessageType(msgPack.MsgType)
+
+						if msgType == channeldpb.MessageType_AUTH {
+							if firstAuth {
+								firstAuth = false
+							} else if authOnlyOnce {
+								continue
+							}
 						}
-						log.Printf("client: %v pass packet: %v", c.Id, packet.Packet.String())
-					}
-				}
-				if needWaitMessageCallback {
-					select {
-					case <-stopFlag:
-						return nil
-					case <-waitMessageCallback:
-					}
-				}
-			}
-			timer := time.NewTimer(time.Duration(actionIntervalMultiplier * float64(time.Duration(packet.OffsetTime)-time.Since(startTime))))
-			select {
-			case <-stopFlag:
-				return nil
-			case <-timer.C:
-			}
-		}
 
-		// End of session
-		if sleepEndOfSession > 0 {
-			timer := time.NewTimer(time.Duration(sleepEndOfSession))
-			select {
-			case <-stopFlag:
-				return nil
-			case <-timer.C:
+						channelId := msgPack.ChannelId
+						if rc.alterChannelIdbeforeSendHandler != nil {
+							newChId, needToSend := rc.alterChannelIdbeforeSendHandler(channelId, msgType, msgPack, c)
+							if !needToSend {
+								log.Printf("client: %v pass packet: %v", c.Id, replayPacket.Packet.String())
+								continue
+							}
+							channelId = newChId
+						}
+
+						var receiveCallback func(client *client.ChanneldClient, channelId uint32, m client.Message) = nil
+						needWaitMessageCallback := (rc.needWaitMessageCallback != nil && rc.needWaitMessageCallback(msgType, msgPack, c)) || (msgType == channeldpb.MessageType_AUTH && waitAuthSuccess)
+						if needWaitMessageCallback {
+							receiveCallback = func(client *client.ChanneldClient, channelId uint32, m client.Message) {
+								atomic.AddInt32(&waitMessageCallback, -1)
+							}
+						}
+
+						entry, ok := rc.beforeSendMessageMap[msgType]
+
+						if !ok && entry == nil {
+							log.Printf("client: %v packet: %v", c.Id, replayPacket.Packet.String())
+							if needWaitMessageCallback {
+								atomic.AddInt32(&waitMessageCallback, 1)
+							}
+							c.SendRaw(channelId, channeldpb.BroadcastType(msgPack.Broadcast), msgPack.MsgType, &msgPack.MsgBody, receiveCallback)
+						} else {
+							msg := proto.Clone(entry.msgTemp)
+							err := proto.Unmarshal(msgPack.MsgBody, msg)
+							if err != nil {
+								log.Println(err)
+								return
+							}
+							needToSend := entry.beforeSendHandler(msg, msgPack, c)
+							if needToSend {
+								log.Printf("client: %v packet: %v", c.Id, replayPacket.Packet.String())
+								if needWaitMessageCallback {
+									atomic.AddInt32(&waitMessageCallback, 1)
+								}
+								c.Send(channelId, channeldpb.BroadcastType(msgPack.Broadcast), msgPack.MsgType, msg, receiveCallback)
+							} else {
+								log.Printf("client: %v pass packet: %v", c.Id, replayPacket.Packet.String())
+							}
+						}
+					}
+				}
+				c.Tick()
+				time.Sleep(maxTickInterval - time.Since(tickStartTime))
 			}
-		}
+			c.Disconnect()
+			time.Sleep(time.Millisecond * 100) // wait totally disconnect
+			wg.Done()
+		}()
+		// Run next mock client after connectionInterval
+		time.Sleep(connInterval)
 	}
+	wg.Wait()
 }
