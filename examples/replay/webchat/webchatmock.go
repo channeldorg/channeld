@@ -95,7 +95,7 @@ func RunChatMock() {
 
 	wg.Wait()
 
-	rm.SetBeforeSendChannelIdHandler(
+	rm.SetAlterChannelIdBeforeSendHandler(
 		func(channelId uint32, msgType channeldpb.MessageType, msgPack *channeldpb.MessagePack, c *client.ChanneldClient) (chId uint32, needToSend bool) {
 			switch msgType {
 			case channeldpb.MessageType_AUTH:
@@ -108,7 +108,7 @@ func RunChatMock() {
 				}
 			default:
 				if chId, isExist := getSubedChannelId(c); isExist {
-					return chId, false
+					return chId, true
 				} else {
 					return 0, false
 				}

@@ -125,7 +125,7 @@ func (rm *ReplayMock) LoadConfig(path string) error {
 	return nil
 }
 
-func (rm *ReplayMock) SetBeforeSendChannelIdHandler(handler AlterChannelIdBeforeSendHandlerFunc) {
+func (rm *ReplayMock) SetAlterChannelIdBeforeSendHandler(handler AlterChannelIdBeforeSendHandlerFunc) {
 	rm.alterChannelIdbeforeSendHandler = handler
 }
 
@@ -291,12 +291,12 @@ func (rm *ReplayMock) ReplaySession(c *client.ChanneldClient, mcs *MockClientSet
 				if rm.alterChannelIdbeforeSendHandler != nil {
 					newChId, needToSend := rm.alterChannelIdbeforeSendHandler(channelId, msgType, msgPack, c)
 					if !needToSend {
+						log.Printf("client: %v pass packet: %v", c.Id, packet.Packet.String())
 						continue
 					}
 					channelId = newChId
 				}
 
-				entry, ok := rm.beforeSendMessageMap[msgType]
 				needWaitMessageCallback := false
 				if rm.needWaitMessageCallback != nil && rm.needWaitMessageCallback(msgType, msgPack, c) {
 					needWaitMessageCallback = true
@@ -309,8 +309,10 @@ func (rm *ReplayMock) ReplaySession(c *client.ChanneldClient, mcs *MockClientSet
 						close(waitMessageCallback)
 					}
 				}
+				entry, ok := rm.beforeSendMessageMap[msgType]
 
 				if !ok && entry == nil {
+					log.Printf("client: %v packet: %v", c.Id, packet.Packet.String())
 					c.SendRaw(channelId, channeldpb.BroadcastType(msgPack.Broadcast), msgPack.MsgType, &msgPack.MsgBody, receiveCallback)
 				} else {
 					msg := proto.Clone(entry.msgTemp)
@@ -320,7 +322,13 @@ func (rm *ReplayMock) ReplaySession(c *client.ChanneldClient, mcs *MockClientSet
 					}
 					needToSend := entry.beforeSendHandler(msg, msgPack, c)
 					if needToSend {
+						log.Printf("client: %v packet: %v", c.Id, packet.Packet.String())
 						c.Send(channelId, channeldpb.BroadcastType(msgPack.Broadcast), msgPack.MsgType, msg, receiveCallback)
+					} else {
+						if needWaitMessageCallback {
+							close(waitMessageCallback)
+						}
+						log.Printf("client: %v pass packet: %v", c.Id, packet.Packet.String())
 					}
 				}
 				if needWaitMessageCallback {
@@ -331,7 +339,6 @@ func (rm *ReplayMock) ReplaySession(c *client.ChanneldClient, mcs *MockClientSet
 					}
 				}
 			}
-			log.Printf("client: %v packet: %v", c.Id, packet.Packet.String())
 			timer := time.NewTimer(time.Duration(actionIntervalMultiplier * float64(time.Duration(packet.OffsetTime)-time.Since(startTime))))
 			select {
 			case <-stopFlag:
