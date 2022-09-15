@@ -19,8 +19,9 @@ import (
 type Duration time.Duration
 
 type MockClientSettings struct {
-	Concurrent               int      `json:"concurrent"`
 	CprFilePath              string   `json:"cprFilePath"`
+	Concurrent               int      `json:"concurrent"`
+	ConnectInterval          Duration `json:"connectInterval"`
 	RunningTime              Duration `json:"runningTime"`
 	SleepEndOfSession        Duration `json:"sleepEndOfSession"`
 	MaxTickInterval          Duration `json:"maxTickInterval"`
@@ -178,8 +179,16 @@ func (rm *ReplayMock) RunMock() {
 	for _, clientSetting := range rm.ClientSettings {
 		wg.Add(1)
 		mti := time.Duration(clientSetting.MaxTickInterval)
+		connInterval := time.Duration(clientSetting.ConnectInterval)
 
 		stopFlag := make(chan struct{})
+		t := clientSetting.RunningTime
+		go func() {
+			time.Sleep(time.Duration(t))
+			close(stopFlag)
+			wg.Done()
+		}()
+
 		for ci := 0; ci < clientSetting.Concurrent; ci++ {
 			go func() {
 				c, err := client.NewClient(channeldAddr)
@@ -226,13 +235,8 @@ func (rm *ReplayMock) RunMock() {
 
 				rm.ReplaySession(c, &clientSetting, stopFlag)
 			}()
+			time.Sleep(connInterval)
 		}
-		t := clientSetting.RunningTime
-		go func() {
-			time.Sleep(time.Duration(t))
-			close(stopFlag)
-			wg.Done()
-		}()
 	}
 
 	wg.Wait()
