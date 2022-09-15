@@ -3,7 +3,7 @@
     "ClientSettings": [
         {
             "concurrent": 300,
-            "cprFilePath": "web-chat/session_1_22-09-07_14-41-02.cpr",
+            "cprFilePath": "webchat/session_1_22-09-07_14-41-02.cpr",
             "sleepEndOfSession": "10ms",
             "runningTime": "10m",
             "maxTickInterval": "100ms",

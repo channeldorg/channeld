@@ -1,4 +1,4 @@
-package main
+package webchat
 
 import (
 	"log"
@@ -17,7 +17,7 @@ var channelNum int = 6
 var channelPoolMutex sync.RWMutex
 var channelPool = make([]uint32, 0, channelNum)
 
-func GetRandChannelId() uint32 {
+func getRandChannelId() uint32 {
 	i := rand.Intn(channelNum)
 	channelPoolMutex.RLock()
 	chId := channelPool[i]
@@ -25,7 +25,7 @@ func GetRandChannelId() uint32 {
 	return chId
 }
 
-func GetSubedChannelId(c *client.ChanneldClient) (channelId uint32, isExist bool) {
+func getSubedChannelId(c *client.ChanneldClient) (channelId uint32, isExist bool) {
 	if len(c.SubscribedChannels) > 0 {
 		for chId := range c.SubscribedChannels {
 			return chId, true
@@ -34,8 +34,8 @@ func GetSubedChannelId(c *client.ChanneldClient) (channelId uint32, isExist bool
 	return 0, false
 }
 
-func runChatMock() {
-	rm, err := replay.CreateReplayMockByConfigFile("./web-chat/mock-config.json")
+func RunChatMock() {
+	rm, err := replay.CreateReplayMockByConfigFile("./webchat/mock-config.json")
 	if err != nil {
 		log.Panicf("failed to create mock: %v\n", err)
 		return
@@ -101,13 +101,13 @@ func runChatMock() {
 			case channeldpb.MessageType_AUTH:
 				return 0, true
 			case channeldpb.MessageType_SUB_TO_CHANNEL:
-				if _, isExist := GetSubedChannelId(c); isExist {
+				if _, isExist := getSubedChannelId(c); isExist {
 					return 0, false
 				} else {
-					return GetRandChannelId(), true
+					return getRandChannelId(), true
 				}
 			default:
-				if chId, isExist := GetSubedChannelId(c); isExist {
+				if chId, isExist := getSubedChannelId(c); isExist {
 					return chId, false
 				} else {
 					return 0, false
