@@ -249,8 +249,6 @@ func (rm *ReplayMock) ReplaySession(c *client.ChanneldClient, mcs *MockClientSet
 	sleepEndOfSession := mcs.SleepEndOfSession
 
 	hasAuth := make(chan struct{})
-	hasAuthClosed := false
-	var hasAuthClosedLock sync.Mutex
 	firstAuth := true
 	if waitAuthSuccess {
 		c.AddMessageHandler(
@@ -259,12 +257,7 @@ func (rm *ReplayMock) ReplaySession(c *client.ChanneldClient, mcs *MockClientSet
 				resultMsg := m.(*channeldpb.AuthResultMessage)
 				if resultMsg.ConnId == c.Id {
 					if resultMsg.Result == channeldpb.AuthResultMessage_SUCCESSFUL {
-						hasAuthClosedLock.Lock()
-						if !hasAuthClosed {
-							hasAuthClosed = true
-							close(hasAuth)
-						}
-						hasAuthClosedLock.Unlock()
+						close(hasAuth)
 					} else {
 						log.Panicln("mock client failed to auth")
 					}
