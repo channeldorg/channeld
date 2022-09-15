@@ -18,6 +18,7 @@ var channelPoolMutex sync.RWMutex
 var channelPool = make([]uint32, 0, channelNum)
 
 func getRandChannelId() uint32 {
+	return 0
 	i := rand.Intn(channelNum)
 	channelPoolMutex.RLock()
 	chId := channelPool[i]
@@ -27,6 +28,7 @@ func getRandChannelId() uint32 {
 
 func getSubedChannelId(c *client.ChanneldClient) (channelId uint32, isExist bool) {
 	if len(c.SubscribedChannels) > 0 {
+		return 0, true
 		for chId := range c.SubscribedChannels {
 			return chId, true
 		}
@@ -35,7 +37,7 @@ func getSubedChannelId(c *client.ChanneldClient) (channelId uint32, isExist bool
 }
 
 func RunChatMock() {
-	rm, err := replay.CreateReplayMockByConfigFile("./webchat/mock-config.json")
+	rc, err := replay.CreateReplayClientByConfigFile("./webchat/mock-config.json")
 	if err != nil {
 		log.Panicf("failed to create mock: %v\n", err)
 		return
@@ -44,7 +46,7 @@ func RunChatMock() {
 	var wg sync.WaitGroup
 	wg.Add(channelNum)
 	go func() {
-		c, err := client.NewClient(rm.ChanneldAddr)
+		c, err := client.NewClient(rc.ChanneldAddr)
 		if err != nil {
 			log.Println(err)
 			return
@@ -95,7 +97,7 @@ func RunChatMock() {
 
 	wg.Wait()
 
-	rm.SetAlterChannelIdBeforeSendHandler(
+	rc.SetAlterChannelIdBeforeSendHandler(
 		func(channelId uint32, msgType channeldpb.MessageType, msgPack *channeldpb.MessagePack, c *client.ChanneldClient) (chId uint32, needToSend bool) {
 			switch msgType {
 			case channeldpb.MessageType_AUTH:
@@ -116,7 +118,7 @@ func RunChatMock() {
 		},
 	)
 
-	rm.SetBeforeSendMessageEntry(
+	rc.SetBeforeSendMessageEntry(
 		channeldpb.MessageType_SUB_TO_CHANNEL,
 		&channeldpb.SubscribedToChannelMessage{},
 		func(msg proto.Message, msgPack *channeldpb.MessagePack, c *client.ChanneldClient) (needToSend bool) {
@@ -130,13 +132,13 @@ func RunChatMock() {
 		},
 	)
 
-	rm.SetNeedWaitMessageCallback(func(msgType channeldpb.MessageType, msgPack *channeldpb.MessagePack, c *client.ChanneldClient) bool {
+	rc.SetNeedWaitMessageCallback(func(msgType channeldpb.MessageType, msgPack *channeldpb.MessagePack, c *client.ChanneldClient) bool {
 		if msgType == channeldpb.MessageType_SUB_TO_CHANNEL {
 			return true
 		}
 		return false
 	})
 
-	rm.RunMock()
+	rc.RunReplay()
 
 }
