@@ -470,15 +470,21 @@ func handleSubToChannel(ctx MessageContext) {
 		return
 	}
 
-	// The connection that subscribes. Could be different to the connection that sends the message.
-	connToSub := GetConnection(ConnectionId(msg.ConnId))
+	var connToSub ConnectionInChannel
+	if ctx.Connection.GetConnectionType() == channeldpb.ConnectionType_CLIENT {
+		connToSub = ctx.Connection
+	} else {
+		// Only the server can specify a ConnId.
+		connToSub = GetConnection(ConnectionId(msg.ConnId))
+	}
+
 	if connToSub == nil {
 		ctx.Connection.Logger().Error("invalid ConnectionId for sub", zap.Uint32("connIdInMsg", msg.ConnId))
 		return
 	}
 
 	hasAccess, err := ctx.Channel.CheckACL(ctx.Connection, ChannelAccessType_Sub)
-	if connToSub.id != ctx.Connection.Id() && !hasAccess {
+	if connToSub.Id() != ctx.Connection.Id() && !hasAccess {
 		ctx.Connection.Logger().Error("connection doesn't have access to sub connection to this channel",
 			zap.Uint32("subConnId", msg.ConnId),
 			zap.String("channelType", ctx.Channel.channelType.String()),
