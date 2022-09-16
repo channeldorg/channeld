@@ -23,19 +23,19 @@ message RemoteFunctionMessage {
 message SceneComponentState {
     // Marks that the state should be removed from the containing map
     bool removed = 1;
-    bool bAbsoluteLocation = 2;
-    bool bAbsoluteRotation = 3;
-    bool bAbsoluteScale = 4;
-    bool bVisible = 5;
-    bool bShouldBeAttached = 6;
-    bool bShouldSnapLocationWhenAttached = 7;
-    bool bShouldSnapRotationWhenAttached = 8;
-    UnrealObjectRef attachParent = 9;
+    optional bool bAbsoluteLocation = 2;
+    optional bool bAbsoluteRotation = 3;
+    optional bool bAbsoluteScale = 4;
+    optional bool bVisible = 5;
+    optional bool bShouldBeAttached = 6;
+    optional bool bShouldSnapLocationWhenAttached = 7;
+    optional bool bShouldSnapRotationWhenAttached = 8;
+    optional UnrealObjectRef attachParent = 9;
     repeated UnrealObjectRef attachChildren = 10;
-    string attachSocketName = 11;
-    FVector relativeLocation = 12;
-    FVector relativeRotation = 13;
-    FVector relativeScale = 14;
+    optional string attachSocketName = 11;
+    optional FVector relativeLocation = 12;
+    optional FVector relativeRotation = 13;
+    optional FVector relativeScale = 14;
 }
 
 message RootMotionMontage {
@@ -43,26 +43,26 @@ message RootMotionMontage {
 }
 
 message BasedMovementInfo {
-    UnrealObjectRef movementBase = 1;
-    string boneName = 2;
-    FVector location = 3;
-    FVector rotation = 4;
-    bool bServerHasBaseComponent = 5;
-    bool bRelativeRotation = 6;
-    bool bServerHasVelocity = 7;
+    optional UnrealObjectRef movementBase = 1;
+    optional string boneName = 2;
+    optional FVector location = 3;
+    optional FVector rotation = 4;
+    optional bool bServerHasBaseComponent = 5;
+    optional bool bRelativeRotation = 6;
+    optional bool bServerHasVelocity = 7;
 }
 
 message CharacterState {
     // Marks that the state should be removed from the containing map
     bool removed = 1;
-    RootMotionMontage rootMotion = 2;
-    BasedMovementInfo basedMovement = 3;
-    float serverLastTransformUpdateTimeStamp = 4;
-    uint32 movementMode = 5;
-    bool bIsCrouched = 6;
-    bool bProxyIsJumpForceApplied = 7;
-    float animRootMotionTranslationScale = 8;
-    float replayLastTransformUpdateTimeStamp = 9;
+    optional RootMotionMontage rootMotion = 2;
+    optional BasedMovementInfo basedMovement = 3;
+    optional float serverLastTransformUpdateTimeStamp = 4;
+    optional uint32 movementMode = 5;
+    optional bool bIsCrouched = 6;
+    optional bool bProxyIsJumpForceApplied = 7;
+    optional float animRootMotionTranslationScale = 8;
+    optional float replayLastTransformUpdateTimeStamp = 9;
 }
 
 message Character_ServerMovePacked_Params {
@@ -74,8 +74,8 @@ message Character_ClientMoveResponsePacked_Params {
 }
 
 message PlayerControllerState {
-    FVector targetViewRotation = 1;
-    FVector spawnLocation = 2;
+    optional FVector targetViewRotation = 1;
+    optional FVector spawnLocation = 2;
 }
 
 message PlayerController_ServerUpdateCamera_Params {
