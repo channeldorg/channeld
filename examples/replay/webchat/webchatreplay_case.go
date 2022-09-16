@@ -18,7 +18,6 @@ var channelPoolMutex sync.RWMutex
 var channelPool = make([]uint32, 0, channelNum)
 
 func getRandChannelId() uint32 {
-	return 0
 	i := rand.Intn(channelNum)
 	channelPoolMutex.RLock()
 	chId := channelPool[i]
@@ -28,7 +27,6 @@ func getRandChannelId() uint32 {
 
 func getSubedChannelId(c *client.ChanneldClient) (channelId uint32, isExist bool) {
 	if len(c.SubscribedChannels) > 0 {
-		return 0, true
 		for chId := range c.SubscribedChannels {
 			return chId, true
 		}
@@ -37,16 +35,16 @@ func getSubedChannelId(c *client.ChanneldClient) (channelId uint32, isExist bool
 }
 
 func RunChatMock() {
-	rc, err := replay.CreateReplayClientByConfigFile("./webchat/mock-config.json")
+	rc, err := replay.CreateReplayClientByConfigFile("./webchat/case-config.json")
 	if err != nil {
-		log.Panicf("failed to create mock: %v\n", err)
+		log.Panicf("failed to create replay client: %v\n", err)
 		return
 	}
 
 	var wg sync.WaitGroup
 	wg.Add(channelNum)
 	go func() {
-		c, err := client.NewClient(rc.ChanneldAddr)
+		c, err := client.NewClient(rc.CaseConfig.ChanneldAddr)
 		if err != nil {
 			log.Println(err)
 			return
@@ -126,7 +124,6 @@ func RunChatMock() {
 			if !ok {
 				return false
 			}
-			log.Printf("client: %v message: %v", c.Id, subMsg)
 			subMsg.ConnId = c.Id
 			return true
 		},
@@ -139,6 +136,6 @@ func RunChatMock() {
 		return false
 	})
 
-	rc.RunReplay()
+	rc.Run()
 
 }
