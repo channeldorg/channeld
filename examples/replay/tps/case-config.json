@@ -1,0 +1,16 @@
+{
+    "channeldAddr": "127.0.0.1:12108",
+    "connectionGroups": [
+        {
+            "connectionNumber": 2,
+            "connectInterval": "5000ms",
+            "cprFilePath": "tps/session_2_22-09-16_16-44-04.cpr",
+            "sleepEndOfSession": "10ms",
+            "runningTime": "1m",
+            "maxTickInterval": "10ms",
+            "actionIntervalMultiplier": 1,
+            "waitAuthSuccess": true,
+            "authOnlyOnce": true
+        }
+    ]
+}

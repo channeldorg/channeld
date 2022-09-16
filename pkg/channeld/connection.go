@@ -639,7 +639,7 @@ func (c *Connection) persistReplaySession() {
 	if GlobalSettings.ReplaySessionPersistenceDir != "" {
 		dir = GlobalSettings.ReplaySessionPersistenceDir
 	} else {
-		dir = filepath.Join("../../", "record")
+		dir = "replays"
 	}
 
 	_, err = os.Stat(dir)

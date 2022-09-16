@@ -61,7 +61,7 @@
         "request": "launch",
         "mode": "debug",
         "program": "examples/replay/main.go",
-        "args": ["-dev", "-loglevel=0", "-profile=cpu", "-ct=1", "-chs=${workspaceFolder}/config/channel_settings_hifi.json"]
+        "args": ["-dev", "-loglevel=0", "-ct=1", "-chs=${workspaceFolder}/config/channel_settings_hifi.json"]
     },
     ]
 }

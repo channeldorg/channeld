@@ -1,7 +1,7 @@
 package main
 
-import "channeld.clewcat.com/channeld/examples/channeld-ue-chat/webchat"
+import "channeld.clewcat.com/channeld/examples/channeld-ue-chat/tps"
 
 func main() {
-	webchat.RunChatMock()
+	tps.Run()
 }
