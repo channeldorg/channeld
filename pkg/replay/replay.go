@@ -178,12 +178,12 @@ func ReadReplaySessionFile(cprPath string) (*replaypb.ReplaySession, error) {
 
 func (rc *ReplayClient) Run() {
 	for _, cg := range rc.ConnectionGroups {
-		cg.Run(rc)
+		cg.run(rc)
 	}
 
 }
 
-func (cg *ConnectionGroup) Run(rc *ReplayClient) {
+func (cg *ConnectionGroup) run(rc *ReplayClient) {
 	connNumber := cg.config.ConnectionNumber
 	maxTickInterval := time.Duration(cg.config.MaxTickInterval)
 	connInterval := time.Duration(cg.config.ConnectInterval)
