@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package replaypb;
+
+import "channeld.proto";
+
+option go_package = "channeld.clewcat.com/channeld/pkg/replaypb";
+
+message ReplayPacket {
+    int64 offsetTime = 1;
+    channeldpb.Packet packet = 2;
+}
+
+message ReplaySession {
+    repeated ReplayPacket packets = 1;
+}

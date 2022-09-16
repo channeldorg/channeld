@@ -296,6 +296,25 @@ func (client *ChanneldClient) Send(channelId uint32, broadcast channeldpb.Broadc
 	return nil
 }
 
+func (client *ChanneldClient) SendRaw(channelId uint32, broadcast channeldpb.BroadcastType, msgType uint32, msgBody *[]byte, callback MessageHandlerFunc) error {
+	var stubId uint32 = 0
+	if callback != nil {
+		for client.stubCallbacks[stubId] != nil {
+			stubId++
+		}
+		client.stubCallbacks[stubId] = callback
+	}
+
+	client.outgoingQueue <- &channeldpb.MessagePack{
+		ChannelId: channelId,
+		Broadcast: uint32(broadcast),
+		StubId:    stubId,
+		MsgType:   msgType,
+		MsgBody:   *msgBody,
+	}
+	return nil
+}
+
 func (client *ChanneldClient) writePacket(p *channeldpb.Packet) error {
 	bytes, err := proto.Marshal(p)
 	if err != nil {

@@ -7,6 +7,9 @@ protoc --go_out=. --go_opt=paths=source_relative -I . *.proto
 cd "%CHANNELD_PATH%\pkg\unrealpb"
 protoc --go_out=. --go_opt=paths=source_relative -I . *.proto
 
+cd "%CHANNELD_PATH%\pkg\replaypb"
+protoc --go_out=. --go_opt=paths=source_relative -I . -I "%CHANNELD_PATH%\pkg\channeldpb" *.proto
+
 cd "%CHANNELD_PATH%\examples\chat-rooms\chatpb"
 protoc --go_out=. --go_opt=paths=source_relative -I . *.proto
 

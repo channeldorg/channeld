@@ -54,6 +54,14 @@
         "cwd": "${workspaceFolder}",
         "program": "examples/channeld-ue-tps/main.go",
         "args": ["-cfsm=config/client_authoratative_fsm.json", "-dev", "-loglevel=-1", "-profile=cpu", "-ct=0"]
-    }
+    },
+    {
+        "name": "Launch replay session",
+        "type": "go",
+        "request": "launch",
+        "mode": "debug",
+        "program": "examples/replay/main.go",
+        "args": ["-dev", "-loglevel=0", "-profile=cpu", "-ct=1", "-chs=${workspaceFolder}/config/channel_settings_hifi.json"]
+    },
     ]
 }
