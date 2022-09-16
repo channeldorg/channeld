@@ -47,7 +47,7 @@ The fastest way to run the server is with [Docker Compose](https://docs.docker.c
 
 There's a [docker-compose file](docker-compose.yml) set up for running the chat rooms demo. Navigate to the root of the repo and run the command:
 
-`docker-compose up chat -d`
+`docker-compose up chat`
 
 ## 3. The chat rooms demo
 After starting the server, browse to http://localhost:8080.
@@ -70,6 +70,6 @@ Follow these steps if the docker image has not been built for the tanks service 
 
 Running the Unity tanks demo with Docker is similar to running the chat rooms demo. Navigate to the root of the repo and run the command:
 
-`docker-compose up tanks -d`
+`docker-compose up tanks`
 
 Then you can the play the game in Unity Editor. See the [full instruction here](https://github.com/indiest/channeld-unity-mirror#how-to-run-the-tank-demo).

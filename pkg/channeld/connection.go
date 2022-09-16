@@ -5,14 +5,17 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"channeld.clewcat.com/channeld/pkg/fsm"
+	"channeld.clewcat.com/channeld/pkg/replaypb"
 	"github.com/golang/snappy"
 	"github.com/gorilla/websocket"
 	"github.com/xtaci/kcp-go"
@@ -57,6 +60,7 @@ type Connection struct {
 	state           int32 // Don't put the connection state into the FSM as 1) the FSM's states are user-defined. 2) the FSM is not goroutine-safe.
 	connTime        time.Time
 	closeHandlers   []func()
+	replaySession   *replaypb.ReplaySession
 }
 
 var allConnections sync.Map // map[ConnectionId]*Connection
@@ -195,6 +199,7 @@ func generateNextConnId(c net.Conn, maxConnId uint32) {
 	}
 }
 
+// NOT goroutine-safe. NEVER call AddConnection in different goroutines.
 func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 	maxConnId := uint32(1)<<GlobalSettings.MaxConnectionIdBits - 1
 
@@ -226,6 +231,12 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 		state:         ConnectionState_UNAUTHENTICATED,
 		connTime:      time.Now(),
 		closeHandlers: make([]func(), 0),
+	}
+
+	if connection.isPacketRecordingEnabled() {
+		connection.replaySession = &replaypb.ReplaySession{
+			Packets: make([]*replaypb.ReplayPacket, 0, 1024),
+		}
 	}
 
 	// IMPORTANT: always make a value copy
@@ -262,6 +273,10 @@ func (c *Connection) Close() {
 	if c.IsClosing() {
 		c.Logger().Warn("connection is already closed")
 		return
+	}
+
+	if c.isPacketRecordingEnabled() {
+		c.persistReplaySession()
 	}
 
 	for _, handlerFunc := range c.closeHandlers {
@@ -392,12 +407,20 @@ func (c *Connection) receivePacket() {
 		return
 	}
 
+	if c.isPacketRecordingEnabled() {
+		c.recordPacket(&p)
+	}
+
 	for _, mp := range p.Messages {
 		c.receiveMessage(mp)
 	}
 
 	//c.Logger().Debug("received packet", zap.Int("size", packetSize))
 	packetReceived.WithLabelValues(c.connectionType.String()).Inc()
+}
+
+func (c *Connection) isPacketRecordingEnabled() bool {
+	return c.connectionType == channeldpb.ConnectionType_CLIENT && GlobalSettings.EnableRecordPacket
 }
 
 func (c *Connection) receiveMessage(mp *channeldpb.MessagePack) {
@@ -575,4 +598,59 @@ func (c *Connection) String() string {
 
 func (c *Connection) Logger() *Logger {
 	return c.logger
+}
+
+func (c *Connection) recordPacket(p *channeldpb.Packet) {
+
+	recordedPacket := &channeldpb.Packet{
+		Messages: make([]*channeldpb.MessagePack, 0, len(p.Messages)),
+	}
+	proto.Merge(recordedPacket, p)
+
+	c.replaySession.Packets = append(c.replaySession.Packets, &replaypb.ReplayPacket{
+		OffsetTime: time.Now().UnixNano(),
+		Packet:     recordedPacket,
+	})
+}
+
+func (c *Connection) persistReplaySession() {
+
+	var prevPacketTime int64
+	if len(c.replaySession.Packets) > 0 {
+		prevPacketTime = c.replaySession.Packets[0].OffsetTime
+	} else {
+		c.Logger().Error("replay session is empty")
+		return
+	}
+
+	for _, packet := range c.replaySession.Packets {
+		t := packet.OffsetTime
+		packet.OffsetTime -= prevPacketTime
+		prevPacketTime = t
+	}
+
+	data, err := proto.Marshal(c.replaySession)
+	if err != nil {
+		c.Logger().Error("failed to marshal replay session", zap.Error(err))
+		return
+	}
+
+	var dir string
+	if GlobalSettings.ReplaySessionPersistenceDir != "" {
+		dir = GlobalSettings.ReplaySessionPersistenceDir
+	} else {
+		dir = filepath.Join("../../", "record")
+	}
+
+	_, err = os.Stat(dir)
+	if err == nil || !os.IsExist(err) {
+		os.MkdirAll(dir, 0777)
+	}
+
+	path := filepath.Join(dir, fmt.Sprintf("session_%d_%s.cpr", c.id, time.Now().Local().Format("06-01-02_15-04-03")))
+	err = ioutil.WriteFile(path, data, 0777)
+	if err != nil {
+		c.Logger().Error("failed to write replay session to location", zap.Error(err))
+	}
+
 }
