@@ -20,6 +20,46 @@ services:
       "-profile=cpu", 
       "-profilepath=/var/log/channeld", 
       "-ct=1"]
+  tps-channeld:
+    build:
+      context: .
+      dockerfile: examples/channeld-ue-tps/Dockerfile
+    image: channeld/tps-channeld
+    volumes:
+    - channeld-vol:/var/log/channeld
+    depends_on:
+      - grafana
+    ports:
+      - "12108:12108"
+    expose:
+      - "8080"
+      - "11288"
+    entrypoint: [
+      "./app", 
+      "-dev",
+      "-cfsm=../../config/client_authoratative_fsm.json", 
+      "-sfsm=../../config/server_authoratative_fsm.json",
+      "-chs=../../config/channel_settings_hifi.json",
+      "-loglevel=0",
+      "-logfile=/var/log/channeld/{time}.log",
+      # "-profile=cpu", 
+      # "-profilepath=/var/log/channeld", 
+      "-ct=0"]
+  tps-server:
+    image: channeld/tps-server
+    depends_on:
+      - tps-channeld
+    environment:
+      - CHANNELD_ADDR=tps-channeld
+    #entrypoint: ["./ChanneldIntegrationServer.sh", "-server", "-log", "-serverIp", "channeld"]
+  tps-client:
+    image: channeld/tps-client
+    depends_on:
+      - tps-server
+    environment:
+      - CHANNELD_ADDR=tps-channeld
+    # entrypoint: ["./ChanneldIntegration.sh", "127.0.0.1", "-log", "-clientIp", "${CHANNELD_IP}", "-nullrhi"] 
+    scale: 3
   tanks:
     image: channeld/tanks
     depends_on:
@@ -71,7 +111,7 @@ services:
       scrape_configs:
         - job_name: channeld
           static_configs:
-          - targets: ['channeld:8080', 'chat:8080']
+          - targets: ['channeld:8080', 'chat:8080', 'tps-channeld:8080']
       EON
       prometheus --config.file=./prometheus.yml
       EOF'
