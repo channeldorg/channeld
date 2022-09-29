@@ -66,11 +66,13 @@ message CharacterState {
 }
 
 message Character_ServerMovePacked_Params {
-    bytes PackedBits = 1;
+    uint32 bitsNum = 1;
+    bytes packedBits = 2;
 }
 
 message Character_ClientMoveResponsePacked_Params {
-    bytes PackedBits = 1;
+    uint32 bitsNum = 1;
+    bytes packedBits = 2;
 }
 
 message PlayerControllerState {
