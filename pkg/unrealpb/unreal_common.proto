@@ -84,3 +84,40 @@ message PlayerController_ServerUpdateCamera_Params {
     FVector camLoc = 1;
     int32 camPitchAndYaw = 2;
 }
+
+message PlayerController_ClientSetHUD_Params {
+    optional string hudClassName = 1;
+}
+
+message PlayerController_ClientSetViewTarget_Params {
+    UnrealObjectRef actor = 1;
+    float blendTime = 2;
+    uint32 blendFunction = 3;
+    float blendExp = 4;
+    bool bLockOutgoing = 5;
+}
+
+message PlayerController_ClientEnableNetworkVoice_Params {
+    bool bEnable = 1;
+}
+
+message PlayerController_ClientCapBandwidth_Params {
+    int32 cap = 1;
+}
+
+message PlayerController_ClientRestart_Params {
+    UnrealObjectRef pawn = 1;
+}
+
+message PlayerController_ClientSetCameraMode_Params {
+    string newCamMode = 1;
+}
+
+message PlayerController_ClientSetRotation_Params {
+    FVector newRotation = 1;
+    bool bResetCamera = 2;
+}
+
+message PlayerController_ClientRetryClientRestart_Params {
+    UnrealObjectRef pawn = 1;
+}
