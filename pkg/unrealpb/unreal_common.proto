@@ -75,6 +75,29 @@ message Character_ClientMoveResponsePacked_Params {
     bytes packedBits = 2;
 }
 
+message PlayerState {
+    optional float score = 1;
+    optional int32 playerId = 2;
+    optional uint32 ping = 3;
+    optional string playerName = 4;
+}
+
+message ControllerState {
+    // APlayerState is an actor.
+    UnrealObjectRef playerState = 1;
+    UnrealObjectRef pawn = 2;
+}
+
+message Controller_ClientSetLocation_Params {
+    FVector newLocation = 1;
+    FVector newRotation = 2;
+}
+
+message Controller_ClientSetRotation_Params {
+    FVector newRotation = 1;
+    bool bResetCamera = 2;
+}
+
 message PlayerControllerState {
     optional FVector targetViewRotation = 1;
     optional FVector spawnLocation = 2;
@@ -111,11 +134,6 @@ message PlayerController_ClientRestart_Params {
 
 message PlayerController_ClientSetCameraMode_Params {
     string newCamMode = 1;
-}
-
-message PlayerController_ClientSetRotation_Params {
-    FVector newRotation = 1;
-    bool bResetCamera = 2;
 }
 
 message PlayerController_ClientRetryClientRestart_Params {
