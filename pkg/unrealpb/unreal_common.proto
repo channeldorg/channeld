@@ -139,3 +139,10 @@ message PlayerController_ClientSetCameraMode_Params {
 message PlayerController_ClientRetryClientRestart_Params {
     UnrealObjectRef pawn = 1;
 }
+
+message GameStateBase {
+    optional string spectatorClassName = 1;
+    optional string gameModeClassName = 2;
+    optional float replicatedWorldTimeSeconds = 3;
+    optional bool bReplicatedHasBegunPlay = 4;
+}
