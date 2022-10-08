@@ -11,13 +11,20 @@ message FVector {
 }
 
 message UnrealObjectRef {
-    uint32 NetGUID = 1;
+    uint32 netGUID = 1;
+    optional string pathName = 2;
+    optional uint32 outerGUID = 3;
 }
 
 message RemoteFunctionMessage {
     UnrealObjectRef targetObj = 1;
     string functionName = 2;
     bytes paramsPayload = 3;
+}
+
+message ActorComponentState {
+    optional bool bIsActive = 1;
+    optional bool bReplicated = 2;
 }
 
 message SceneComponentState {
@@ -121,7 +128,7 @@ message PlayerController_ClientSetViewTarget_Params {
 }
 
 message PlayerController_ClientEnableNetworkVoice_Params {
-    bool bEnable = 1;
+    optional bool bEnable = 1;
 }
 
 message PlayerController_ClientCapBandwidth_Params {
@@ -138,6 +145,11 @@ message PlayerController_ClientSetCameraMode_Params {
 
 message PlayerController_ClientRetryClientRestart_Params {
     UnrealObjectRef pawn = 1;
+}
+
+message PlayerController_ServerSetSpectatorLocation_Params {
+    FVector newLoc = 1;
+    FVector newRot = 2;
 }
 
 message GameStateBase {
