@@ -12,8 +12,14 @@ message FVector {
 
 message UnrealObjectRef {
     uint32 netGUID = 1;
-    optional string pathName = 2;
-    optional uint32 outerGUID = 3;
+    message GuidCachedObject {
+        uint32 netGUID = 1;
+        string pathName = 2;
+        uint32 outerGUID = 3;
+    }
+    repeated GuidCachedObject context = 2;
+    bytes netGUIDBunch = 3;
+    uint32 bunchBitsNum = 4;
 }
 
 message RemoteFunctionMessage {
@@ -150,6 +156,10 @@ message PlayerController_ClientRetryClientRestart_Params {
 message PlayerController_ServerSetSpectatorLocation_Params {
     FVector newLoc = 1;
     FVector newRot = 2;
+}
+
+message PlayerController_ServerAcknowledgePossession_Params {
+    UnrealObjectRef pawn = 1;
 }
 
 message GameStateBase {
