@@ -9,4 +9,8 @@ option go_package = "channeld.clewcat.com/examples/channeld-ue-tps/tpspb";
 message TestRepChannelData {
     map<uint32, unrealpb.SceneComponentState> sceneComponentStates = 1;
     map<uint32, unrealpb.CharacterState> characterStates = 2;
+    map<uint32, unrealpb.PlayerState> playerStates = 3;
+    map<uint32, unrealpb.ControllerState> controllerStates = 4;
+    map<uint32, unrealpb.PlayerControllerState> playerControllerStates = 5;
+    unrealpb.GameStateBase gameState = 6;
 }

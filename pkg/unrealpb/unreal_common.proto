@@ -89,16 +89,20 @@ message Character_ClientMoveResponsePacked_Params {
 }
 
 message PlayerState {
-    optional float score = 1;
-    optional int32 playerId = 2;
-    optional uint32 ping = 3;
-    optional string playerName = 4;
+    // Marks that the state should be removed from the containing map
+    bool removed = 1;
+    optional float score = 2;
+    optional int32 playerId = 3;
+    optional uint32 ping = 4;
+    optional string playerName = 5;
 }
 
 message ControllerState {
-    // APlayerState is an actor.
-    UnrealObjectRef playerState = 1;
-    UnrealObjectRef pawn = 2;
+     // Marks that the state should be removed from the containing map
+    bool removed = 1;
+   // APlayerState is an actor.
+    UnrealObjectRef playerState = 2;
+    UnrealObjectRef pawn = 3;
 }
 
 message Controller_ClientSetLocation_Params {
@@ -112,8 +116,10 @@ message Controller_ClientSetRotation_Params {
 }
 
 message PlayerControllerState {
-    optional FVector targetViewRotation = 1;
-    optional FVector spawnLocation = 2;
+    // Marks that the state should be removed from the containing map
+    bool removed = 1;
+    optional FVector targetViewRotation = 2;
+    optional FVector spawnLocation = 3;
 }
 
 message PlayerController_ServerUpdateCamera_Params {
@@ -163,8 +169,10 @@ message PlayerController_ServerAcknowledgePossession_Params {
 }
 
 message GameStateBase {
-    optional string spectatorClassName = 1;
-    optional string gameModeClassName = 2;
-    optional float replicatedWorldTimeSeconds = 3;
-    optional bool bReplicatedHasBegunPlay = 4;
+    // Marks that the state should be removed from the containing map
+    bool removed = 1;
+    optional string spectatorClassName = 2;
+    optional string gameModeClassName = 3;
+    optional float replicatedWorldTimeSeconds = 4;
+    optional bool bReplicatedHasBegunPlay = 5;
 }
