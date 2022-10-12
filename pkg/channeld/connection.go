@@ -587,7 +587,10 @@ func (c *Connection) GetConnectionType() channeldpb.ConnectionType {
 }
 
 func (c *Connection) OnAuthenticated() {
-	c.state = ConnectionState_AUTHENTICATED
+	if c.IsClosing() {
+		return
+	}
+	atomic.StoreInt32(&c.state, ConnectionState_AUTHENTICATED)
 	unauthenticatedConnections.Delete(c.id)
 	c.fsm.MoveToNextState()
 }
