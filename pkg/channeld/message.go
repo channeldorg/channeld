@@ -218,6 +218,10 @@ func handleAuth(ctx MessageContext) {
 }
 
 func onAuthComplete(ctx MessageContext, authResult channeldpb.AuthResultMessage_AuthResult) {
+	if ctx.Connection.IsClosing() {
+		return
+	}
+
 	if authResult == channeldpb.AuthResultMessage_SUCCESSFUL {
 		ctx.Connection.OnAuthenticated()
 	}
