@@ -201,6 +201,18 @@ func generateNextConnId(c net.Conn, maxConnId uint32) {
 
 // NOT goroutine-safe. NEVER call AddConnection in different goroutines.
 func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
+	var readerSize int
+	var writerSize int
+	if t == channeldpb.ConnectionType_SERVER {
+		readerSize = GlobalSettings.ServerReadBufferSize
+		writerSize = GlobalSettings.ServerWriteBufferSize
+	} else if t == channeldpb.ConnectionType_CLIENT {
+		readerSize = GlobalSettings.ClientReadBufferSize
+		writerSize = GlobalSettings.ClientWriteBufferSize
+	} else {
+		rootLogger.Panic("invalid connection type", zap.Int32("connType", int32(t)))
+	}
+
 	maxConnId := uint32(1)<<GlobalSettings.MaxConnectionIdBits - 1
 
 	for tries := 0; ; tries++ {
@@ -220,8 +232,8 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 		connectionType:  t,
 		compressionType: channeldpb.CompressionType_NO_COMPRESSION,
 		conn:            c,
-		reader:          bufio.NewReader(c),
-		writer:          bufio.NewWriter(c),
+		reader:          bufio.NewReaderSize(c, readerSize),
+		writer:          bufio.NewWriterSize(c, writerSize),
 		sender:          &queuedMessageSender{},
 		sendQueue:       make(chan MessageContext, 128),
 		logger: &Logger{rootLogger.With(
