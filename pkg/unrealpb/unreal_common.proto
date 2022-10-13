@@ -28,6 +28,19 @@ message RemoteFunctionMessage {
     bytes paramsPayload = 3;
 }
 
+message ActorState {
+    bool removed = 1;
+    optional bool bReplicateMovement = 2;
+    optional uint32 localRole = 3;
+    optional uint32 remoteRole = 4;
+    optional UnrealObjectRef owner = 5;
+    optional bool bHidden = 6;
+    optional bool bTearOff = 7;
+    optional bool bCanBeDamaged = 8;
+    optional UnrealObjectRef instigator = 9;
+    // TODO: AttachmentReplication, ReplicatedMovement
+}
+
 message ActorComponentState {
     optional bool bIsActive = 1;
     optional bool bReplicated = 2;
