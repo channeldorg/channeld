@@ -21,7 +21,14 @@ func OnChatFinished() {
 	log.Printf("desired to received num: %d, global recevied num: %d, global send num: %d, client num: %d", int(desired2ReceivedNum), globalReceiveNum, globalSendNum, ClientNum)
 }
 
+func ChatClientFinishedFunc(c *client.ChanneldClient, data *clientData) {
+	log.Printf("client%d, received num: %d, received self msg num: %d", c.Id, data.ctx["receivedNum"], data.ctx["receivedSelfNum"])
+}
+
 func ChatInitFunc(c *client.ChanneldClient, data *clientData) {
+	data.ctx["receivedNum"] = 0
+	data.ctx["receivedSelfNum"] = 0
+
 	c.AddMessageHandler(uint32(channeldpb.MessageType_CHANNEL_DATA_UPDATE), func(client *client.ChanneldClient, channelId uint32, m client.Message) {
 		msg := m.(*channeldpb.ChannelDataUpdateMessage)
 		chatData := &chatpb.ChatChannelData{}
@@ -32,6 +39,17 @@ func ChatInitFunc(c *client.ChanneldClient, data *clientData) {
 				n--
 			}
 			atomic.AddInt32(&globalReceiveNum, int32(n))
+			data.ctx["receivedNum"] = n
+			sneder := fmt.Sprintf("Client%d", client.Id)
+			receivedSelfMsgNum := 0
+			for _, chatMsg := range chatData.ChatMessages {
+				if chatMsg.Sender == sneder {
+					receivedSelfMsgNum++
+				}
+			}
+			if receivedSelfMsgNum > 0 {
+				data.ctx["receivedSelfNum"] = data.ctx["receivedSelfNum"].(int) + receivedSelfMsgNum
+			}
 		}
 	})
 

@@ -49,7 +49,7 @@ func removeChannelId(client *client.ChanneldClient, data *clientData, channelId 
 	}
 }
 
-func runClient(clientActions []*clientAction, initFunc func(client *client.ChanneldClient, data *clientData)) {
+func runClient(clientActions []*clientAction, initFunc func(client *client.ChanneldClient, data *clientData), finishedFunc func(client *client.ChanneldClient, data *clientData)) {
 	defer wg.Done()
 	c, err := client.NewClient(ServerAddr)
 	log.Println(ServerAddr)
@@ -89,7 +89,7 @@ func runClient(clientActions []*clientAction, initFunc func(client *client.Chann
 					ConnId: resultMsg.ConnId,
 					SubOptions: &channeldpb.ChannelSubscriptionOptions{
 						DataAccess:       channeldpb.ChannelDataAccess_WRITE_ACCESS,
-						FanOutIntervalMs: 10,
+						FanOutIntervalMs: 100,
 						DataFieldMasks:   []string{},
 					},
 				}, nil)
@@ -163,6 +163,10 @@ func runClient(clientActions []*clientAction, initFunc func(client *client.Chann
 		time.Sleep(MaxTickInterval - time.Since(tickStartTime))
 	}
 
+	if finishedFunc != nil {
+		finishedFunc(c, data)
+	}
+
 	if !c.IsConnected() {
 		log.Printf("client %d is disconnected by the server.\n", c.Id)
 	} else {
@@ -187,9 +191,9 @@ func main() {
 	}
 	for i := 0; i < ClientNum; i++ {
 		wg.Add(1)
-		//go runClient(TanksClientActions, TanksInitFunc)
+		//go runClient(TanksClientActions, TanksInitFunc, nil)
 
-		go runClient(ChatClientActions, ChatInitFunc)
+		go runClient(ChatClientActions, ChatInitFunc, ChatClientFinishedFunc)
 		time.Sleep(ConnectInterval)
 	}
 	wg.Wait()
