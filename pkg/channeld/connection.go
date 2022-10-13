@@ -2,7 +2,6 @@ package channeld
 
 import (
 	"bufio"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -24,6 +23,8 @@ import (
 )
 
 type ConnectionId uint32
+
+const MaxPacketSize uint32 = 0x00ffff
 
 //type ConnectionState int32
 
@@ -51,6 +52,8 @@ type Connection struct {
 	connectionType  channeldpb.ConnectionType
 	compressionType channeldpb.CompressionType
 	conn            net.Conn
+	readBuffer      []byte
+	readPos         int
 	reader          *bufio.Reader
 	writer          *bufio.Writer
 	sender          MessageSender
@@ -232,6 +235,8 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 		connectionType:  t,
 		compressionType: channeldpb.CompressionType_NO_COMPRESSION,
 		conn:            c,
+		readBuffer:      make([]byte, MaxPacketSize),
+		readPos:         0,
 		reader:          bufio.NewReaderSize(c, readerSize),
 		writer:          bufio.NewWriterSize(c, writerSize),
 		sender:          &queuedMessageSender{},
@@ -316,9 +321,12 @@ func (e *closeError) Error() string {
 	return e.source.Error()
 }
 
-func readBytes(c *Connection, len uint) ([]byte, error) {
-	bytes := make([]byte, len)
-	if _, err := io.ReadFull(c.reader, bytes); err != nil {
+func (c *Connection) receivePacket() {
+	// TODO: use a per-connection buffer instead of allocating it in every receive()
+	// FIXME: read all bytes once into a buffer
+	readPtr := c.readBuffer[c.readPos:]
+	bytesRead, err := c.conn.Read(readPtr)
+	if err != nil {
 		switch err := err.(type) {
 		case *net.OpError:
 			c.Logger().Warn("read bytes",
@@ -326,55 +334,34 @@ func readBytes(c *Connection, len uint) ([]byte, error) {
 				zap.String("remoteAddr", c.conn.RemoteAddr().String()),
 				zap.Error(err),
 			)
-			c.Close()
-			return nil, &closeError{err}
 		case *websocket.CloseError:
 			c.Logger().Info("disconnected",
 				zap.String("remoteAddr", c.conn.RemoteAddr().String()),
 			)
-			c.Close()
-			return nil, &closeError{err}
 		}
 
 		if err == io.EOF {
 			c.Logger().Info("disconnected",
 				zap.String("remoteAddr", c.conn.RemoteAddr().String()),
 			)
-			c.Close()
-			return nil, &closeError{err}
 		}
-		return nil, err
-	}
-	return bytes, nil
-}
-
-func _(c *Connection) (uint32, error) {
-	bytes, err := readBytes(c, 4)
-	if err != nil {
-		return 0, err
-	} else {
-		return binary.BigEndian.Uint32(bytes), nil
-	}
-}
-
-func (c *Connection) receivePacket() {
-	// TODO: use a per-connection buffer instead of allocating it in every receive()
-	// FIXME: read all bytes once into a buffer
-	tag, err := readBytes(c, 5)
-	if err != nil {
+		c.Close()
 		return
 	}
+
+	c.readPos += bytesRead
+	if c.readPos < 5 {
+		// Unfinished header
+		return
+	}
+
+	tag := c.readBuffer[:5]
 	if tag[0] != 67 {
+		c.readPos = 0
 		c.Logger().Warn("invalid tag, the packet will be dropped",
 			zap.ByteString("tag", tag),
 			zap.Error(err),
 		)
-		_, isClosed := err.(*closeError)
-		if !isClosed {
-			// Drop the packet. Avoid the allocation.
-			//ioutil.ReadAll(c.reader)
-			io.Copy(io.Discard, c.reader)
-		}
 		return
 	}
 
@@ -385,13 +372,15 @@ func (c *Connection) receivePacket() {
 		packetSize = packetSize | int(tag[2])<<8
 	}
 
-	bytes := make([]byte, packetSize)
-	if _, err := io.ReadFull(c.reader, bytes); err != nil {
-		c.Logger().Error("reading packet", zap.Error(err))
+	fullSize := 5 + packetSize
+	if c.readPos < fullSize {
+		// Unfinished packet
 		return
 	}
 
-	bytesReceived.WithLabelValues(c.connectionType.String()).Add(float64(packetSize + 4))
+	bytes := c.readBuffer[5:fullSize]
+
+	bytesReceived.WithLabelValues(c.connectionType.String()).Add(float64(fullSize))
 
 	// Apply the decompression from the 5th byte in the header
 	ct := tag[4]
@@ -426,6 +415,9 @@ func (c *Connection) receivePacket() {
 	for _, mp := range p.Messages {
 		c.receiveMessage(mp)
 	}
+
+	// Reset read position
+	c.readPos = 0
 
 	//c.Logger().Debug("received packet", zap.Int("size", packetSize))
 	packetReceived.WithLabelValues(c.connectionType.String()).Inc()
@@ -574,13 +566,20 @@ func (c *Connection) flush() {
 	/* Avoid writing multple times. With WebSocket, every Write() sends a message.
 	writer.Write(tag)
 	*/
-	_, err = c.writer.Write(append(tag, bytes...))
+	bytes = append(tag, bytes...)
+	/*
+		_, err = c.writer.Write(bytes)
+		if err != nil {
+			c.Logger().Error("error writing packet", zap.Error(err))
+			return
+		}
+
+		c.writer.Flush()
+	*/
+	len, err = c.conn.Write(bytes)
 	if err != nil {
 		c.Logger().Error("error writing packet", zap.Error(err))
-		return
 	}
-
-	c.writer.Flush()
 
 	packetSent.WithLabelValues(c.connectionType.String()).Inc()
 	bytesSent.WithLabelValues(c.connectionType.String()).Add(float64(len))

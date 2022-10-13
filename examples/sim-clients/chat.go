@@ -14,7 +14,7 @@ import (
 var ChatClientActions = []*clientAction{
 	{
 		name:        "listChannel",
-		probability: 1,
+		probability: 0,                        //1,
 		minInterval: time.Millisecond * 20000, //2000
 		perform: func(c *client.ChanneldClient, data *clientData) bool {
 			c.Send(0, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_LIST_CHANNEL), &channeldpb.ListChannelMessage{}, nil)
@@ -23,7 +23,7 @@ var ChatClientActions = []*clientAction{
 	},
 	{
 		name:        "createChannel",
-		probability: 0.05,
+		probability: 0, //0.05,
 		minInterval: time.Millisecond * 10000,
 		perform: func(c *client.ChanneldClient, data *clientData) bool {
 			if len(c.ListedChannels) >= MaxChannelNum {
@@ -67,7 +67,7 @@ var ChatClientActions = []*clientAction{
 	},
 	{
 		name:        "subToChannel",
-		probability: 0.1,
+		probability: 0, //0.1,
 		minInterval: time.Millisecond * 3000,
 		perform: func(client *client.ChanneldClient, data *clientData) bool {
 			if list := client.ListedChannels; len(list) > 1 {
@@ -98,7 +98,7 @@ var ChatClientActions = []*clientAction{
 	},
 	{
 		name:        "unsubToChannel",
-		probability: 0.1,
+		probability: 0, //0.1,
 		minInterval: time.Millisecond * 3000,
 		perform: func(client *client.ChanneldClient, data *clientData) bool {
 			if len(client.SubscribedChannels) <= 1 {
