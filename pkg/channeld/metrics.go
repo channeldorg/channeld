@@ -43,6 +43,14 @@ var packetSent = prometheus.NewCounterVec(
 	[]string{"connType"},
 )
 
+var packetDropped = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "packets_drop",
+		Help: "Dropped packets",
+	},
+	[]string{"connType"},
+)
+
 var fragmentedPacketCount = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "packets_frag",
@@ -105,6 +113,7 @@ func InitMetrics() {
 	prometheus.MustRegister(msgSent)
 	prometheus.MustRegister(packetReceived)
 	prometheus.MustRegister(packetSent)
+	prometheus.MustRegister(packetDropped)
 	prometheus.MustRegister(fragmentedPacketCount)
 	prometheus.MustRegister(combinedPacketCount)
 	prometheus.MustRegister(bytesReceived)

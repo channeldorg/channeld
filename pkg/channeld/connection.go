@@ -435,6 +435,7 @@ func (c *Connection) readPacket(bufPos *int) *channeldpb.Packet {
 	tag := c.readBuffer[*bufPos : *bufPos+5]
 	if tag[0] != 67 {
 		c.readPos = 0
+		packetDropped.WithLabelValues(c.connectionType.String()).Inc()
 		c.Logger().Warn("invalid tag, the packet will be dropped",
 			zap.ByteString("tag", tag),
 		)
@@ -450,6 +451,7 @@ func (c *Connection) readPacket(bufPos *int) *channeldpb.Packet {
 
 	if packetSize > int(MaxPacketSize) {
 		c.readPos = 0
+		packetDropped.WithLabelValues(c.connectionType.String()).Inc()
 		c.Logger().Warn("packet size exceeds the limit, the packet will be dropped", zap.Int("packetSize", packetSize))
 		return nil
 	}
@@ -463,6 +465,7 @@ func (c *Connection) readPacket(bufPos *int) *channeldpb.Packet {
 
 	if *bufPos+fullSize >= len(c.readBuffer) {
 		c.readPos = 0
+		packetDropped.WithLabelValues(c.connectionType.String()).Inc()
 		c.Logger().Warn("packet size exceeds the read buffer, the packet will be dropped", zap.Int("packetSize", packetSize))
 		return nil
 	}
