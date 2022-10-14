@@ -22,7 +22,7 @@ func OnChatFinished() {
 }
 
 func ChatClientFinishedFunc(c *client.ChanneldClient, data *clientData) {
-	log.Printf("client%d, received num: %d, received self msg num: %d", c.Id, data.ctx["receivedNum"], data.ctx["receivedSelfNum"])
+	log.Printf("client%d, received num: %d, send num: %d, received self msg num: %d", c.Id, data.ctx["receivedNum"], data.ctx["sendNum"], data.ctx["receivedSelfNum"])
 }
 
 func ChatInitFunc(c *client.ChanneldClient, data *clientData) {
@@ -39,7 +39,7 @@ func ChatInitFunc(c *client.ChanneldClient, data *clientData) {
 				n--
 			}
 			atomic.AddInt32(&globalReceiveNum, int32(n))
-			data.ctx["receivedNum"] = n
+			data.ctx["receivedNum"] = data.ctx["receivedNum"].(int) + n
 			sneder := fmt.Sprintf("Client%d", client.Id)
 			receivedSelfMsgNum := 0
 			for _, chatMsg := range chatData.ChatMessages {
@@ -167,13 +167,13 @@ var ChatClientActions = []*clientAction{
 		probability: 1,
 		minInterval: time.Millisecond * 1000,
 		perform: func(client *client.ChanneldClient, data *clientData) bool {
-			inum, exists := data.ctx["num"]
+			inum, exists := data.ctx["sendNum"]
 			var num int = 0
 			if exists {
 				num = inum.(int)
 			}
 			num++
-			data.ctx["num"] = num
+			data.ctx["sendNum"] = num
 			atomic.AddInt32(&globalSendNum, 1)
 			content := fmt.Sprintf("{\"clientSendNum\": %d, \"globalSendNum\": %d, \"globalReceiveNum\": %d}", num, globalSendNum, globalReceiveNum)
 			// content := fmt.Sprintf("Client send message, sent num: %d, global send num: %d", num, globalSendNum)
