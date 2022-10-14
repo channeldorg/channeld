@@ -30,11 +30,11 @@ type ChannelId uint32
 type ChannelTime int64 // time.Duration
 
 func (t ChannelTime) AddMs(ms uint32) ChannelTime {
-	return t + ChannelTime(ms*uint32(time.Millisecond))
+	return t + ChannelTime(time.Duration(ms)*time.Millisecond)
 }
 
 func (t ChannelTime) OffsetMs(ms int32) ChannelTime {
-	return t + ChannelTime(ms*int32(time.Millisecond))
+	return t + ChannelTime(time.Duration(ms)*time.Millisecond)
 }
 
 type channelMessage struct {
@@ -214,13 +214,14 @@ func (ch *Channel) PutMessage(msg Message, handler MessageHandlerFunc, conn *Con
 		return
 	}
 	ch.inMsgQueue <- channelMessage{ctx: MessageContext{
-		MsgType:    channeldpb.MessageType(pack.MsgType),
-		Msg:        msg,
-		Connection: conn,
-		Channel:    ch,
-		Broadcast:  pack.Broadcast,
-		StubId:     pack.StubId,
-		ChannelId:  pack.ChannelId,
+		MsgType:     channeldpb.MessageType(pack.MsgType),
+		Msg:         msg,
+		Connection:  conn,
+		Channel:     ch,
+		Broadcast:   pack.Broadcast,
+		StubId:      pack.StubId,
+		ChannelId:   pack.ChannelId,
+		arrivalTime: ch.GetTime(),
 	}, handler: handler}
 }
 
