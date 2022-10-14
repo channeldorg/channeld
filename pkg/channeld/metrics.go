@@ -4,6 +4,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+var logNum = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "logs",
+		Help: "Number of logs",
+	},
+	[]string{"level"},
+)
+
 var msgReceived = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "messages_in",
@@ -92,6 +100,7 @@ var channelTickDuration = prometheus.NewGaugeVec(
 )
 
 func InitMetrics() {
+	prometheus.MustRegister(logNum)
 	prometheus.MustRegister(msgReceived)
 	prometheus.MustRegister(msgSent)
 	prometheus.MustRegister(packetReceived)
