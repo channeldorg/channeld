@@ -136,14 +136,14 @@ func (s *GlobalSettingsType) ParseFlag() error {
 
 	flag.StringVar(&s.ServerNetwork, "sn", "tcp", "the network type for the server connections")
 	flag.StringVar(&s.ServerAddress, "sa", ":11288", "the network address for the server connections")
-	flag.IntVar(&s.ServerReadBufferSize, "srb", 1024, "the read buffer size for the server connections")
+	flag.IntVar(&s.ServerReadBufferSize, "srb", 0x0001ffff, "the read buffer size for the server connections")
 	flag.IntVar(&s.ServerWriteBufferSize, "swb", 256, "the write buffer size for the server connections")
 	flag.StringVar(&s.ServerFSM, "sfsm", "config/server_authoratative_fsm.json", "the path to the server FSM config")
 	flag.BoolVar(&s.ServerBypassAuth, "sba", true, "should server bypasses the authentication?")
 
 	flag.StringVar(&s.ClientNetwork, "cn", "tcp", "the network type for the client connections")
 	flag.StringVar(&s.ClientAddress, "ca", ":12108", "the network address for the client connections")
-	flag.IntVar(&s.ClientReadBufferSize, "crb", 256, "the read buffer size for the client connections")
+	flag.IntVar(&s.ClientReadBufferSize, "crb", 0x0001ffff, "the read buffer size for the client connections")
 	flag.IntVar(&s.ClientWriteBufferSize, "cwb", 512, "the write buffer size for the client connections")
 	flag.StringVar(&s.ClientFSM, "cfsm", "config/client_non_authoratative_fsm.json", "the path to the client FSM config")
 

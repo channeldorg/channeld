@@ -76,7 +76,7 @@ func main() {
 			{Sender: "System", SendTime: time.Now().Unix(), Content: "Welcome!"},
 		}},
 		&channeldpb.ChannelDataMergeOptions{
-			ListSizeLimit: 10,
+			ListSizeLimit: 100,
 			TruncateTop:   true,
 		},
 	)
