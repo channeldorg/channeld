@@ -52,5 +52,13 @@ func InitLogs() {
 	}
 	zapLogger, _ := cfg.Build()
 	rootLogger = &Logger{zapLogger}
+
+	zap.Hooks(func(e zapcore.Entry) error {
+		if e.Level >= zapcore.WarnLevel {
+			logNum.WithLabelValues(e.Level.String()).Inc()
+		}
+		return nil
+	})
+
 	defer rootLogger.Sync()
 }

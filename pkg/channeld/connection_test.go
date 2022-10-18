@@ -30,7 +30,7 @@ func TestDropPacket(t *testing.T) {
 
 	go func() {
 		for {
-			c.receivePacket()
+			c.receive()
 		}
 	}()
 

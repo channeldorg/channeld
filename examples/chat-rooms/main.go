@@ -76,12 +76,13 @@ func main() {
 			{Sender: "System", SendTime: time.Now().Unix(), Content: "Welcome!"},
 		}},
 		&channeldpb.ChannelDataMergeOptions{
-			ListSizeLimit: 10,
+			ListSizeLimit: 100,
 			TruncateTop:   true,
 		},
 	)
 	//channeld.SetWebSocketTrustedOrigins(["localhost"])
 	go channeld.StartListening(channeldpb.ConnectionType_CLIENT, "ws", *wsAddr)
+	//go channeld.StartListening(channeldpb.ConnectionType_CLIENT, channeld.GlobalSettings.ClientNetwork, channeld.GlobalSettings.ClientAddress)
 
 	log.Fatal(http.ListenAndServe(*webAddr, nil))
 
