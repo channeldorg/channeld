@@ -12,14 +12,16 @@ import (
 )
 
 var ServerAddr string = "ws://localhost:12108" //"49.234.9.192:12108" //"ws://49.234.9.192:12108"
+// var ServerAddr string = "ws://47.103.146.108:12108"
 
 const (
-	ClientNum                int           = 500
-	MaxChannelNum            int           = 100
-	RunDuration              time.Duration = 120 * time.Second
-	ConnectInterval          time.Duration = 100 * time.Millisecond
+	ClientNum                int           = 8
+	MaxChannelNum            int           = 1
+	RunDuration              time.Duration = 30 * time.Second
+	CoolDownDuration         time.Duration = 5 * time.Second
+	ConnectInterval          time.Duration = 0 * time.Millisecond
 	MaxTickInterval          time.Duration = 100 * time.Millisecond
-	ActionIntervalMultiplier float64       = 0.2
+	ActionIntervalMultiplier float64       = 1
 	SubToGlobalAfterAuth     bool          = true
 )
 
@@ -47,9 +49,10 @@ func removeChannelId(client *client.ChanneldClient, data *clientData, channelId 
 	}
 }
 
-func runClient(clientActions []*clientAction, initFunc func(client *client.ChanneldClient, data *clientData)) {
+func runClient(clientActions []*clientAction, initFunc func(client *client.ChanneldClient, data *clientData), finishedFunc func(client *client.ChanneldClient, data *clientData)) {
 	defer wg.Done()
 	c, err := client.NewClient(ServerAddr)
+	log.Println(ServerAddr)
 	if err != nil {
 		log.Println(err)
 		return
@@ -86,7 +89,7 @@ func runClient(clientActions []*clientAction, initFunc func(client *client.Chann
 					ConnId: resultMsg.ConnId,
 					SubOptions: &channeldpb.ChannelSubscriptionOptions{
 						DataAccess:       channeldpb.ChannelDataAccess_WRITE_ACCESS,
-						FanOutIntervalMs: 10,
+						FanOutIntervalMs: 100,
 						DataFieldMasks:   []string{},
 					},
 				}, nil)
@@ -114,13 +117,14 @@ func runClient(clientActions []*clientAction, initFunc func(client *client.Chann
 	}
 
 	actionInstances := map[*clientAction]*struct{ time.Time }{}
-	for t := time.Now(); time.Since(t) < RunDuration && c.IsConnected(); {
+	limitedRuntime := RunDuration + CoolDownDuration
+	for t := time.Now(); time.Since(t) < limitedRuntime && c.IsConnected(); {
 		tickStartTime := time.Now()
 
 		c.Tick()
 
-		// Authenticated
-		if c.Id > 0 {
+		// Authenticated and not cooldown
+		if c.Id > 0 && time.Since(t) <= RunDuration {
 			var actionToPerform *clientAction
 			actions := make([]*clientAction, 0)
 			var probSum float32 = 0
@@ -159,6 +163,10 @@ func runClient(clientActions []*clientAction, initFunc func(client *client.Chann
 		time.Sleep(MaxTickInterval - time.Since(tickStartTime))
 	}
 
+	if finishedFunc != nil {
+		finishedFunc(c, data)
+	}
+
 	if !c.IsConnected() {
 		log.Printf("client %d is disconnected by the server.\n", c.Id)
 	} else {
@@ -183,10 +191,11 @@ func main() {
 	}
 	for i := 0; i < ClientNum; i++ {
 		wg.Add(1)
-		//go runClient(TanksClientActions, TanksInitFunc)
-		go runClient(ChatClientActions, nil)
+		//go runClient(TanksClientActions, TanksInitFunc, nil)
+
+		go runClient(ChatClientActions, ChatInitFunc, ChatClientFinishedFunc)
 		time.Sleep(ConnectInterval)
 	}
-
 	wg.Wait()
+	OnChatFinished()
 }

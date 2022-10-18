@@ -156,13 +156,23 @@ window.addEventListener("load", function(evt) {
         appendLog("User" + msg.connId + " left channel " + channelId);
     };
 
+    var receivedNum = 0
     var handleChannelDataUpdate = function(msg, channelId) {
         if (channelId != curChannelId)
             return;
-
         var chatChannelData = unmarshalAny(msg.data);
         for (const textMsg of chatChannelData.chatMessages) {
-            appendMessage("[" + new Date(textMsg.sendTime).toLocaleTimeString() + "]" + textMsg.sender + ": " + textMsg.content);
+            let content
+            try {
+                content = JSON.parse(textMsg.content)
+                receivedNum++
+            } catch {
+                content = {
+                    globalSendNum: NaN
+                }
+            }
+            msgCountInfo = `[received num: ${receivedNum}, global send num: ${content.globalSendNum}, send - received: ${content.globalSendNum - receivedNum}]`
+            appendMessage("[" + new Date(textMsg.sendTime).toLocaleTimeString() + "]" + msgCountInfo + textMsg.sender + ": " + textMsg.content);
         }
     };
 
