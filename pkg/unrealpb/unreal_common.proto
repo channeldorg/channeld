@@ -28,6 +28,10 @@ message RemoteFunctionMessage {
     bytes paramsPayload = 3;
 }
 
+message SpawnObjectMessage {
+    UnrealObjectRef obj = 1;
+}
+
 message ActorState {
     bool removed = 1;
     optional bool bReplicateMovement = 2;

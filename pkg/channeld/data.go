@@ -150,6 +150,11 @@ func (ch *Channel) tickData(t ChannelTime) {
 				foc.hadFirstFanOut = true
 				// Use a hacky way to prevent the first update msg being fanned out twice (only happens when the channel doesn't have init data)
 				//t++
+				// rootLogger.Info("conn first fan out",
+				// 	zap.Uint32("connId", uint32(foc.conn.Id())),
+				// 	zap.Int64("channelTime", int64(t)),
+				// 	zap.Int64("nextFanOutTime", int64(nextFanOutTime)),
+				// )
 			} else if bufp != nil {
 				if foc.lastFanOutTime >= lastUpdateTime {
 					lastUpdateTime = foc.lastFanOutTime
