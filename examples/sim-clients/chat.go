@@ -182,7 +182,7 @@ var ChatClientActions = []*clientAction{
 			dataUpdate, _ := anypb.New(&chatpb.ChatChannelData{
 				ChatMessages: []*chatpb.ChatMessage{{
 					Sender:   fmt.Sprintf("Client%d", client.Id),
-					SendTime: time.Now().Unix(),
+					SendTime: time.Now().UnixMilli(),
 					Content:  content,
 				}},
 			})

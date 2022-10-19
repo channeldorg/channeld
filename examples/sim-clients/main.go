@@ -18,7 +18,7 @@ const (
 	ClientNum                int           = 8
 	MaxChannelNum            int           = 1
 	RunDuration              time.Duration = 30 * time.Second
-	CoolDownDuration         time.Duration = 5 * time.Second
+	CooldownDuration         time.Duration = 5 * time.Second
 	ConnectInterval          time.Duration = 0 * time.Millisecond
 	MaxTickInterval          time.Duration = 100 * time.Millisecond
 	ActionIntervalMultiplier float64       = 1
@@ -117,7 +117,7 @@ func runClient(clientActions []*clientAction, initFunc func(client *client.Chann
 	}
 
 	actionInstances := map[*clientAction]*struct{ time.Time }{}
-	limitedRuntime := RunDuration + CoolDownDuration
+	limitedRuntime := RunDuration + CooldownDuration
 	for t := time.Now(); time.Since(t) < limitedRuntime && c.IsConnected(); {
 		tickStartTime := time.Now()
 
