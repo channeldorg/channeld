@@ -11,20 +11,20 @@ message FVector {
 }
 
 message UnrealObjectRef {
-    uint32 netGUID = 1;
+    optional uint32 netGUID = 1;
     message GuidCachedObject {
         uint32 netGUID = 1;
         string pathName = 2;
         uint32 outerGUID = 3;
     }
     repeated GuidCachedObject context = 2;
-    bytes netGUIDBunch = 3;
-    uint32 bunchBitsNum = 4;
+    optional bytes netGUIDBunch = 3;
+    optional uint32 bunchBitsNum = 4;
 }
 
 message ActorComponentRef {
-    UnrealObjectRef owner = 1;
-    string compName = 2;
+    optional UnrealObjectRef owner = 1;
+    optional string compName = 2;
 }
 
 message RemoteFunctionMessage {
