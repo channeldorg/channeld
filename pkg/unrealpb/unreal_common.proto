@@ -22,6 +22,11 @@ message UnrealObjectRef {
     uint32 bunchBitsNum = 4;
 }
 
+message ActorComponentRef {
+    UnrealObjectRef owner = 1;
+    string compName = 2;
+}
+
 message RemoteFunctionMessage {
     UnrealObjectRef targetObj = 1;
     string functionName = 2;
@@ -30,18 +35,20 @@ message RemoteFunctionMessage {
 
 message SpawnObjectMessage {
     UnrealObjectRef obj = 1;
+    optional uint32 localRole = 2;
 }
 
 message ActorState {
     bool removed = 1;
-    optional bool bReplicateMovement = 2;
-    optional uint32 localRole = 3;
-    optional uint32 remoteRole = 4;
-    optional UnrealObjectRef owner = 5;
-    optional bool bHidden = 6;
-    optional bool bTearOff = 7;
-    optional bool bCanBeDamaged = 8;
-    optional UnrealObjectRef instigator = 9;
+    optional uint32 owningConnId = 2;
+    optional bool bReplicateMovement = 3;
+    optional uint32 localRole = 4;
+    optional uint32 remoteRole = 5;
+    optional UnrealObjectRef owner = 6;
+    optional bool bHidden = 7;
+    optional bool bTearOff = 8;
+    optional bool bCanBeDamaged = 9;
+    optional UnrealObjectRef instigator = 10;
     // TODO: AttachmentReplication, ReplicatedMovement
 }
 
@@ -73,7 +80,7 @@ message RootMotionMontage {
 }
 
 message BasedMovementInfo {
-    optional UnrealObjectRef movementBase = 1;
+    optional ActorComponentRef movementBase = 1;
     optional string boneName = 2;
     optional FVector location = 3;
     optional FVector rotation = 4;
