@@ -4,10 +4,12 @@ package unrealpb;
 
 option go_package = "channeld.clewcat.com/channeld/pkg/unrealpb";
 
+// Maps to UE's FVector AND FRotator struct.
+// For FRotator, x = pitch, y = yaw, z = roll
 message FVector {
-    float x = 1;
-    float y = 2;
-    float z = 3;
+    optional float x = 1;
+    optional float y = 2;
+    optional float z = 3;
 }
 
 message UnrealObjectRef {
@@ -38,6 +40,15 @@ message SpawnObjectMessage {
     optional uint32 localRole = 2;
 }
 
+message RepMovement {
+    optional FVector linearVelocity = 1;
+    optional FVector angularVelocity = 2;
+    optional FVector location = 3;
+    optional FVector rotation = 4;
+    optional bool bSimulatedPhysicSleep = 5;
+    optional bool bRepPhysics = 6;
+}
+
 message ActorState {
     bool removed = 1;
     optional uint32 owningConnId = 2;
@@ -49,7 +60,8 @@ message ActorState {
     optional bool bTearOff = 8;
     optional bool bCanBeDamaged = 9;
     optional UnrealObjectRef instigator = 10;
-    // TODO: AttachmentReplication, ReplicatedMovement
+    optional RepMovement replicatedMovement = 11;
+    // TODO: AttachmentReplication
 }
 
 message ActorComponentState {
