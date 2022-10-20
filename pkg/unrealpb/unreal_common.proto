@@ -40,13 +40,22 @@ message SpawnObjectMessage {
     optional uint32 localRole = 2;
 }
 
-message RepMovement {
+message FRepMovement {
     optional FVector linearVelocity = 1;
     optional FVector angularVelocity = 2;
     optional FVector location = 3;
     optional FVector rotation = 4;
     optional bool bSimulatedPhysicSleep = 5;
     optional bool bRepPhysics = 6;
+}
+
+message FRepAttachment {
+    UnrealObjectRef attachParent = 1;
+    FVector locationOffset = 2;
+    FVector relativeScale = 3;
+    FVector rotationOffset = 4;
+    string attachSocket = 5;
+    ActorComponentRef attachComponent = 6;
 }
 
 message ActorState {
@@ -60,8 +69,8 @@ message ActorState {
     optional bool bTearOff = 8;
     optional bool bCanBeDamaged = 9;
     optional UnrealObjectRef instigator = 10;
-    optional RepMovement replicatedMovement = 11;
-    // TODO: AttachmentReplication
+    optional FRepMovement replicatedMovement = 11;
+    optional FRepAttachment attachmentReplication = 12;
 }
 
 message ActorComponentState {
