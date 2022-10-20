@@ -149,7 +149,7 @@ func (ch *Channel) tickData(t ChannelTime) {
 				ch.fanOutDataUpdate(conn, cs, ch.data.msg)
 				foc.hadFirstFanOut = true
 				// Use a hacky way to prevent the first update msg being fanned out twice (only happens when the channel doesn't have init data)
-				t++
+				//t++
 				// rootLogger.Info("conn first fan out",
 				// 	zap.Uint32("connId", uint32(foc.conn.Id())),
 				// 	zap.Int64("channelTime", int64(t)),
@@ -163,6 +163,12 @@ func (ch *Channel) tickData(t ChannelTime) {
 				//for be := bufp.Value.(*updateMsgBufferElement); bufp != nil && be.arrivalTime >= lastUpdateTime && be.arrivalTime <= nextFanOutTime; bufp = bufp.Next() {
 				for bufi := 0; bufi < ch.data.updateMsgBuffer.Len(); bufi++ {
 					be := bufp.Value.(*updateMsgBufferElement)
+					ch.Logger().Trace("going through updateMsgBuffer",
+						zap.Int("bufi", bufi),
+						zap.Int64("lastUpdateTime", int64(lastUpdateTime)/1000),
+						zap.Int64("arrivalTime", int64(be.arrivalTime)/1000),
+						zap.Int64("nextFanOutTime", int64(nextFanOutTime)/1000),
+					)
 					if be.arrivalTime >= lastUpdateTime && be.arrivalTime <= nextFanOutTime {
 						if accumulatedUpdateMsg == nil {
 							accumulatedUpdateMsg = proto.Clone(be.updateMsg)
@@ -212,6 +218,11 @@ func (ch *Channel) fanOutDataUpdate(conn ConnectionInChannel, cs *ChannelSubscri
 		StubId:     0,
 		ChannelId:  uint32(ch.id),
 	})
+	conn.Logger().Trace("fan out",
+		zap.Int64("channelTime", int64(ch.GetTime())),
+		zap.Int64("lastFanOutTime", int64(cs.fanOutElement.Value.(*fanOutConnection).lastFanOutTime)),
+		zap.Stringer("updateMsg", updateMsg.(fmt.Stringer)),
+	)
 	// cs.lastFanOutTime = time.Now()
 	// cs.fanOutDataMsg = nil
 }

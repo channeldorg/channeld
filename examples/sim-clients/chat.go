@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
+	"log"
+	"sync/atomic"
 	"time"
 
 	"channeld.clewcat.com/channeld/examples/chat-rooms/chatpb"
@@ -11,10 +12,54 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
+var globalSendNum int32 = 0
+var globalReceiveNum int32 = 0
+
+func OnChatFinished() {
+	desired2ReceivedNum := float32(ClientNum) * float32(globalSendNum)
+	log.Printf("loss ratio: %f percent", (desired2ReceivedNum-float32(globalReceiveNum))/desired2ReceivedNum*100)
+	log.Printf("desired to received num: %d, global recevied num: %d, global send num: %d, client num: %d", int(desired2ReceivedNum), globalReceiveNum, globalSendNum, ClientNum)
+}
+
+func ChatClientFinishedFunc(c *client.ChanneldClient, data *clientData) {
+	log.Printf("client%d, received num: %d, send num: %d, received self msg num: %d", c.Id, data.ctx["receivedNum"], data.ctx["sendNum"], data.ctx["receivedSelfNum"])
+}
+
+func ChatInitFunc(c *client.ChanneldClient, data *clientData) {
+	data.ctx["receivedNum"] = 0
+	data.ctx["receivedSelfNum"] = 0
+
+	c.AddMessageHandler(uint32(channeldpb.MessageType_CHANNEL_DATA_UPDATE), func(client *client.ChanneldClient, channelId uint32, m client.Message) {
+		msg := m.(*channeldpb.ChannelDataUpdateMessage)
+		chatData := &chatpb.ChatChannelData{}
+		msg.Data.UnmarshalTo(chatData)
+		if len(chatData.ChatMessages) > 0 {
+			n := len(chatData.ChatMessages)
+			if chatData.ChatMessages[0].Sender == "System" {
+				n--
+			}
+			atomic.AddInt32(&globalReceiveNum, int32(n))
+			data.ctx["receivedNum"] = data.ctx["receivedNum"].(int) + n
+			sneder := fmt.Sprintf("Client%d", client.Id)
+			receivedSelfMsgNum := 0
+			for _, chatMsg := range chatData.ChatMessages {
+				if chatMsg.Sender == sneder {
+					receivedSelfMsgNum++
+				}
+			}
+			if receivedSelfMsgNum > 0 {
+				data.ctx["receivedSelfNum"] = data.ctx["receivedSelfNum"].(int) + receivedSelfMsgNum
+			}
+		}
+	})
+
+	time.Sleep(2 * time.Second)
+}
+
 var ChatClientActions = []*clientAction{
 	{
 		name:        "listChannel",
-		probability: 1,
+		probability: 0,                        //1,
 		minInterval: time.Millisecond * 20000, //2000
 		perform: func(c *client.ChanneldClient, data *clientData) bool {
 			c.Send(0, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_LIST_CHANNEL), &channeldpb.ListChannelMessage{}, nil)
@@ -23,7 +68,7 @@ var ChatClientActions = []*clientAction{
 	},
 	{
 		name:        "createChannel",
-		probability: 0.05,
+		probability: 0, //0.05,
 		minInterval: time.Millisecond * 10000,
 		perform: func(c *client.ChanneldClient, data *clientData) bool {
 			if len(c.ListedChannels) >= MaxChannelNum {
@@ -67,7 +112,7 @@ var ChatClientActions = []*clientAction{
 	},
 	{
 		name:        "subToChannel",
-		probability: 0.1,
+		probability: 0, //0.1,
 		minInterval: time.Millisecond * 3000,
 		perform: func(client *client.ChanneldClient, data *clientData) bool {
 			if list := client.ListedChannels; len(list) > 1 {
@@ -98,7 +143,7 @@ var ChatClientActions = []*clientAction{
 	},
 	{
 		name:        "unsubToChannel",
-		probability: 0.1,
+		probability: 0, //0.1,
 		minInterval: time.Millisecond * 3000,
 		perform: func(client *client.ChanneldClient, data *clientData) bool {
 			if len(client.SubscribedChannels) <= 1 {
@@ -122,13 +167,26 @@ var ChatClientActions = []*clientAction{
 		probability: 1,
 		minInterval: time.Millisecond * 1000,
 		perform: func(client *client.ChanneldClient, data *clientData) bool {
+			inum, exists := data.ctx["sendNum"]
+			var num int = 0
+			if exists {
+				num = inum.(int)
+			}
+			num++
+			data.ctx["sendNum"] = num
+			atomic.AddInt32(&globalSendNum, 1)
+			content := fmt.Sprintf("{\"clientSendNum\": %d, \"globalSendNum\": %d, \"globalReceiveNum\": %d}", num, globalSendNum, globalReceiveNum)
+			// content := fmt.Sprintf("Client send message, sent num: %d, global send num: %d", num, globalSendNum)
+			log.Println(content)
+
 			dataUpdate, _ := anypb.New(&chatpb.ChatChannelData{
 				ChatMessages: []*chatpb.ChatMessage{{
 					Sender:   fmt.Sprintf("Client%d", client.Id),
-					SendTime: time.Now().Unix(),
-					Content:  fmt.Sprintf("How are you, User%d?", rand.Intn(ClientNum)),
+					SendTime: time.Now().UnixMilli(),
+					Content:  content,
 				}},
 			})
+
 			client.Send(data.activeChannelId, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_CHANNEL_DATA_UPDATE),
 				&channeldpb.ChannelDataUpdateMessage{
 					Data: dataUpdate,

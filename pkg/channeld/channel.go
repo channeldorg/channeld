@@ -214,13 +214,14 @@ func (ch *Channel) PutMessage(msg Message, handler MessageHandlerFunc, conn *Con
 		return
 	}
 	ch.inMsgQueue <- channelMessage{ctx: MessageContext{
-		MsgType:    channeldpb.MessageType(pack.MsgType),
-		Msg:        msg,
-		Connection: conn,
-		Channel:    ch,
-		Broadcast:  pack.Broadcast,
-		StubId:     pack.StubId,
-		ChannelId:  pack.ChannelId,
+		MsgType:     channeldpb.MessageType(pack.MsgType),
+		Msg:         msg,
+		Connection:  conn,
+		Channel:     ch,
+		Broadcast:   pack.Broadcast,
+		StubId:      pack.StubId,
+		ChannelId:   pack.ChannelId,
+		arrivalTime: ch.GetTime(),
 	}, handler: handler}
 }
 

@@ -3,12 +3,12 @@ package client
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"strings"
 	"sync"
 	"time"
 
+	"channeld.clewcat.com/channeld/pkg/channeld"
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"github.com/golang/snappy"
 	"github.com/gorilla/websocket"
@@ -36,6 +36,8 @@ type ChanneldClient struct {
 	CreatedChannels    map[uint32]struct{}
 	ListedChannels     map[uint32]struct{}
 	Conn               net.Conn
+	readBuffer         []byte
+	readPos            int
 	connected          bool
 	incomingQueue      chan messageQueueEntry
 	outgoingQueue      chan *channeldpb.MessagePack
@@ -66,6 +68,8 @@ func NewClient(addr string) (*ChanneldClient, error) {
 		CreatedChannels:    make(map[uint32]struct{}),
 		ListedChannels:     make(map[uint32]struct{}),
 		Conn:               conn,
+		readBuffer:         make([]byte, channeld.MaxPacketSize),
+		readPos:            0,
 		connected:          true,
 		incomingQueue:      make(chan messageQueueEntry, 128),
 		outgoingQueue:      make(chan *channeldpb.MessagePack, 32),
@@ -162,32 +166,25 @@ func defaultMessageHandler(client *ChanneldClient, channelId uint32, m Message) 
 	//log.Printf("Client(%d) received message from channel %d: %s", client.Id, channelId, m)
 }
 
-func (client *ChanneldClient) readBytes(conn net.Conn, len uint) ([]byte, error) {
-	bytes := make([]byte, len)
-	if _, err := io.ReadFull(conn, bytes); err != nil {
-		switch err.(type) {
-		case *net.OpError:
-		case *websocket.CloseError:
-			client.connected = false
-			return nil, fmt.Errorf("WebSocket server disconnected: %s", conn.RemoteAddr())
-		}
-
-		if err == io.EOF {
-			client.connected = false
-			return nil, fmt.Errorf("server disconnected: %s", conn.RemoteAddr())
-		}
-		return nil, err
-	}
-	return bytes, nil
-}
-
 func (client *ChanneldClient) IsConnected() bool {
 	return client.connected
 }
 
 func (client *ChanneldClient) Receive() error {
-	tag, err := client.readBytes(client.Conn, 5)
-	if err != nil || tag[0] != 67 {
+	readPtr := client.readBuffer[client.readPos:]
+	bytesRead, err := client.Conn.Read(readPtr)
+	if err != nil {
+		return err
+	}
+
+	client.readPos += bytesRead
+	if client.readPos < 5 {
+		// Unfinished header
+		return nil
+	}
+
+	tag := client.readBuffer[:5]
+	if tag[0] != 67 {
 		return fmt.Errorf("invalid tag: %s, the packet will be dropped: %w", tag, err)
 	}
 
@@ -198,11 +195,15 @@ func (client *ChanneldClient) Receive() error {
 		packetSize = packetSize | int(tag[2])<<8
 	}
 
-	bytes := make([]byte, packetSize)
-	if _, err := io.ReadFull(client.Conn, bytes); err != nil {
-		return fmt.Errorf("error reading packet: %w", err)
+	fullSize := 5 + packetSize
+	if client.readPos < fullSize {
+		// Unfinished packet
+		return nil
 	}
 
+	bytes := client.readBuffer[5:fullSize]
+
+	// Apply the decompression from the 5th byte in the header
 	// Apply the decompression from the 5th byte in the header
 	if tag[4] == byte(channeldpb.CompressionType_SNAPPY) {
 		len, err := snappy.DecodedLen(bytes)
@@ -236,6 +237,8 @@ func (client *ChanneldClient) Receive() error {
 
 		client.incomingQueue <- messageQueueEntry{msg, mp.ChannelId, mp.StubId, entry.handlers}
 	}
+
+	client.readPos = 0
 
 	return nil
 }

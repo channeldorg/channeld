@@ -4,6 +4,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+var logNum = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "logs",
+		Help: "Number of logs",
+	},
+	[]string{"level"},
+)
+
 var msgReceived = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "messages_in",
@@ -31,6 +39,30 @@ var packetSent = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "packets_out",
 		Help: "Sent packets",
+	},
+	[]string{"connType"},
+)
+
+var packetDropped = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "packets_drop",
+		Help: "Dropped packets",
+	},
+	[]string{"connType"},
+)
+
+var fragmentedPacketCount = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "packets_frag",
+		Help: "Fragmented packets",
+	},
+	[]string{"connType"},
+)
+
+var combinedPacketCount = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "packets_comb",
+		Help: "Combined packets",
 	},
 	[]string{"connType"},
 )
@@ -76,10 +108,14 @@ var channelTickDuration = prometheus.NewGaugeVec(
 )
 
 func InitMetrics() {
+	prometheus.MustRegister(logNum)
 	prometheus.MustRegister(msgReceived)
 	prometheus.MustRegister(msgSent)
 	prometheus.MustRegister(packetReceived)
 	prometheus.MustRegister(packetSent)
+	prometheus.MustRegister(packetDropped)
+	prometheus.MustRegister(fragmentedPacketCount)
+	prometheus.MustRegister(combinedPacketCount)
 	prometheus.MustRegister(bytesReceived)
 	prometheus.MustRegister(bytesSent)
 	prometheus.MustRegister(connectionNum)

@@ -2,7 +2,6 @@ package channeld
 
 import (
 	"bufio"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -24,6 +23,8 @@ import (
 )
 
 type ConnectionId uint32
+
+const MaxPacketSize int = 0x00ffff
 
 //type ConnectionState int32
 
@@ -51,16 +52,18 @@ type Connection struct {
 	connectionType  channeldpb.ConnectionType
 	compressionType channeldpb.CompressionType
 	conn            net.Conn
+	readBuffer      []byte
+	readPos         int
 	reader          *bufio.Reader
-	writer          *bufio.Writer
-	sender          MessageSender
-	sendQueue       chan MessageContext
-	fsm             *fsm.FiniteStateMachine
-	logger          *Logger
-	state           int32 // Don't put the connection state into the FSM as 1) the FSM's states are user-defined. 2) the FSM is not goroutine-safe.
-	connTime        time.Time
-	closeHandlers   []func()
-	replaySession   *replaypb.ReplaySession
+	// writer          *bufio.Writer
+	sender        MessageSender
+	sendQueue     chan MessageContext
+	fsm           *fsm.FiniteStateMachine
+	logger        *Logger
+	state         int32 // Don't put the connection state into the FSM as 1) the FSM's states are user-defined. 2) the FSM is not goroutine-safe.
+	connTime      time.Time
+	closeHandlers []func()
+	replaySession *replaypb.ReplaySession
 }
 
 var allConnections sync.Map // map[ConnectionId]*Connection
@@ -133,7 +136,7 @@ func startGoroutines(connection *Connection) {
 	// receive goroutine
 	go func() {
 		for !connection.IsClosing() {
-			connection.receivePacket()
+			connection.receive()
 		}
 	}()
 
@@ -202,13 +205,13 @@ func generateNextConnId(c net.Conn, maxConnId uint32) {
 // NOT goroutine-safe. NEVER call AddConnection in different goroutines.
 func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 	var readerSize int
-	var writerSize int
+	// var writerSize int
 	if t == channeldpb.ConnectionType_SERVER {
 		readerSize = GlobalSettings.ServerReadBufferSize
-		writerSize = GlobalSettings.ServerWriteBufferSize
+		// writerSize = GlobalSettings.ServerWriteBufferSize
 	} else if t == channeldpb.ConnectionType_CLIENT {
 		readerSize = GlobalSettings.ClientReadBufferSize
-		writerSize = GlobalSettings.ClientWriteBufferSize
+		// writerSize = GlobalSettings.ClientWriteBufferSize
 	} else {
 		rootLogger.Panic("invalid connection type", zap.Int32("connType", int32(t)))
 	}
@@ -232,10 +235,12 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 		connectionType:  t,
 		compressionType: channeldpb.CompressionType_NO_COMPRESSION,
 		conn:            c,
-		reader:          bufio.NewReaderSize(c, readerSize),
-		writer:          bufio.NewWriterSize(c, writerSize),
-		sender:          &queuedMessageSender{},
-		sendQueue:       make(chan MessageContext, 128),
+		readBuffer:      make([]byte, readerSize),
+		readPos:         0,
+		// reader:    bufio.NewReaderSize(c, readerSize),
+		// writer:    bufio.NewWriterSize(c, writerSize),
+		sender:    &queuedMessageSender{},
+		sendQueue: make(chan MessageContext, 128),
 		logger: &Logger{rootLogger.With(
 			zap.String("connType", t.String()),
 			zap.Uint32("connId", nextConnectionId),
@@ -308,17 +313,11 @@ func (c *Connection) IsClosing() bool {
 	return c.state > ConnectionState_AUTHENTICATED
 }
 
-type closeError struct {
-	source error
-}
-
-func (e *closeError) Error() string {
-	return e.source.Error()
-}
-
-func readBytes(c *Connection, len uint) ([]byte, error) {
-	bytes := make([]byte, len)
-	if _, err := io.ReadFull(c.reader, bytes); err != nil {
+func (c *Connection) receive() {
+	// Read all bytes into the buffer at once
+	readPtr := c.readBuffer[c.readPos:]
+	bytesRead, err := c.conn.Read(readPtr)
+	if err != nil {
 		switch err := err.(type) {
 		case *net.OpError:
 			c.Logger().Warn("read bytes",
@@ -326,56 +325,121 @@ func readBytes(c *Connection, len uint) ([]byte, error) {
 				zap.String("remoteAddr", c.conn.RemoteAddr().String()),
 				zap.Error(err),
 			)
-			c.Close()
-			return nil, &closeError{err}
 		case *websocket.CloseError:
 			c.Logger().Info("disconnected",
 				zap.String("remoteAddr", c.conn.RemoteAddr().String()),
 			)
-			c.Close()
-			return nil, &closeError{err}
 		}
 
 		if err == io.EOF {
 			c.Logger().Info("disconnected",
 				zap.String("remoteAddr", c.conn.RemoteAddr().String()),
 			)
-			c.Close()
-			return nil, &closeError{err}
 		}
-		return nil, err
-	}
-	return bytes, nil
-}
-
-func _(c *Connection) (uint32, error) {
-	bytes, err := readBytes(c, 4)
-	if err != nil {
-		return 0, err
-	} else {
-		return binary.BigEndian.Uint32(bytes), nil
-	}
-}
-
-func (c *Connection) receivePacket() {
-	// TODO: use a per-connection buffer instead of allocating it in every receive()
-	// FIXME: read all bytes once into a buffer
-	tag, err := readBytes(c, 5)
-	if err != nil {
+		c.Close()
 		return
 	}
+
+	c.readPos += bytesRead
+	if c.readPos < 5 {
+		// Unfinished header
+		fragmentedPacketCount.WithLabelValues(c.connectionType.String()).Inc()
+		return
+	}
+
+	/*
+		tag := c.readBuffer[:5]
+		if tag[0] != 67 {
+			c.readPos = 0
+			c.Logger().Warn("invalid tag, the packet will be dropped",
+				zap.ByteString("tag", tag),
+			)
+			return
+		}
+
+		packetSize := int(tag[3])
+		if tag[1] != 72 {
+			packetSize = packetSize | int(tag[1])<<16 | int(tag[2])<<8
+		} else if tag[2] != 78 {
+			packetSize = packetSize | int(tag[2])<<8
+		}
+
+		if packetSize > int(MaxPacketSize) {
+			c.readPos = 0
+			c.Logger().Warn("packet size exceeds the limit, the packet will be dropped", zap.Int("packetSize", packetSize))
+			return
+		}
+
+		fullSize := 5 + packetSize
+		if c.readPos < fullSize {
+			// Unfinished packet
+			return
+		}
+
+		bytes := c.readBuffer[5:fullSize]
+
+		bytesReceived.WithLabelValues(c.connectionType.String()).Add(float64(fullSize))
+
+		// Apply the decompression from the 5th byte in the header
+		ct := tag[4]
+		_, valid := channeldpb.CompressionType_name[int32(ct)]
+		if valid && ct != 0 {
+			c.compressionType = channeldpb.CompressionType(ct)
+			if c.compressionType == channeldpb.CompressionType_SNAPPY {
+				len, err := snappy.DecodedLen(bytes)
+				if err != nil {
+					c.Logger().Error("snappy.DecodedLen", zap.Error(err))
+					return
+				}
+				dst := make([]byte, len)
+				bytes, err = snappy.Decode(dst, bytes)
+				if err != nil {
+					c.Logger().Error("snappy.Decode", zap.Error(err))
+					return
+				}
+			}
+		}
+
+		var p channeldpb.Packet
+		if err := proto.Unmarshal(bytes, &p); err != nil {
+			c.Logger().Error("unmarshalling packet", zap.Error(err))
+			return
+		}
+
+		if c.isPacketRecordingEnabled() {
+			c.recordPacket(&p)
+		}
+
+		for _, mp := range p.Messages {
+			c.receiveMessage(mp)
+		}
+
+		packetReceived.WithLabelValues(c.connectionType.String()).Inc()
+
+	*/
+
+	for bufPos := 0; bufPos < c.readPos; {
+		if c.readPacket(&bufPos) == nil {
+			return
+		}
+		if bufPos < c.readPos {
+			combinedPacketCount.WithLabelValues(c.connectionType.String()).Inc()
+		}
+	}
+
+	// Reset read position
+	c.readPos = 0
+}
+
+func (c *Connection) readPacket(bufPos *int) *channeldpb.Packet {
+	tag := c.readBuffer[*bufPos : *bufPos+5]
 	if tag[0] != 67 {
+		c.readPos = 0
+		packetDropped.WithLabelValues(c.connectionType.String()).Inc()
 		c.Logger().Warn("invalid tag, the packet will be dropped",
 			zap.ByteString("tag", tag),
-			zap.Error(err),
 		)
-		_, isClosed := err.(*closeError)
-		if !isClosed {
-			// Drop the packet. Avoid the allocation.
-			//ioutil.ReadAll(c.reader)
-			io.Copy(io.Discard, c.reader)
-		}
-		return
+		return nil
 	}
 
 	packetSize := int(tag[3])
@@ -385,13 +449,30 @@ func (c *Connection) receivePacket() {
 		packetSize = packetSize | int(tag[2])<<8
 	}
 
-	bytes := make([]byte, packetSize)
-	if _, err := io.ReadFull(c.reader, bytes); err != nil {
-		c.Logger().Error("reading packet", zap.Error(err))
-		return
+	if packetSize > int(MaxPacketSize) {
+		c.readPos = 0
+		packetDropped.WithLabelValues(c.connectionType.String()).Inc()
+		c.Logger().Warn("packet size exceeds the limit, the packet will be dropped", zap.Int("packetSize", packetSize))
+		return nil
 	}
 
-	bytesReceived.WithLabelValues(c.connectionType.String()).Add(float64(packetSize + 4))
+	fullSize := 5 + packetSize
+	if c.readPos < fullSize {
+		// Unfinished packet
+		fragmentedPacketCount.WithLabelValues(c.connectionType.String()).Inc()
+		return nil
+	}
+
+	if *bufPos+fullSize >= len(c.readBuffer) {
+		c.readPos = 0
+		packetDropped.WithLabelValues(c.connectionType.String()).Inc()
+		c.Logger().Warn("packet size exceeds the read buffer, the packet will be dropped", zap.Int("packetSize", packetSize))
+		return nil
+	}
+
+	bytes := c.readBuffer[*bufPos+5 : *bufPos+fullSize]
+
+	bytesReceived.WithLabelValues(c.connectionType.String()).Add(float64(fullSize))
 
 	// Apply the decompression from the 5th byte in the header
 	ct := tag[4]
@@ -402,13 +483,13 @@ func (c *Connection) receivePacket() {
 			len, err := snappy.DecodedLen(bytes)
 			if err != nil {
 				c.Logger().Error("snappy.DecodedLen", zap.Error(err))
-				return
+				return nil
 			}
 			dst := make([]byte, len)
 			bytes, err = snappy.Decode(dst, bytes)
 			if err != nil {
 				c.Logger().Error("snappy.Decode", zap.Error(err))
-				return
+				return nil
 			}
 		}
 	}
@@ -416,8 +497,10 @@ func (c *Connection) receivePacket() {
 	var p channeldpb.Packet
 	if err := proto.Unmarshal(bytes, &p); err != nil {
 		c.Logger().Error("unmarshalling packet", zap.Error(err))
-		return
+		return nil
 	}
+
+	packetReceived.WithLabelValues(c.connectionType.String()).Inc()
 
 	if c.isPacketRecordingEnabled() {
 		c.recordPacket(&p)
@@ -427,8 +510,9 @@ func (c *Connection) receivePacket() {
 		c.receiveMessage(mp)
 	}
 
-	//c.Logger().Debug("received packet", zap.Int("size", packetSize))
-	packetReceived.WithLabelValues(c.connectionType.String()).Inc()
+	*bufPos += fullSize
+
+	return &p
 }
 
 func (c *Connection) isPacketRecordingEnabled() bool {
@@ -574,13 +658,20 @@ func (c *Connection) flush() {
 	/* Avoid writing multple times. With WebSocket, every Write() sends a message.
 	writer.Write(tag)
 	*/
-	_, err = c.writer.Write(append(tag, bytes...))
+	bytes = append(tag, bytes...)
+	/*
+		_, err = c.writer.Write(bytes)
+		if err != nil {
+			c.Logger().Error("error writing packet", zap.Error(err))
+			return
+		}
+
+		c.writer.Flush()
+	*/
+	len, err = c.conn.Write(bytes)
 	if err != nil {
 		c.Logger().Error("error writing packet", zap.Error(err))
-		return
 	}
-
-	c.writer.Flush()
 
 	packetSent.WithLabelValues(c.connectionType.String()).Inc()
 	bytesSent.WithLabelValues(c.connectionType.String()).Add(float64(len))

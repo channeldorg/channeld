@@ -25,6 +25,8 @@ type MessageContext struct {
 	Connection ConnectionInChannel
 	// The channel that handling the message. Not required for sending or broadcasting.
 	Channel *Channel
+	// Internally used for receiving
+	arrivalTime ChannelTime
 }
 
 func (ctx *MessageContext) HasConnection() bool {
@@ -621,7 +623,7 @@ func handleChannelDataUpdate(ctx MessageContext) {
 			ctx.Channel.SetDataUpdateConnId(ConnectionId(msg.ContextConnId))
 		}
 	}
-	ctx.Channel.Data().OnUpdate(updateMsg, ctx.Channel.GetTime(), ctx.Channel.spatialNotifier)
+	ctx.Channel.Data().OnUpdate(updateMsg, ctx.arrivalTime, ctx.Channel.spatialNotifier)
 }
 
 func handleDisconnect(ctx MessageContext) {
