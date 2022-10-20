@@ -7,11 +7,12 @@ import "unreal_common.proto";
 option go_package = "channeld.clewcat.com/examples/channeld-ue-tps/tpspb";
 
 message TestRepChannelData {
-    map<uint32, unrealpb.ActorState> actorStates = 1;
-    map<uint32, unrealpb.SceneComponentState> sceneComponentStates = 2;
+    unrealpb.GameStateBase gameState = 1;
+    map<uint32, unrealpb.ActorState> actorStates = 2;
     map<uint32, unrealpb.CharacterState> characterStates = 3;
     map<uint32, unrealpb.PlayerState> playerStates = 4;
     map<uint32, unrealpb.ControllerState> controllerStates = 5;
     map<uint32, unrealpb.PlayerControllerState> playerControllerStates = 6;
-    unrealpb.GameStateBase gameState = 7;
+    map<uint32, unrealpb.ActorComponentState> actorComponentStates = 7;
+    map<uint32, unrealpb.SceneComponentState> sceneComponentStates = 8;
 }

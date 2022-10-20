@@ -53,13 +53,13 @@ message ActorState {
 }
 
 message ActorComponentState {
-    optional bool bIsActive = 1;
-    optional bool bReplicated = 2;
+    // Marks that the state should be removed from the containing map
+    bool removed = 1;
+    optional bool bIsActive = 2;
+    optional bool bReplicated = 3;
 }
 
 message SceneComponentState {
-    // Marks that the state should be removed from the containing map
-    bool removed = 1;
     optional bool bAbsoluteLocation = 2;
     optional bool bAbsoluteRotation = 3;
     optional bool bAbsoluteScale = 4;
@@ -90,8 +90,6 @@ message BasedMovementInfo {
 }
 
 message CharacterState {
-    // Marks that the state should be removed from the containing map
-    bool removed = 1;
     optional RootMotionMontage rootMotion = 2;
     optional BasedMovementInfo basedMovement = 3;
     optional float serverLastTransformUpdateTimeStamp = 4;
@@ -113,8 +111,6 @@ message Character_ClientMoveResponsePacked_Params {
 }
 
 message PlayerState {
-    // Marks that the state should be removed from the containing map
-    bool removed = 1;
     optional float score = 2;
     optional int32 playerId = 3;
     optional uint32 ping = 4;
@@ -140,8 +136,6 @@ message Controller_ClientSetRotation_Params {
 }
 
 message PlayerControllerState {
-    // Marks that the state should be removed from the containing map
-    bool removed = 1;
     optional FVector targetViewRotation = 2;
     optional FVector spawnLocation = 3;
 }
@@ -193,8 +187,6 @@ message PlayerController_ServerAcknowledgePossession_Params {
 }
 
 message GameStateBase {
-    // Marks that the state should be removed from the containing map
-    bool removed = 1;
     optional string spectatorClassName = 2;
     optional string gameModeClassName = 3;
     optional float replicatedWorldTimeSeconds = 4;
