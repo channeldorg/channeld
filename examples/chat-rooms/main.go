@@ -80,6 +80,7 @@ func main() {
 			TruncateTop:   true,
 		},
 	)
+	chatpb.TimeSpanLimit = time.Second * 60
 	//channeld.SetWebSocketTrustedOrigins(["localhost"])
 	go channeld.StartListening(channeldpb.ConnectionType_CLIENT, "ws", *wsAddr)
 	//go channeld.StartListening(channeldpb.ConnectionType_CLIENT, channeld.GlobalSettings.ClientNetwork, channeld.GlobalSettings.ClientAddress)
