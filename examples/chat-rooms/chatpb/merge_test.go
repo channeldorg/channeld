@@ -31,9 +31,9 @@ func TestMergeByTimeSpanLimit(t *testing.T) {
 	testChannel, _ := channeld.CreateChannel(channeldpb.ChannelType_TEST, nil)
 
 	listSizeLimit := 100
-	data := &ChatChannelData{ChatMessages: make([]*ChatMessage, 0)}
+	channelData := &ChatChannelData{ChatMessages: make([]*ChatMessage, 0)}
 	testChannel.InitData(
-		data,
+		channelData,
 		&channeldpb.ChannelDataMergeOptions{
 			ListSizeLimit: uint32(listSizeLimit),
 			TruncateTop:   true,
@@ -48,108 +48,108 @@ func TestMergeByTimeSpanLimit(t *testing.T) {
 	// ---------------- step 1 ----------------
 	startTime := time.Now()
 	MsgNum := 100
-	Data := &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s1")}
-	testChannel.Data().OnUpdate(Data, channelStartTime, nil)
+	updateData := &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s1")}
+	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
 	// 0 -> 100
-	assert.Equal(t, 100, len(data.ChatMessages))
+	assert.Equal(t, 100, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
 	// ---------------- step 1 ----------------
 
 	// ---------------- step 2 ----------------
 	startTime = time.Now()
 	MsgNum = 10
-	Data = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s2")}
-	testChannel.Data().OnUpdate(Data, channelStartTime, nil)
+	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s2")}
+	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
 	// 100 -> 110
-	assert.Equal(t, 110, len(data.ChatMessages))
+	assert.Equal(t, 110, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
 	// ---------------- step 2 ----------------
 
 	// ---------------- step 3 ----------------
 	startTime = time.Now()
 	MsgNum = 200
-	Data = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s3")}
-	testChannel.Data().OnUpdate(Data, channelStartTime, nil)
+	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s3")}
+	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
 	// 110 -> 310
-	assert.Equal(t, 310, len(data.ChatMessages))
+	assert.Equal(t, 310, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
 	// ---------------- step 3 ----------------
 
 	// ---------------- step 4 ----------------
 	startTime = time.Now()
 	MsgNum = 5
-	Data = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s4")}
-	testChannel.Data().OnUpdate(Data, channelStartTime, nil)
+	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s4")}
+	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
 	// 310 -> 215
 	// - s1:100
 	// + s4:5
-	assert.Equal(t, 215, len(data.ChatMessages))
+	assert.Equal(t, 215, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
 	// ---------------- step 4 ----------------
 
 	// ---------------- step 5 ----------------
 	startTime = time.Now()
 	MsgNum = 0
-	Data = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s5")}
-	testChannel.Data().OnUpdate(Data, channelStartTime, nil)
+	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s5")}
+	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
 	// 215 -> 205
 	// - s2:10
-	assert.Equal(t, 205, len(data.ChatMessages))
+	assert.Equal(t, 205, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
 	// ---------------- step 5 ----------------
 
 	// ---------------- step 6 ----------------
 	startTime = time.Now()
 	MsgNum = 0
-	Data = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s6")}
-	testChannel.Data().OnUpdate(Data, channelStartTime, nil)
+	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s6")}
+	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
 	// 205 -> 100
 	// - s3:105
-	assert.Equal(t, 100, len(data.ChatMessages))
+	assert.Equal(t, 100, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
 	// ---------------- step 6 ----------------
 
 	// ---------------- step 7 ----------------
 	startTime = time.Now()
 	MsgNum = 120
-	Data = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s7")}
-	testChannel.Data().OnUpdate(Data, channelStartTime, nil)
+	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s7")}
+	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
 	// 100 -> 120
 	// - s3:95
 	// - s4:5
 	// + s7:120
-	assert.Equal(t, 120, len(data.ChatMessages))
+	assert.Equal(t, 120, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
 	// ---------------- step 7 ----------------
 
 	// ---------------- step 8 ----------------
 	startTime = time.Now()
 	MsgNum = 0
-	Data = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s8")}
-	testChannel.Data().OnUpdate(Data, channelStartTime, nil)
+	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s8")}
+	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
 	// 120 -> 120
-	assert.Equal(t, 120, len(data.ChatMessages))
+	assert.Equal(t, 120, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
 	// ---------------- step 8 ----------------
 
 	// ---------------- step 9 ----------------
 	startTime = time.Now()
 	MsgNum = 0
-	Data = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s9")}
-	testChannel.Data().OnUpdate(Data, channelStartTime, nil)
+	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s9")}
+	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
 	// 120 -> 120
-	assert.Equal(t, 120, len(data.ChatMessages))
+	assert.Equal(t, 120, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
 	// ---------------- step 9 ----------------
 
 	// ---------------- step 10 ----------------
 	startTime = time.Now()
 	MsgNum = 0
-	Data = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s10")}
-	testChannel.Data().OnUpdate(Data, channelStartTime, nil)
+	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s10")}
+	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
 	// 120 -> 100
 	// - s7:20
-	assert.Equal(t, 100, len(data.ChatMessages))
+	assert.Equal(t, 100, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
 	// ---------------- step 10 ----------------
 }
@@ -160,9 +160,9 @@ func TestMergeWithoutTimeSpanLimit(t *testing.T) {
 	testChannel, _ := channeld.CreateChannel(channeldpb.ChannelType_TEST, nil)
 
 	listSizeLimit := 100
-	data := &ChatChannelData{ChatMessages: make([]*ChatMessage, 0)}
+	channelData := &ChatChannelData{ChatMessages: make([]*ChatMessage, 0)}
 	testChannel.InitData(
-		data,
+		channelData,
 		&channeldpb.ChannelDataMergeOptions{
 			ListSizeLimit: uint32(listSizeLimit),
 			TruncateTop:   true,
@@ -177,28 +177,28 @@ func TestMergeWithoutTimeSpanLimit(t *testing.T) {
 	// ---------------- step 1 ----------------
 	startTime := time.Now()
 	MsgNum := 100
-	Data := &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s1")}
-	testChannel.Data().OnUpdate(Data, channelStartTime, nil)
+	updateData := &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s1")}
+	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
 	// 0 -> 100
-	assert.Equal(t, 100, len(data.ChatMessages))
+	assert.Equal(t, 100, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
 	// ---------------- step 1 ----------------
 
 	// ---------------- step 2 ----------------
 	startTime = time.Now()
 	MsgNum = 10
-	Data = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s2")}
-	testChannel.Data().OnUpdate(Data, channelStartTime, nil)
-	assert.Equal(t, 100, len(data.ChatMessages))
+	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s2")}
+	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
+	assert.Equal(t, 100, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
 	// ---------------- step 2 ----------------
 
 	// ---------------- step 3 ----------------
 	startTime = time.Now()
 	MsgNum = 200
-	Data = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s3")}
-	testChannel.Data().OnUpdate(Data, channelStartTime, nil)
-	assert.Equal(t, 100, len(data.ChatMessages))
+	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s3")}
+	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
+	assert.Equal(t, 100, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
 	// ---------------- step 3 ----------------
 }
@@ -209,9 +209,9 @@ func TestMergeByLongTimeSpanLimit(t *testing.T) {
 	testChannel, _ := channeld.CreateChannel(channeldpb.ChannelType_TEST, nil)
 
 	listSizeLimit := 100
-	data := &ChatChannelData{ChatMessages: make([]*ChatMessage, 0)}
+	channelData := &ChatChannelData{ChatMessages: make([]*ChatMessage, 0)}
 	testChannel.InitData(
-		data,
+		channelData,
 		&channeldpb.ChannelDataMergeOptions{
 			ListSizeLimit: uint32(listSizeLimit),
 			TruncateTop:   true,
@@ -226,28 +226,28 @@ func TestMergeByLongTimeSpanLimit(t *testing.T) {
 	// ---------------- step 1 ----------------
 	startTime := time.Now()
 	MsgNum := 100
-	Data := &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s1")}
-	testChannel.Data().OnUpdate(Data, channelStartTime, nil)
+	updateData := &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s1")}
+	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
 	// 0 -> 100
-	assert.Equal(t, 100, len(data.ChatMessages))
+	assert.Equal(t, 100, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
 	// ---------------- step 1 ----------------
 
 	// ---------------- step 2 ----------------
 	startTime = time.Now()
 	MsgNum = 10
-	Data = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s2")}
-	testChannel.Data().OnUpdate(Data, channelStartTime, nil)
-	assert.Equal(t, 110, len(data.ChatMessages))
+	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s2")}
+	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
+	assert.Equal(t, 110, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
 	// ---------------- step 2 ----------------
 
 	// ---------------- step 3 ----------------
 	startTime = time.Now()
 	MsgNum = 200
-	Data = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s3")}
-	testChannel.Data().OnUpdate(Data, channelStartTime, nil)
-	assert.Equal(t, 310, len(data.ChatMessages))
+	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s3")}
+	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
+	assert.Equal(t, 310, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
 	// ---------------- step 3 ----------------
 }

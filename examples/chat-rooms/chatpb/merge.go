@@ -9,8 +9,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// Extend the merged list when the length of the merged list greater then options.ListSizeLimit
-var TimeSpanLimit time.Duration = time.Minute * 1
+// Filter the merged list when the length of the merged list exceeds mergeOptions.ListSizeLimit
+var TimeSpanLimit time.Duration = time.Second * 10
 
 func (dst *ChatChannelData) Merge(src proto.Message, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) error {
 	srcMsg, ok := src.(*ChatChannelData)
