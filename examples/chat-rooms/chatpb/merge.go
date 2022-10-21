@@ -25,11 +25,11 @@ func (dst *ChatChannelData) Merge(src proto.Message, options *channeldpb.Channel
 		dst.ChatMessages = append(dst.ChatMessages, srcMsg.ChatMessages...)
 	}
 
-	lsl := int(options.ListSizeLimit)
+	limit := int(options.ListSizeLimit)
 	n := len(dst.ChatMessages)
-	if lsl > 0 && n > lsl {
+	if limit > 0 && n > limit {
 		if options.TruncateTop {
-			start := n - lsl
+			start := n - limit
 			if TimeSpanLimit > 0 {
 				availableTime := time.Now().Add(-TimeSpanLimit)
 				for ; start > 0; start-- {
@@ -42,7 +42,7 @@ func (dst *ChatChannelData) Merge(src proto.Message, options *channeldpb.Channel
 			}
 			dst.ChatMessages = dst.ChatMessages[start:]
 		} else {
-			dst.ChatMessages = dst.ChatMessages[:lsl]
+			dst.ChatMessages = dst.ChatMessages[:limit]
 		}
 	}
 
