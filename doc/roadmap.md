@@ -62,6 +62,7 @@
     - [x] Integrate with Unreal's Replication system
     - [ ] Replication codegen
     - [ ] Multi-server support
+    - [ ] Editor toolbar extension
     - [ ] KCP support
     - [ ] Data traffic compression
 - [ ] Dynamic region load-balancing
