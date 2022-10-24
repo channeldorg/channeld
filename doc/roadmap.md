@@ -18,7 +18,7 @@
 - [x] [Snappy](https://github.com/golang/snappy) compression
 - [ ] [Markov-chain](https://en.wikipedia.org/wiki/Markov_chain) compression
 - [ ] Encryption
-- [ ] Replay
+- [x] Replay
 - [x] Prometheus integration
 
 # Optimizations
@@ -27,7 +27,7 @@
 - [x] Enable custom merge of channel data messages
 
 # Tests
-- [ ] Unit tests
+- [x] Unit tests
 - [ ] Smoke tests
 - [ ] Scale tests
 
@@ -59,9 +59,9 @@
     - [x] Implement the C++ client library
     - [x] Blueprint support
     - [x] Integrate with Unreal's networking stack
-    - [ ] Integrate with Unreal's Replication system
+    - [x] Integrate with Unreal's Replication system
     - [ ] Replication codegen
-    - [x] Multi-server support
+    - [ ] Multi-server support
     - [ ] KCP support
     - [ ] Data traffic compression
 - [ ] Dynamic region load-balancing
