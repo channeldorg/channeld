@@ -88,8 +88,8 @@ message SceneComponentState {
     optional bool bShouldBeAttached = 6;
     optional bool bShouldSnapLocationWhenAttached = 7;
     optional bool bShouldSnapRotationWhenAttached = 8;
-    optional UnrealObjectRef attachParent = 9;
-    repeated UnrealObjectRef attachChildren = 10;
+    optional ActorComponentRef attachParent = 9;
+    repeated ActorComponentRef attachChildren = 10;
     optional string attachSocketName = 11;
     optional FVector relativeLocation = 12;
     optional FVector relativeRotation = 13;
