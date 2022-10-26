@@ -251,6 +251,18 @@ message PlayerController_ServerAcknowledgePossession_Params {
     UnrealObjectRef pawn = 1;
 }
 
+message PlayerController_ClientGotoState_Params {
+    string newState = 1;
+}
+
+message PlayerController_ClientReceiveLocalizedMessage_Params {
+    string message = 1;
+    int32 switch = 2;
+    UnrealObjectRef relatedPlayerState_1 = 3;
+    UnrealObjectRef relatedPlayerState_2 = 4;
+    UnrealObjectRef optionalObject = 5;
+}
+
 message GameStateBase {
     optional string spectatorClassName = 2;
     optional string gameModeClassName = 3;

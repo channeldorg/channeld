@@ -2107,6 +2107,132 @@ func (x *PlayerController_ServerAcknowledgePossession_Params) GetPawn() *UnrealO
 	return nil
 }
 
+type PlayerController_ClientGotoState_Params struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	NewState string `protobuf:"bytes,1,opt,name=newState,proto3" json:"newState,omitempty"`
+}
+
+func (x *PlayerController_ClientGotoState_Params) Reset() {
+	*x = PlayerController_ClientGotoState_Params{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_unreal_common_proto_msgTypes[30]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *PlayerController_ClientGotoState_Params) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PlayerController_ClientGotoState_Params) ProtoMessage() {}
+
+func (x *PlayerController_ClientGotoState_Params) ProtoReflect() protoreflect.Message {
+	mi := &file_unreal_common_proto_msgTypes[30]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PlayerController_ClientGotoState_Params.ProtoReflect.Descriptor instead.
+func (*PlayerController_ClientGotoState_Params) Descriptor() ([]byte, []int) {
+	return file_unreal_common_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *PlayerController_ClientGotoState_Params) GetNewState() string {
+	if x != nil {
+		return x.NewState
+	}
+	return ""
+}
+
+type PlayerController_ClientReceiveLocalizedMessage_Params struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Message              string           `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	Switch               int32            `protobuf:"varint,2,opt,name=switch,proto3" json:"switch,omitempty"`
+	RelatedPlayerState_1 *UnrealObjectRef `protobuf:"bytes,3,opt,name=relatedPlayerState_1,json=relatedPlayerState1,proto3" json:"relatedPlayerState_1,omitempty"`
+	RelatedPlayerState_2 *UnrealObjectRef `protobuf:"bytes,4,opt,name=relatedPlayerState_2,json=relatedPlayerState2,proto3" json:"relatedPlayerState_2,omitempty"`
+	OptionalObject       *UnrealObjectRef `protobuf:"bytes,5,opt,name=optionalObject,proto3" json:"optionalObject,omitempty"`
+}
+
+func (x *PlayerController_ClientReceiveLocalizedMessage_Params) Reset() {
+	*x = PlayerController_ClientReceiveLocalizedMessage_Params{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_unreal_common_proto_msgTypes[31]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *PlayerController_ClientReceiveLocalizedMessage_Params) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PlayerController_ClientReceiveLocalizedMessage_Params) ProtoMessage() {}
+
+func (x *PlayerController_ClientReceiveLocalizedMessage_Params) ProtoReflect() protoreflect.Message {
+	mi := &file_unreal_common_proto_msgTypes[31]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PlayerController_ClientReceiveLocalizedMessage_Params.ProtoReflect.Descriptor instead.
+func (*PlayerController_ClientReceiveLocalizedMessage_Params) Descriptor() ([]byte, []int) {
+	return file_unreal_common_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *PlayerController_ClientReceiveLocalizedMessage_Params) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *PlayerController_ClientReceiveLocalizedMessage_Params) GetSwitch() int32 {
+	if x != nil {
+		return x.Switch
+	}
+	return 0
+}
+
+func (x *PlayerController_ClientReceiveLocalizedMessage_Params) GetRelatedPlayerState_1() *UnrealObjectRef {
+	if x != nil {
+		return x.RelatedPlayerState_1
+	}
+	return nil
+}
+
+func (x *PlayerController_ClientReceiveLocalizedMessage_Params) GetRelatedPlayerState_2() *UnrealObjectRef {
+	if x != nil {
+		return x.RelatedPlayerState_2
+	}
+	return nil
+}
+
+func (x *PlayerController_ClientReceiveLocalizedMessage_Params) GetOptionalObject() *UnrealObjectRef {
+	if x != nil {
+		return x.OptionalObject
+	}
+	return nil
+}
+
 type GameStateBase struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -2121,7 +2247,7 @@ type GameStateBase struct {
 func (x *GameStateBase) Reset() {
 	*x = GameStateBase{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_unreal_common_proto_msgTypes[30]
+		mi := &file_unreal_common_proto_msgTypes[32]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2134,7 +2260,7 @@ func (x *GameStateBase) String() string {
 func (*GameStateBase) ProtoMessage() {}
 
 func (x *GameStateBase) ProtoReflect() protoreflect.Message {
-	mi := &file_unreal_common_proto_msgTypes[30]
+	mi := &file_unreal_common_proto_msgTypes[32]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2147,7 +2273,7 @@ func (x *GameStateBase) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GameStateBase.ProtoReflect.Descriptor instead.
 func (*GameStateBase) Descriptor() ([]byte, []int) {
-	return file_unreal_common_proto_rawDescGZIP(), []int{30}
+	return file_unreal_common_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *GameStateBase) GetSpectatorClassName() string {
@@ -2191,7 +2317,7 @@ type UnrealObjectRef_GuidCachedObject struct {
 func (x *UnrealObjectRef_GuidCachedObject) Reset() {
 	*x = UnrealObjectRef_GuidCachedObject{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_unreal_common_proto_msgTypes[31]
+		mi := &file_unreal_common_proto_msgTypes[33]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2204,7 +2330,7 @@ func (x *UnrealObjectRef_GuidCachedObject) String() string {
 func (*UnrealObjectRef_GuidCachedObject) ProtoMessage() {}
 
 func (x *UnrealObjectRef_GuidCachedObject) ProtoReflect() protoreflect.Message {
-	mi := &file_unreal_common_proto_msgTypes[31]
+	mi := &file_unreal_common_proto_msgTypes[33]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2267,7 +2393,7 @@ type FRepRootMotionMontage_FRootMotionSource struct {
 func (x *FRepRootMotionMontage_FRootMotionSource) Reset() {
 	*x = FRepRootMotionMontage_FRootMotionSource{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_unreal_common_proto_msgTypes[32]
+		mi := &file_unreal_common_proto_msgTypes[34]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2280,7 +2406,7 @@ func (x *FRepRootMotionMontage_FRootMotionSource) String() string {
 func (*FRepRootMotionMontage_FRootMotionSource) ProtoMessage() {}
 
 func (x *FRepRootMotionMontage_FRootMotionSource) ProtoReflect() protoreflect.Message {
-	mi := &file_unreal_common_proto_msgTypes[32]
+	mi := &file_unreal_common_proto_msgTypes[34]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2426,7 +2552,7 @@ type FRepRootMotionMontage_FRootMotionSourceGroup struct {
 func (x *FRepRootMotionMontage_FRootMotionSourceGroup) Reset() {
 	*x = FRepRootMotionMontage_FRootMotionSourceGroup{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_unreal_common_proto_msgTypes[33]
+		mi := &file_unreal_common_proto_msgTypes[35]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2439,7 +2565,7 @@ func (x *FRepRootMotionMontage_FRootMotionSourceGroup) String() string {
 func (*FRepRootMotionMontage_FRootMotionSourceGroup) ProtoMessage() {}
 
 func (x *FRepRootMotionMontage_FRootMotionSourceGroup) ProtoReflect() protoreflect.Message {
-	mi := &file_unreal_common_proto_msgTypes[33]
+	mi := &file_unreal_common_proto_msgTypes[35]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2524,7 +2650,7 @@ type FRepRootMotionMontage_FRootMotionSource_FRootMotionFinishVelocitySettings s
 func (x *FRepRootMotionMontage_FRootMotionSource_FRootMotionFinishVelocitySettings) Reset() {
 	*x = FRepRootMotionMontage_FRootMotionSource_FRootMotionFinishVelocitySettings{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_unreal_common_proto_msgTypes[34]
+		mi := &file_unreal_common_proto_msgTypes[36]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2537,7 +2663,7 @@ func (x *FRepRootMotionMontage_FRootMotionSource_FRootMotionFinishVelocitySettin
 func (*FRepRootMotionMontage_FRootMotionSource_FRootMotionFinishVelocitySettings) ProtoMessage() {}
 
 func (x *FRepRootMotionMontage_FRootMotionSource_FRootMotionFinishVelocitySettings) ProtoReflect() protoreflect.Message {
-	mi := &file_unreal_common_proto_msgTypes[34]
+	mi := &file_unreal_common_proto_msgTypes[36]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3213,33 +3339,58 @@ var file_unreal_common_proto_rawDesc = []byte{
 	0x73, 0x69, 0x6f, 0x6e, 0x5f, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x12, 0x2d, 0x0a, 0x04, 0x70,
 	0x61, 0x77, 0x6e, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x19, 0x2e, 0x75, 0x6e, 0x72, 0x65,
 	0x61, 0x6c, 0x70, 0x62, 0x2e, 0x55, 0x6e, 0x72, 0x65, 0x61, 0x6c, 0x4f, 0x62, 0x6a, 0x65, 0x63,
-	0x74, 0x52, 0x65, 0x66, 0x52, 0x04, 0x70, 0x61, 0x77, 0x6e, 0x22, 0xe3, 0x02, 0x0a, 0x0d, 0x47,
-	0x61, 0x6d, 0x65, 0x53, 0x74, 0x61, 0x74, 0x65, 0x42, 0x61, 0x73, 0x65, 0x12, 0x33, 0x0a, 0x12,
-	0x73, 0x70, 0x65, 0x63, 0x74, 0x61, 0x74, 0x6f, 0x72, 0x43, 0x6c, 0x61, 0x73, 0x73, 0x4e, 0x61,
-	0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x48, 0x00, 0x52, 0x12, 0x73, 0x70, 0x65, 0x63,
-	0x74, 0x61, 0x74, 0x6f, 0x72, 0x43, 0x6c, 0x61, 0x73, 0x73, 0x4e, 0x61, 0x6d, 0x65, 0x88, 0x01,
-	0x01, 0x12, 0x31, 0x0a, 0x11, 0x67, 0x61, 0x6d, 0x65, 0x4d, 0x6f, 0x64, 0x65, 0x43, 0x6c, 0x61,
-	0x73, 0x73, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x48, 0x01, 0x52, 0x11,
-	0x67, 0x61, 0x6d, 0x65, 0x4d, 0x6f, 0x64, 0x65, 0x43, 0x6c, 0x61, 0x73, 0x73, 0x4e, 0x61, 0x6d,
-	0x65, 0x88, 0x01, 0x01, 0x12, 0x43, 0x0a, 0x1a, 0x72, 0x65, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74,
-	0x65, 0x64, 0x57, 0x6f, 0x72, 0x6c, 0x64, 0x54, 0x69, 0x6d, 0x65, 0x53, 0x65, 0x63, 0x6f, 0x6e,
-	0x64, 0x73, 0x18, 0x04, 0x20, 0x01, 0x28, 0x02, 0x48, 0x02, 0x52, 0x1a, 0x72, 0x65, 0x70, 0x6c,
-	0x69, 0x63, 0x61, 0x74, 0x65, 0x64, 0x57, 0x6f, 0x72, 0x6c, 0x64, 0x54, 0x69, 0x6d, 0x65, 0x53,
-	0x65, 0x63, 0x6f, 0x6e, 0x64, 0x73, 0x88, 0x01, 0x01, 0x12, 0x3d, 0x0a, 0x17, 0x62, 0x52, 0x65,
-	0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x65, 0x64, 0x48, 0x61, 0x73, 0x42, 0x65, 0x67, 0x75, 0x6e,
-	0x50, 0x6c, 0x61, 0x79, 0x18, 0x05, 0x20, 0x01, 0x28, 0x08, 0x48, 0x03, 0x52, 0x17, 0x62, 0x52,
-	0x65, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x65, 0x64, 0x48, 0x61, 0x73, 0x42, 0x65, 0x67, 0x75,
-	0x6e, 0x50, 0x6c, 0x61, 0x79, 0x88, 0x01, 0x01, 0x42, 0x15, 0x0a, 0x13, 0x5f, 0x73, 0x70, 0x65,
-	0x63, 0x74, 0x61, 0x74, 0x6f, 0x72, 0x43, 0x6c, 0x61, 0x73, 0x73, 0x4e, 0x61, 0x6d, 0x65, 0x42,
-	0x14, 0x0a, 0x12, 0x5f, 0x67, 0x61, 0x6d, 0x65, 0x4d, 0x6f, 0x64, 0x65, 0x43, 0x6c, 0x61, 0x73,
-	0x73, 0x4e, 0x61, 0x6d, 0x65, 0x42, 0x1d, 0x0a, 0x1b, 0x5f, 0x72, 0x65, 0x70, 0x6c, 0x69, 0x63,
+	0x74, 0x52, 0x65, 0x66, 0x52, 0x04, 0x70, 0x61, 0x77, 0x6e, 0x22, 0x45, 0x0a, 0x27, 0x50, 0x6c,
+	0x61, 0x79, 0x65, 0x72, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c, 0x6c, 0x65, 0x72, 0x5f, 0x43,
+	0x6c, 0x69, 0x65, 0x6e, 0x74, 0x47, 0x6f, 0x74, 0x6f, 0x53, 0x74, 0x61, 0x74, 0x65, 0x5f, 0x50,
+	0x61, 0x72, 0x61, 0x6d, 0x73, 0x12, 0x1a, 0x0a, 0x08, 0x6e, 0x65, 0x77, 0x53, 0x74, 0x61, 0x74,
+	0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x6e, 0x65, 0x77, 0x53, 0x74, 0x61, 0x74,
+	0x65, 0x22, 0xc8, 0x02, 0x0a, 0x35, 0x50, 0x6c, 0x61, 0x79, 0x65, 0x72, 0x43, 0x6f, 0x6e, 0x74,
+	0x72, 0x6f, 0x6c, 0x6c, 0x65, 0x72, 0x5f, 0x43, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x52, 0x65, 0x63,
+	0x65, 0x69, 0x76, 0x65, 0x4c, 0x6f, 0x63, 0x61, 0x6c, 0x69, 0x7a, 0x65, 0x64, 0x4d, 0x65, 0x73,
+	0x73, 0x61, 0x67, 0x65, 0x5f, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x12, 0x18, 0x0a, 0x07, 0x6d,
+	0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x6d, 0x65,
+	0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x16, 0x0a, 0x06, 0x73, 0x77, 0x69, 0x74, 0x63, 0x68, 0x18,
+	0x02, 0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x73, 0x77, 0x69, 0x74, 0x63, 0x68, 0x12, 0x4c, 0x0a,
+	0x14, 0x72, 0x65, 0x6c, 0x61, 0x74, 0x65, 0x64, 0x50, 0x6c, 0x61, 0x79, 0x65, 0x72, 0x53, 0x74,
+	0x61, 0x74, 0x65, 0x5f, 0x31, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x19, 0x2e, 0x75, 0x6e,
+	0x72, 0x65, 0x61, 0x6c, 0x70, 0x62, 0x2e, 0x55, 0x6e, 0x72, 0x65, 0x61, 0x6c, 0x4f, 0x62, 0x6a,
+	0x65, 0x63, 0x74, 0x52, 0x65, 0x66, 0x52, 0x13, 0x72, 0x65, 0x6c, 0x61, 0x74, 0x65, 0x64, 0x50,
+	0x6c, 0x61, 0x79, 0x65, 0x72, 0x53, 0x74, 0x61, 0x74, 0x65, 0x31, 0x12, 0x4c, 0x0a, 0x14, 0x72,
+	0x65, 0x6c, 0x61, 0x74, 0x65, 0x64, 0x50, 0x6c, 0x61, 0x79, 0x65, 0x72, 0x53, 0x74, 0x61, 0x74,
+	0x65, 0x5f, 0x32, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x19, 0x2e, 0x75, 0x6e, 0x72, 0x65,
+	0x61, 0x6c, 0x70, 0x62, 0x2e, 0x55, 0x6e, 0x72, 0x65, 0x61, 0x6c, 0x4f, 0x62, 0x6a, 0x65, 0x63,
+	0x74, 0x52, 0x65, 0x66, 0x52, 0x13, 0x72, 0x65, 0x6c, 0x61, 0x74, 0x65, 0x64, 0x50, 0x6c, 0x61,
+	0x79, 0x65, 0x72, 0x53, 0x74, 0x61, 0x74, 0x65, 0x32, 0x12, 0x41, 0x0a, 0x0e, 0x6f, 0x70, 0x74,
+	0x69, 0x6f, 0x6e, 0x61, 0x6c, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x18, 0x05, 0x20, 0x01, 0x28,
+	0x0b, 0x32, 0x19, 0x2e, 0x75, 0x6e, 0x72, 0x65, 0x61, 0x6c, 0x70, 0x62, 0x2e, 0x55, 0x6e, 0x72,
+	0x65, 0x61, 0x6c, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x52, 0x65, 0x66, 0x52, 0x0e, 0x6f, 0x70,
+	0x74, 0x69, 0x6f, 0x6e, 0x61, 0x6c, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x22, 0xe3, 0x02, 0x0a,
+	0x0d, 0x47, 0x61, 0x6d, 0x65, 0x53, 0x74, 0x61, 0x74, 0x65, 0x42, 0x61, 0x73, 0x65, 0x12, 0x33,
+	0x0a, 0x12, 0x73, 0x70, 0x65, 0x63, 0x74, 0x61, 0x74, 0x6f, 0x72, 0x43, 0x6c, 0x61, 0x73, 0x73,
+	0x4e, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x48, 0x00, 0x52, 0x12, 0x73, 0x70,
+	0x65, 0x63, 0x74, 0x61, 0x74, 0x6f, 0x72, 0x43, 0x6c, 0x61, 0x73, 0x73, 0x4e, 0x61, 0x6d, 0x65,
+	0x88, 0x01, 0x01, 0x12, 0x31, 0x0a, 0x11, 0x67, 0x61, 0x6d, 0x65, 0x4d, 0x6f, 0x64, 0x65, 0x43,
+	0x6c, 0x61, 0x73, 0x73, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x48, 0x01,
+	0x52, 0x11, 0x67, 0x61, 0x6d, 0x65, 0x4d, 0x6f, 0x64, 0x65, 0x43, 0x6c, 0x61, 0x73, 0x73, 0x4e,
+	0x61, 0x6d, 0x65, 0x88, 0x01, 0x01, 0x12, 0x43, 0x0a, 0x1a, 0x72, 0x65, 0x70, 0x6c, 0x69, 0x63,
 	0x61, 0x74, 0x65, 0x64, 0x57, 0x6f, 0x72, 0x6c, 0x64, 0x54, 0x69, 0x6d, 0x65, 0x53, 0x65, 0x63,
-	0x6f, 0x6e, 0x64, 0x73, 0x42, 0x1a, 0x0a, 0x18, 0x5f, 0x62, 0x52, 0x65, 0x70, 0x6c, 0x69, 0x63,
-	0x61, 0x74, 0x65, 0x64, 0x48, 0x61, 0x73, 0x42, 0x65, 0x67, 0x75, 0x6e, 0x50, 0x6c, 0x61, 0x79,
-	0x42, 0x2c, 0x5a, 0x2a, 0x63, 0x68, 0x61, 0x6e, 0x6e, 0x65, 0x6c, 0x64, 0x2e, 0x63, 0x6c, 0x65,
-	0x77, 0x63, 0x61, 0x74, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x68, 0x61, 0x6e, 0x6e, 0x65, 0x6c,
-	0x64, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x75, 0x6e, 0x72, 0x65, 0x61, 0x6c, 0x70, 0x62, 0x62, 0x06,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x6f, 0x6e, 0x64, 0x73, 0x18, 0x04, 0x20, 0x01, 0x28, 0x02, 0x48, 0x02, 0x52, 0x1a, 0x72, 0x65,
+	0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x65, 0x64, 0x57, 0x6f, 0x72, 0x6c, 0x64, 0x54, 0x69, 0x6d,
+	0x65, 0x53, 0x65, 0x63, 0x6f, 0x6e, 0x64, 0x73, 0x88, 0x01, 0x01, 0x12, 0x3d, 0x0a, 0x17, 0x62,
+	0x52, 0x65, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x65, 0x64, 0x48, 0x61, 0x73, 0x42, 0x65, 0x67,
+	0x75, 0x6e, 0x50, 0x6c, 0x61, 0x79, 0x18, 0x05, 0x20, 0x01, 0x28, 0x08, 0x48, 0x03, 0x52, 0x17,
+	0x62, 0x52, 0x65, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x65, 0x64, 0x48, 0x61, 0x73, 0x42, 0x65,
+	0x67, 0x75, 0x6e, 0x50, 0x6c, 0x61, 0x79, 0x88, 0x01, 0x01, 0x42, 0x15, 0x0a, 0x13, 0x5f, 0x73,
+	0x70, 0x65, 0x63, 0x74, 0x61, 0x74, 0x6f, 0x72, 0x43, 0x6c, 0x61, 0x73, 0x73, 0x4e, 0x61, 0x6d,
+	0x65, 0x42, 0x14, 0x0a, 0x12, 0x5f, 0x67, 0x61, 0x6d, 0x65, 0x4d, 0x6f, 0x64, 0x65, 0x43, 0x6c,
+	0x61, 0x73, 0x73, 0x4e, 0x61, 0x6d, 0x65, 0x42, 0x1d, 0x0a, 0x1b, 0x5f, 0x72, 0x65, 0x70, 0x6c,
+	0x69, 0x63, 0x61, 0x74, 0x65, 0x64, 0x57, 0x6f, 0x72, 0x6c, 0x64, 0x54, 0x69, 0x6d, 0x65, 0x53,
+	0x65, 0x63, 0x6f, 0x6e, 0x64, 0x73, 0x42, 0x1a, 0x0a, 0x18, 0x5f, 0x62, 0x52, 0x65, 0x70, 0x6c,
+	0x69, 0x63, 0x61, 0x74, 0x65, 0x64, 0x48, 0x61, 0x73, 0x42, 0x65, 0x67, 0x75, 0x6e, 0x50, 0x6c,
+	0x61, 0x79, 0x42, 0x2c, 0x5a, 0x2a, 0x63, 0x68, 0x61, 0x6e, 0x6e, 0x65, 0x6c, 0x64, 0x2e, 0x63,
+	0x6c, 0x65, 0x77, 0x63, 0x61, 0x74, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x68, 0x61, 0x6e, 0x6e,
+	0x65, 0x6c, 0x64, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x75, 0x6e, 0x72, 0x65, 0x61, 0x6c, 0x70, 0x62,
+	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -3254,7 +3405,7 @@ func file_unreal_common_proto_rawDescGZIP() []byte {
 	return file_unreal_common_proto_rawDescData
 }
 
-var file_unreal_common_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
+var file_unreal_common_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
 var file_unreal_common_proto_goTypes = []interface{}{
 	(*FVector)(nil),                                                                   // 0: unrealpb.FVector
 	(*UnrealObjectRef)(nil),                                                           // 1: unrealpb.UnrealObjectRef
@@ -3286,14 +3437,16 @@ var file_unreal_common_proto_goTypes = []interface{}{
 	(*PlayerController_ClientRetryClientRestart_Params)(nil),                          // 27: unrealpb.PlayerController_ClientRetryClientRestart_Params
 	(*PlayerController_ServerSetSpectatorLocation_Params)(nil),                        // 28: unrealpb.PlayerController_ServerSetSpectatorLocation_Params
 	(*PlayerController_ServerAcknowledgePossession_Params)(nil),                       // 29: unrealpb.PlayerController_ServerAcknowledgePossession_Params
-	(*GameStateBase)(nil),                                                             // 30: unrealpb.GameStateBase
-	(*UnrealObjectRef_GuidCachedObject)(nil),                                          // 31: unrealpb.UnrealObjectRef.GuidCachedObject
-	(*FRepRootMotionMontage_FRootMotionSource)(nil),                                   // 32: unrealpb.FRepRootMotionMontage.FRootMotionSource
-	(*FRepRootMotionMontage_FRootMotionSourceGroup)(nil),                              // 33: unrealpb.FRepRootMotionMontage.FRootMotionSourceGroup
-	(*FRepRootMotionMontage_FRootMotionSource_FRootMotionFinishVelocitySettings)(nil), // 34: unrealpb.FRepRootMotionMontage.FRootMotionSource.FRootMotionFinishVelocitySettings
+	(*PlayerController_ClientGotoState_Params)(nil),                                   // 30: unrealpb.PlayerController_ClientGotoState_Params
+	(*PlayerController_ClientReceiveLocalizedMessage_Params)(nil),                     // 31: unrealpb.PlayerController_ClientReceiveLocalizedMessage_Params
+	(*GameStateBase)(nil),                                                             // 32: unrealpb.GameStateBase
+	(*UnrealObjectRef_GuidCachedObject)(nil),                                          // 33: unrealpb.UnrealObjectRef.GuidCachedObject
+	(*FRepRootMotionMontage_FRootMotionSource)(nil),                                   // 34: unrealpb.FRepRootMotionMontage.FRootMotionSource
+	(*FRepRootMotionMontage_FRootMotionSourceGroup)(nil),                              // 35: unrealpb.FRepRootMotionMontage.FRootMotionSourceGroup
+	(*FRepRootMotionMontage_FRootMotionSource_FRootMotionFinishVelocitySettings)(nil), // 36: unrealpb.FRepRootMotionMontage.FRootMotionSource.FRootMotionFinishVelocitySettings
 }
 var file_unreal_common_proto_depIdxs = []int32{
-	31, // 0: unrealpb.UnrealObjectRef.context:type_name -> unrealpb.UnrealObjectRef.GuidCachedObject
+	33, // 0: unrealpb.UnrealObjectRef.context:type_name -> unrealpb.UnrealObjectRef.GuidCachedObject
 	1,  // 1: unrealpb.ActorComponentRef.owner:type_name -> unrealpb.UnrealObjectRef
 	1,  // 2: unrealpb.RemoteFunctionMessage.targetObj:type_name -> unrealpb.UnrealObjectRef
 	1,  // 3: unrealpb.SpawnObjectMessage.obj:type_name -> unrealpb.UnrealObjectRef
@@ -3322,7 +3475,7 @@ var file_unreal_common_proto_depIdxs = []int32{
 	0,  // 26: unrealpb.FRepRootMotionMontage.location:type_name -> unrealpb.FVector
 	0,  // 27: unrealpb.FRepRootMotionMontage.rotation:type_name -> unrealpb.FVector
 	2,  // 28: unrealpb.FRepRootMotionMontage.movementBase:type_name -> unrealpb.ActorComponentRef
-	33, // 29: unrealpb.FRepRootMotionMontage.authoritativeRootMotion:type_name -> unrealpb.FRepRootMotionMontage.FRootMotionSourceGroup
+	35, // 29: unrealpb.FRepRootMotionMontage.authoritativeRootMotion:type_name -> unrealpb.FRepRootMotionMontage.FRootMotionSourceGroup
 	0,  // 30: unrealpb.FRepRootMotionMontage.acceleration:type_name -> unrealpb.FVector
 	0,  // 31: unrealpb.FRepRootMotionMontage.linearVelocity:type_name -> unrealpb.FVector
 	11, // 32: unrealpb.CharacterState.rootMotion:type_name -> unrealpb.FRepRootMotionMontage
@@ -3341,16 +3494,19 @@ var file_unreal_common_proto_depIdxs = []int32{
 	0,  // 45: unrealpb.PlayerController_ServerSetSpectatorLocation_Params.newLoc:type_name -> unrealpb.FVector
 	0,  // 46: unrealpb.PlayerController_ServerSetSpectatorLocation_Params.newRot:type_name -> unrealpb.FVector
 	1,  // 47: unrealpb.PlayerController_ServerAcknowledgePossession_Params.pawn:type_name -> unrealpb.UnrealObjectRef
-	34, // 48: unrealpb.FRepRootMotionMontage.FRootMotionSource.finishVelocityParams:type_name -> unrealpb.FRepRootMotionMontage.FRootMotionSource.FRootMotionFinishVelocitySettings
-	32, // 49: unrealpb.FRepRootMotionMontage.FRootMotionSourceGroup.rootMotionSources:type_name -> unrealpb.FRepRootMotionMontage.FRootMotionSource
-	32, // 50: unrealpb.FRepRootMotionMontage.FRootMotionSourceGroup.pendingAddRootMotionSources:type_name -> unrealpb.FRepRootMotionMontage.FRootMotionSource
-	0,  // 51: unrealpb.FRepRootMotionMontage.FRootMotionSourceGroup.lastPreAdditiveVelocity:type_name -> unrealpb.FVector
-	0,  // 52: unrealpb.FRepRootMotionMontage.FRootMotionSource.FRootMotionFinishVelocitySettings.setVelocity:type_name -> unrealpb.FVector
-	53, // [53:53] is the sub-list for method output_type
-	53, // [53:53] is the sub-list for method input_type
-	53, // [53:53] is the sub-list for extension type_name
-	53, // [53:53] is the sub-list for extension extendee
-	0,  // [0:53] is the sub-list for field type_name
+	1,  // 48: unrealpb.PlayerController_ClientReceiveLocalizedMessage_Params.relatedPlayerState_1:type_name -> unrealpb.UnrealObjectRef
+	1,  // 49: unrealpb.PlayerController_ClientReceiveLocalizedMessage_Params.relatedPlayerState_2:type_name -> unrealpb.UnrealObjectRef
+	1,  // 50: unrealpb.PlayerController_ClientReceiveLocalizedMessage_Params.optionalObject:type_name -> unrealpb.UnrealObjectRef
+	36, // 51: unrealpb.FRepRootMotionMontage.FRootMotionSource.finishVelocityParams:type_name -> unrealpb.FRepRootMotionMontage.FRootMotionSource.FRootMotionFinishVelocitySettings
+	34, // 52: unrealpb.FRepRootMotionMontage.FRootMotionSourceGroup.rootMotionSources:type_name -> unrealpb.FRepRootMotionMontage.FRootMotionSource
+	34, // 53: unrealpb.FRepRootMotionMontage.FRootMotionSourceGroup.pendingAddRootMotionSources:type_name -> unrealpb.FRepRootMotionMontage.FRootMotionSource
+	0,  // 54: unrealpb.FRepRootMotionMontage.FRootMotionSourceGroup.lastPreAdditiveVelocity:type_name -> unrealpb.FVector
+	0,  // 55: unrealpb.FRepRootMotionMontage.FRootMotionSource.FRootMotionFinishVelocitySettings.setVelocity:type_name -> unrealpb.FVector
+	56, // [56:56] is the sub-list for method output_type
+	56, // [56:56] is the sub-list for method input_type
+	56, // [56:56] is the sub-list for extension type_name
+	56, // [56:56] is the sub-list for extension extendee
+	0,  // [0:56] is the sub-list for field type_name
 }
 
 func init() { file_unreal_common_proto_init() }
@@ -3720,7 +3876,7 @@ func file_unreal_common_proto_init() {
 			}
 		}
 		file_unreal_common_proto_msgTypes[30].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GameStateBase); i {
+			switch v := v.(*PlayerController_ClientGotoState_Params); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3732,7 +3888,7 @@ func file_unreal_common_proto_init() {
 			}
 		}
 		file_unreal_common_proto_msgTypes[31].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*UnrealObjectRef_GuidCachedObject); i {
+			switch v := v.(*PlayerController_ClientReceiveLocalizedMessage_Params); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3744,7 +3900,7 @@ func file_unreal_common_proto_init() {
 			}
 		}
 		file_unreal_common_proto_msgTypes[32].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*FRepRootMotionMontage_FRootMotionSource); i {
+			switch v := v.(*GameStateBase); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3756,7 +3912,7 @@ func file_unreal_common_proto_init() {
 			}
 		}
 		file_unreal_common_proto_msgTypes[33].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*FRepRootMotionMontage_FRootMotionSourceGroup); i {
+			switch v := v.(*UnrealObjectRef_GuidCachedObject); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3768,6 +3924,30 @@ func file_unreal_common_proto_init() {
 			}
 		}
 		file_unreal_common_proto_msgTypes[34].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*FRepRootMotionMontage_FRootMotionSource); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_unreal_common_proto_msgTypes[35].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*FRepRootMotionMontage_FRootMotionSourceGroup); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_unreal_common_proto_msgTypes[36].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*FRepRootMotionMontage_FRootMotionSource_FRootMotionFinishVelocitySettings); i {
 			case 0:
 				return &v.state
@@ -3795,17 +3975,17 @@ func file_unreal_common_proto_init() {
 	file_unreal_common_proto_msgTypes[19].OneofWrappers = []interface{}{}
 	file_unreal_common_proto_msgTypes[21].OneofWrappers = []interface{}{}
 	file_unreal_common_proto_msgTypes[23].OneofWrappers = []interface{}{}
-	file_unreal_common_proto_msgTypes[30].OneofWrappers = []interface{}{}
 	file_unreal_common_proto_msgTypes[32].OneofWrappers = []interface{}{}
-	file_unreal_common_proto_msgTypes[33].OneofWrappers = []interface{}{}
 	file_unreal_common_proto_msgTypes[34].OneofWrappers = []interface{}{}
+	file_unreal_common_proto_msgTypes[35].OneofWrappers = []interface{}{}
+	file_unreal_common_proto_msgTypes[36].OneofWrappers = []interface{}{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_unreal_common_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   35,
+			NumMessages:   37,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
