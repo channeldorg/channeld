@@ -183,8 +183,6 @@ message PlayerState {
 }
 
 message ControllerState {
-     // Marks that the state should be removed from the containing map
-    bool removed = 1;
     // APlayerState is an actor.
     UnrealObjectRef playerState = 2;
     UnrealObjectRef pawn = 3;

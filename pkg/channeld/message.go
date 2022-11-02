@@ -65,13 +65,23 @@ func handleClientToServerUserMessage(ctx MessageContext) {
 		ctx.Connection.Logger().Error("message is not a ServerForwardMessage, will not be handled.")
 		return
 	}
-	ctx.Connection.Logger().Debug("forward user-space message from client to server",
-		zap.Uint32("msgType", uint32(ctx.MsgType)),
-		zap.Uint32("clientConnId", msg.ClientConnId),
-		zap.Uint32("channelId", uint32(ctx.Channel.id)),
-		zap.Uint32("broadcastType", ctx.Broadcast),
-		zap.Int("payloadSize", len(msg.Payload)),
-	)
+	if len(msg.Payload) < 128 {
+		ctx.Connection.Logger().Debug("forward user-space message from client to server",
+			zap.Uint32("msgType", uint32(ctx.MsgType)),
+			zap.Uint32("clientConnId", msg.ClientConnId),
+			zap.Uint32("channelId", uint32(ctx.Channel.id)),
+			zap.Uint32("broadcastType", ctx.Broadcast),
+			zap.Int("payloadSize", len(msg.Payload)),
+		)
+	} else {
+		ctx.Connection.Logger().Info("forward user-space message from client to server",
+			zap.Uint32("msgType", uint32(ctx.MsgType)),
+			zap.Uint32("clientConnId", msg.ClientConnId),
+			zap.Uint32("channelId", uint32(ctx.Channel.id)),
+			zap.Uint32("broadcastType", ctx.Broadcast),
+			zap.Int("payloadSize", len(msg.Payload)),
+		)
+	}
 
 	if ctx.Channel.HasOwner() {
 		ctx.Channel.ownerConnection.Send(ctx)
@@ -100,13 +110,24 @@ func handleServerToClientUserMessage(ctx MessageContext) {
 		return
 	}
 
-	ctx.Connection.Logger().Debug("forward user-space message from server to client",
-		zap.Uint32("msgType", uint32(ctx.MsgType)),
-		zap.Uint32("clientConnId", msg.ClientConnId),
-		zap.Uint32("channelId", uint32(ctx.Channel.id)),
-		zap.Uint32("broadcastType", ctx.Broadcast),
-		zap.Int("payloadSize", len(msg.Payload)),
-	)
+	if len(msg.Payload) < 128 {
+		ctx.Connection.Logger().Debug("forward user-space message from server to client",
+			zap.Uint32("msgType", uint32(ctx.MsgType)),
+			zap.Uint32("clientConnId", msg.ClientConnId),
+			zap.Uint32("channelId", uint32(ctx.Channel.id)),
+			zap.Uint32("broadcastType", ctx.Broadcast),
+			zap.Int("payloadSize", len(msg.Payload)),
+		)
+	} else {
+		ctx.Connection.Logger().Info("forward user-space message from server to client",
+			zap.Uint32("msgType", uint32(ctx.MsgType)),
+			zap.Uint32("clientConnId", msg.ClientConnId),
+			zap.Uint32("channelId", uint32(ctx.Channel.id)),
+			zap.Uint32("broadcastType", ctx.Broadcast),
+			zap.Int("payloadSize", len(msg.Payload)),
+		)
+
+	}
 
 	switch channeldpb.BroadcastType(ctx.Broadcast) {
 	case channeldpb.BroadcastType_NO_BROADCAST:
