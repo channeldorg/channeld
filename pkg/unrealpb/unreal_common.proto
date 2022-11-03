@@ -37,7 +37,8 @@ message RemoteFunctionMessage {
 
 message SpawnObjectMessage {
     UnrealObjectRef obj = 1;
-    optional uint32 localRole = 2;
+    optional uint32 channelId = 2;
+    optional uint32 localRole = 3;
 }
 
 message FRepMovement {
