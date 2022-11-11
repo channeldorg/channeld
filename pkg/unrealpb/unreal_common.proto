@@ -41,6 +41,11 @@ message SpawnObjectMessage {
     optional uint32 localRole = 3;
 }
 
+message ServerSpawnedPlayerMessage {
+    uint32 clientConnId = 1;
+    FVector startPos = 2;
+}
+
 message FRepMovement {
     optional FVector linearVelocity = 1;
     optional FVector angularVelocity = 2;

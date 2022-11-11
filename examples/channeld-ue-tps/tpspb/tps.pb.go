@@ -124,6 +124,53 @@ func (x *TestRepChannelData) GetSceneComponentStates() map[uint32]*unrealpb.Scen
 	return nil
 }
 
+type GlobalChannelData struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	GameState *unrealpb.GameStateBase `protobuf:"bytes,1,opt,name=gameState,proto3" json:"gameState,omitempty"`
+}
+
+func (x *GlobalChannelData) Reset() {
+	*x = GlobalChannelData{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_tps_proto_msgTypes[1]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GlobalChannelData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GlobalChannelData) ProtoMessage() {}
+
+func (x *GlobalChannelData) ProtoReflect() protoreflect.Message {
+	mi := &file_tps_proto_msgTypes[1]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GlobalChannelData.ProtoReflect.Descriptor instead.
+func (*GlobalChannelData) Descriptor() ([]byte, []int) {
+	return file_tps_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *GlobalChannelData) GetGameState() *unrealpb.GameStateBase {
+	if x != nil {
+		return x.GameState
+	}
+	return nil
+}
+
 var File_tps_proto protoreflect.FileDescriptor
 
 var file_tps_proto_rawDesc = []byte{
@@ -218,11 +265,15 @@ var file_tps_proto_rawDesc = []byte{
 	0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1d, 0x2e, 0x75, 0x6e, 0x72,
 	0x65, 0x61, 0x6c, 0x70, 0x62, 0x2e, 0x53, 0x63, 0x65, 0x6e, 0x65, 0x43, 0x6f, 0x6d, 0x70, 0x6f,
 	0x6e, 0x65, 0x6e, 0x74, 0x53, 0x74, 0x61, 0x74, 0x65, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65,
-	0x3a, 0x02, 0x38, 0x01, 0x42, 0x35, 0x5a, 0x33, 0x63, 0x68, 0x61, 0x6e, 0x6e, 0x65, 0x6c, 0x64,
-	0x2e, 0x63, 0x6c, 0x65, 0x77, 0x63, 0x61, 0x74, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x65, 0x78, 0x61,
-	0x6d, 0x70, 0x6c, 0x65, 0x73, 0x2f, 0x63, 0x68, 0x61, 0x6e, 0x6e, 0x65, 0x6c, 0x64, 0x2d, 0x75,
-	0x65, 0x2d, 0x74, 0x70, 0x73, 0x2f, 0x74, 0x70, 0x73, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x33,
+	0x3a, 0x02, 0x38, 0x01, 0x22, 0x4a, 0x0a, 0x11, 0x47, 0x6c, 0x6f, 0x62, 0x61, 0x6c, 0x43, 0x68,
+	0x61, 0x6e, 0x6e, 0x65, 0x6c, 0x44, 0x61, 0x74, 0x61, 0x12, 0x35, 0x0a, 0x09, 0x67, 0x61, 0x6d,
+	0x65, 0x53, 0x74, 0x61, 0x74, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x17, 0x2e, 0x75,
+	0x6e, 0x72, 0x65, 0x61, 0x6c, 0x70, 0x62, 0x2e, 0x47, 0x61, 0x6d, 0x65, 0x53, 0x74, 0x61, 0x74,
+	0x65, 0x42, 0x61, 0x73, 0x65, 0x52, 0x09, 0x67, 0x61, 0x6d, 0x65, 0x53, 0x74, 0x61, 0x74, 0x65,
+	0x42, 0x35, 0x5a, 0x33, 0x63, 0x68, 0x61, 0x6e, 0x6e, 0x65, 0x6c, 0x64, 0x2e, 0x63, 0x6c, 0x65,
+	0x77, 0x63, 0x61, 0x74, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65,
+	0x73, 0x2f, 0x63, 0x68, 0x61, 0x6e, 0x6e, 0x65, 0x6c, 0x64, 0x2d, 0x75, 0x65, 0x2d, 0x74, 0x70,
+	0x73, 0x2f, 0x74, 0x70, 0x73, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -237,46 +288,48 @@ func file_tps_proto_rawDescGZIP() []byte {
 	return file_tps_proto_rawDescData
 }
 
-var file_tps_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_tps_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_tps_proto_goTypes = []interface{}{
 	(*TestRepChannelData)(nil),             // 0: tpspb.TestRepChannelData
-	nil,                                    // 1: tpspb.TestRepChannelData.ActorStatesEntry
-	nil,                                    // 2: tpspb.TestRepChannelData.CharacterStatesEntry
-	nil,                                    // 3: tpspb.TestRepChannelData.PlayerStatesEntry
-	nil,                                    // 4: tpspb.TestRepChannelData.ControllerStatesEntry
-	nil,                                    // 5: tpspb.TestRepChannelData.PlayerControllerStatesEntry
-	nil,                                    // 6: tpspb.TestRepChannelData.ActorComponentStatesEntry
-	nil,                                    // 7: tpspb.TestRepChannelData.SceneComponentStatesEntry
-	(*unrealpb.GameStateBase)(nil),         // 8: unrealpb.GameStateBase
-	(*unrealpb.ActorState)(nil),            // 9: unrealpb.ActorState
-	(*unrealpb.CharacterState)(nil),        // 10: unrealpb.CharacterState
-	(*unrealpb.PlayerState)(nil),           // 11: unrealpb.PlayerState
-	(*unrealpb.ControllerState)(nil),       // 12: unrealpb.ControllerState
-	(*unrealpb.PlayerControllerState)(nil), // 13: unrealpb.PlayerControllerState
-	(*unrealpb.ActorComponentState)(nil),   // 14: unrealpb.ActorComponentState
-	(*unrealpb.SceneComponentState)(nil),   // 15: unrealpb.SceneComponentState
+	(*GlobalChannelData)(nil),              // 1: tpspb.GlobalChannelData
+	nil,                                    // 2: tpspb.TestRepChannelData.ActorStatesEntry
+	nil,                                    // 3: tpspb.TestRepChannelData.CharacterStatesEntry
+	nil,                                    // 4: tpspb.TestRepChannelData.PlayerStatesEntry
+	nil,                                    // 5: tpspb.TestRepChannelData.ControllerStatesEntry
+	nil,                                    // 6: tpspb.TestRepChannelData.PlayerControllerStatesEntry
+	nil,                                    // 7: tpspb.TestRepChannelData.ActorComponentStatesEntry
+	nil,                                    // 8: tpspb.TestRepChannelData.SceneComponentStatesEntry
+	(*unrealpb.GameStateBase)(nil),         // 9: unrealpb.GameStateBase
+	(*unrealpb.ActorState)(nil),            // 10: unrealpb.ActorState
+	(*unrealpb.CharacterState)(nil),        // 11: unrealpb.CharacterState
+	(*unrealpb.PlayerState)(nil),           // 12: unrealpb.PlayerState
+	(*unrealpb.ControllerState)(nil),       // 13: unrealpb.ControllerState
+	(*unrealpb.PlayerControllerState)(nil), // 14: unrealpb.PlayerControllerState
+	(*unrealpb.ActorComponentState)(nil),   // 15: unrealpb.ActorComponentState
+	(*unrealpb.SceneComponentState)(nil),   // 16: unrealpb.SceneComponentState
 }
 var file_tps_proto_depIdxs = []int32{
-	8,  // 0: tpspb.TestRepChannelData.gameState:type_name -> unrealpb.GameStateBase
-	1,  // 1: tpspb.TestRepChannelData.actorStates:type_name -> tpspb.TestRepChannelData.ActorStatesEntry
-	2,  // 2: tpspb.TestRepChannelData.characterStates:type_name -> tpspb.TestRepChannelData.CharacterStatesEntry
-	3,  // 3: tpspb.TestRepChannelData.playerStates:type_name -> tpspb.TestRepChannelData.PlayerStatesEntry
-	4,  // 4: tpspb.TestRepChannelData.controllerStates:type_name -> tpspb.TestRepChannelData.ControllerStatesEntry
-	5,  // 5: tpspb.TestRepChannelData.playerControllerStates:type_name -> tpspb.TestRepChannelData.PlayerControllerStatesEntry
-	6,  // 6: tpspb.TestRepChannelData.actorComponentStates:type_name -> tpspb.TestRepChannelData.ActorComponentStatesEntry
-	7,  // 7: tpspb.TestRepChannelData.sceneComponentStates:type_name -> tpspb.TestRepChannelData.SceneComponentStatesEntry
-	9,  // 8: tpspb.TestRepChannelData.ActorStatesEntry.value:type_name -> unrealpb.ActorState
-	10, // 9: tpspb.TestRepChannelData.CharacterStatesEntry.value:type_name -> unrealpb.CharacterState
-	11, // 10: tpspb.TestRepChannelData.PlayerStatesEntry.value:type_name -> unrealpb.PlayerState
-	12, // 11: tpspb.TestRepChannelData.ControllerStatesEntry.value:type_name -> unrealpb.ControllerState
-	13, // 12: tpspb.TestRepChannelData.PlayerControllerStatesEntry.value:type_name -> unrealpb.PlayerControllerState
-	14, // 13: tpspb.TestRepChannelData.ActorComponentStatesEntry.value:type_name -> unrealpb.ActorComponentState
-	15, // 14: tpspb.TestRepChannelData.SceneComponentStatesEntry.value:type_name -> unrealpb.SceneComponentState
-	15, // [15:15] is the sub-list for method output_type
-	15, // [15:15] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	9,  // 0: tpspb.TestRepChannelData.gameState:type_name -> unrealpb.GameStateBase
+	2,  // 1: tpspb.TestRepChannelData.actorStates:type_name -> tpspb.TestRepChannelData.ActorStatesEntry
+	3,  // 2: tpspb.TestRepChannelData.characterStates:type_name -> tpspb.TestRepChannelData.CharacterStatesEntry
+	4,  // 3: tpspb.TestRepChannelData.playerStates:type_name -> tpspb.TestRepChannelData.PlayerStatesEntry
+	5,  // 4: tpspb.TestRepChannelData.controllerStates:type_name -> tpspb.TestRepChannelData.ControllerStatesEntry
+	6,  // 5: tpspb.TestRepChannelData.playerControllerStates:type_name -> tpspb.TestRepChannelData.PlayerControllerStatesEntry
+	7,  // 6: tpspb.TestRepChannelData.actorComponentStates:type_name -> tpspb.TestRepChannelData.ActorComponentStatesEntry
+	8,  // 7: tpspb.TestRepChannelData.sceneComponentStates:type_name -> tpspb.TestRepChannelData.SceneComponentStatesEntry
+	9,  // 8: tpspb.GlobalChannelData.gameState:type_name -> unrealpb.GameStateBase
+	10, // 9: tpspb.TestRepChannelData.ActorStatesEntry.value:type_name -> unrealpb.ActorState
+	11, // 10: tpspb.TestRepChannelData.CharacterStatesEntry.value:type_name -> unrealpb.CharacterState
+	12, // 11: tpspb.TestRepChannelData.PlayerStatesEntry.value:type_name -> unrealpb.PlayerState
+	13, // 12: tpspb.TestRepChannelData.ControllerStatesEntry.value:type_name -> unrealpb.ControllerState
+	14, // 13: tpspb.TestRepChannelData.PlayerControllerStatesEntry.value:type_name -> unrealpb.PlayerControllerState
+	15, // 14: tpspb.TestRepChannelData.ActorComponentStatesEntry.value:type_name -> unrealpb.ActorComponentState
+	16, // 15: tpspb.TestRepChannelData.SceneComponentStatesEntry.value:type_name -> unrealpb.SceneComponentState
+	16, // [16:16] is the sub-list for method output_type
+	16, // [16:16] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_tps_proto_init() }
@@ -297,6 +350,18 @@ func file_tps_proto_init() {
 				return nil
 			}
 		}
+		file_tps_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GlobalChannelData); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -304,7 +369,7 @@ func file_tps_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_tps_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
