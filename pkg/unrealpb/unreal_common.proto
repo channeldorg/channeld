@@ -112,6 +112,41 @@ message FBasedMovementInfo {
     optional bool bServerHasVelocity = 7;
 }
 
+message FRootMotionSource {
+    optional uint32 priority = 1;
+    optional uint32 localId = 2;
+    optional uint32 accumulatedMode = 3;
+    optional string instanceName = 4;
+    optional float startTime = 5;
+    optional float currentTime = 6;
+    optional float previousTime = 7;
+    optional float duration = 8;
+    optional uint32 status = 9;
+    optional uint32 settings = 10;
+    optional bool bInLocalSpace = 11;
+    optional bool bNeedsSimulatedCatchup = 12;
+    optional bool bSimulatedNeedsSmoothing = 13;
+    optional bool bHasRootMotion = 14;
+    optional float blendWeight = 15;
+    message FRootMotionFinishVelocitySettings {
+        optional uint32 mode = 1;
+        optional FVector setVelocity = 2;
+        optional float clampVelocity = 3;
+    }
+    optional FRootMotionFinishVelocitySettings finishVelocityParams = 16;
+}
+
+message FRootMotionSourceGroup {
+    repeated FRootMotionSource rootMotionSources = 1;
+    repeated FRootMotionSource pendingAddRootMotionSources = 2;
+    optional bool bHasAdditiveSources = 3;
+    optional bool bHasOverrideSources = 4;
+    optional bool bHasOverrideSourcesWithIgnoreZAccumulate = 5;
+    optional bool bIsAdditiveVelocityApplied = 6;
+    optional uint32 lastAccumulatedSettings = 7;
+    optional FVector lastPreAdditiveVelocity = 8;
+}
+
 message FRepRootMotionMontage {
     optional bool bIsActive = 1;
     optional UnrealObjectRef animMontage = 2;
@@ -122,39 +157,6 @@ message FRepRootMotionMontage {
     optional string movementBaseBoneName = 7;
     optional bool bRelativePosition = 8;
     optional bool bRelativeRotation = 9;
-    message FRootMotionSource {
-        optional uint32 priority = 1;
-        optional uint32 localId = 2;
-        optional uint32 accumulatedMode = 3;
-        optional string instanceName = 4;
-        optional float startTime = 5;
-        optional float currentTime = 6;
-        optional float previousTime = 7;
-        optional float duration = 8;
-        optional uint32 status = 9;
-        optional uint32 settings = 10;
-        optional bool bInLocalSpace = 11;
-        optional bool bNeedsSimulatedCatchup = 12;
-        optional bool bSimulatedNeedsSmoothing = 13;
-        optional bool bHasRootMotion = 14;
-        optional float blendWeight = 15;
-        message FRootMotionFinishVelocitySettings {
-            optional uint32 mode = 1;
-            optional FVector setVelocity = 2;
-            optional float clampVelocity = 3;
-        }
-        optional FRootMotionFinishVelocitySettings finishVelocityParams = 16;
-    }
-    message FRootMotionSourceGroup {
-        repeated FRootMotionSource rootMotionSources = 1;
-        repeated FRootMotionSource pendingAddRootMotionSources = 2;
-        optional bool bHasAdditiveSources = 3;
-        optional bool bHasOverrideSources = 4;
-        optional bool bHasOverrideSourcesWithIgnoreZAccumulate = 5;
-        optional bool bIsAdditiveVelocityApplied = 6;
-        optional uint32 lastAccumulatedSettings = 7;
-        optional FVector lastPreAdditiveVelocity = 8;
-    }
     optional FRootMotionSourceGroup authoritativeRootMotion = 10;
     optional FVector acceleration = 11;
     optional FVector linearVelocity = 12;
@@ -272,4 +274,19 @@ message GameStateBase {
     optional string gameModeClassName = 3;
     optional float replicatedWorldTimeSeconds = 4;
     optional bool bReplicatedHasBegunPlay = 5;
+}
+
+// For customized FCharacterMoveResponseDataContainer::Serialize
+message FClientAdjustment {
+    optional bool bAckGoodMove = 1;
+    optional float timeStamp = 2;
+    optional FVector newLoc = 3;
+    optional FVector newVel = 4;
+    optional FVector newRot = 5;
+    optional UnrealObjectRef newBase = 6;
+    optional string newBaseBoneName = 7;
+    optional bool bBaseRelativePosition = 8;
+    optional FRootMotionSourceGroup rootMotionSourceCorrection = 9;
+    optional FVector rootMotionRotation = 10;
+    optional uint32 movementMode = 11;
 }
