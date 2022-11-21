@@ -14,11 +14,13 @@ import (
 
 var globalSendNum int32 = 0
 var globalReceiveNum int32 = 0
+var globalPacketReceiveNum int32 = 0
 
 func OnChatFinished() {
 	desired2ReceivedNum := float32(ClientNum) * float32(globalSendNum)
 	log.Printf("loss ratio: %f percent", (desired2ReceivedNum-float32(globalReceiveNum))/desired2ReceivedNum*100)
 	log.Printf("desired to received num: %d, global recevied num: %d, global send num: %d, client num: %d", int(desired2ReceivedNum), globalReceiveNum, globalSendNum, ClientNum)
+	log.Printf("global packet received num: %d", globalPacketReceiveNum)
 }
 
 func ChatClientFinishedFunc(c *client.ChanneldClient, data *clientData) {
@@ -30,6 +32,7 @@ func ChatInitFunc(c *client.ChanneldClient, data *clientData) {
 	data.ctx["receivedSelfNum"] = 0
 
 	c.AddMessageHandler(uint32(channeldpb.MessageType_CHANNEL_DATA_UPDATE), func(client *client.ChanneldClient, channelId uint32, m client.Message) {
+		atomic.AddInt32(&globalPacketReceiveNum, 1)
 		msg := m.(*channeldpb.ChannelDataUpdateMessage)
 		chatData := &chatpb.ChatChannelData{}
 		msg.Data.UnmarshalTo(chatData)
