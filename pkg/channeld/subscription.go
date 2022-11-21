@@ -44,7 +44,7 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.Channel
 			DataAccess:       channeldpb.ChannelDataAccess_WRITE_ACCESS,
 			DataFieldMasks:   make([]string, 0),
 			FanOutIntervalMs: GlobalSettings.GetChannelSettings(ch.channelType).DefaultFanOutIntervalMs,
-			FanOutDelayMs:    0,
+			FanOutDelayMs:    GlobalSettings.GetChannelSettings(ch.channelType).DefaultFanOutDelayMs,
 		}
 	}
 	cs.fanOutElement = ch.fanOutQueue.PushFront(&fanOutConnection{

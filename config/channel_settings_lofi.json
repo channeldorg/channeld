@@ -2,6 +2,7 @@
     "1": {
         "TickIntervalMs": 100,
         "DefaultFanOutIntervalMs": 200,
+        "DefaultFanOutDelayMs": 0,
         "RemoveChannelAfterOwnerRemoved": false,
         "ACLSettings": {
             "Sub": 3,
@@ -12,6 +13,7 @@
     "2": {
         "TickIntervalMs": 100,
         "DefaultFanOutIntervalMs": 200,
+        "DefaultFanOutDelayMs": 0,
         "RemoveChannelAfterOwnerRemoved": true,
         "ACLSettings": {
             "Sub": 2,
@@ -22,6 +24,7 @@
     "3": {
         "TickIntervalMs": 100,
         "DefaultFanOutIntervalMs": 200,
+        "DefaultFanOutDelayMs": 0,
         "RemoveChannelAfterOwnerRemoved": true,
         "ACLSettings": {
             "Sub": 3,
