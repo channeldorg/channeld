@@ -46,6 +46,12 @@ message ServerSpawnedPlayerMessage {
     FVector startPos = 2;
 }
 
+message DestroyObjectMessage {
+    uint32 netId = 1;
+    uint32 reason = 2;
+}
+
+
 message FRepMovement {
     optional FVector linearVelocity = 1;
     optional FVector angularVelocity = 2;

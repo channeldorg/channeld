@@ -559,7 +559,7 @@ func (c *Connection) receiveMessage(mp *channeldpb.MessagePack) {
 				c.Logger().Error("unmarshalling ServerForwardMessage", zap.Error(err))
 				return
 			}
-			handler = handleServerToClientUserMessage
+			handler = HandleServerToClientUserMessage
 		}
 	} else {
 		handler = entry.handler

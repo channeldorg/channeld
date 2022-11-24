@@ -103,7 +103,7 @@ func handleClientToServerUserMessage(ctx MessageContext) {
 	}
 }
 
-func handleServerToClientUserMessage(ctx MessageContext) {
+func HandleServerToClientUserMessage(ctx MessageContext) {
 	msg, ok := ctx.Msg.(*channeldpb.ServerForwardMessage)
 	if !ok {
 		ctx.Connection.Logger().Error("message is not a ServerForwardMessage, will not be handled.")
@@ -497,9 +497,9 @@ func handleSubToChannel(ctx MessageContext) {
 		return
 	}
 
-	var connToSub ConnectionInChannel
+	var connToSub *Connection
 	if ctx.Connection.GetConnectionType() == channeldpb.ConnectionType_CLIENT {
-		connToSub = ctx.Connection
+		connToSub = ctx.Connection.(*Connection)
 	} else {
 		// Only the server can specify a ConnId.
 		connToSub = GetConnection(ConnectionId(msg.ConnId))

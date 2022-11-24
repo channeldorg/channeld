@@ -38,7 +38,7 @@ func main() {
 		GridHeight:   5000,
 		GridCols:     2,
 		GridRows:     2,
-		ServerCols:   2,
+		ServerCols:   1,
 		ServerRows:   1,
 		// GridWidth:                10,
 		// GridHeight:               10,
@@ -47,6 +47,8 @@ func main() {
 		// ServerCols:               1,
 		// ServerRows:               1,
 		ServerInterestBorderSize: 0})
+
+	channeld.RegisterMessageHandler(103, &channeldpb.ServerForwardMessage{}, tpspb.HandleUnrealSpawnObject)
 
 	// Setup Prometheus
 	http.Handle("/metrics", promhttp.Handler())

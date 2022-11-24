@@ -16,6 +16,10 @@ type Logger struct {
 
 var rootLogger *Logger //*zap.Logger
 
+func RootLogger() *Logger {
+	return rootLogger
+}
+
 const TraceLevel LogLevel = -2
 
 /*
