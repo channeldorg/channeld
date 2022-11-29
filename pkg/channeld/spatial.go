@@ -35,6 +35,10 @@ func InitSpatialController(controller SpatialController) {
 	spatialController = controller
 }
 
+func GetSpatialController() SpatialController {
+	return spatialController
+}
+
 const (
 	MinY = -3.40282347e+38 / 2
 	MaxY = 3.40282347e+38 / 2

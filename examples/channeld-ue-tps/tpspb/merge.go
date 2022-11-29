@@ -18,7 +18,7 @@ var allSpawnedObj map[uint32]*unrealpb.UnrealObjectRef = make(map[uint32]*unreal
 var allSpawnedObjLock sync.RWMutex
 
 func HandleUnrealSpawnObject(ctx channeld.MessageContext) {
-	channeld.HandleServerToClientUserMessage(ctx)
+	defer channeld.HandleServerToClientUserMessage(ctx)
 
 	// server -> channeld -> client
 	msg, ok := ctx.Msg.(*channeldpb.ServerForwardMessage)
@@ -39,17 +39,45 @@ func HandleUnrealSpawnObject(ctx channeld.MessageContext) {
 		return
 	}
 
+	// Update the message's spaital channelId based on the actor's location
+	oldChId := *spawnMsg.ChannelId
+	if spawnMsg.Location != nil {
+		spatialChId, err := channeld.GetSpatialController().GetChannelId(common.SpatialInfo{
+			X: float64(*spawnMsg.Location.X),
+			Y: float64(*spawnMsg.Location.Y),
+			Z: float64(*spawnMsg.Location.Z),
+		})
+		if err != nil {
+			ctx.Connection.Logger().Warn("failed to GetChannelId", zap.Error(err),
+				zap.Float32("x", *spawnMsg.Location.X),
+				zap.Float32("y", *spawnMsg.Location.Y),
+				zap.Float32("z", *spawnMsg.Location.Z))
+			return
+		}
+		*spawnMsg.ChannelId = uint32(spatialChId)
+		if *spawnMsg.ChannelId != oldChId {
+			newPayload, err := proto.Marshal(spawnMsg)
+			if err == nil {
+				msg.Payload = newPayload
+			}
+		}
+	}
+
 	defer allSpawnedObjLock.Unlock()
 	allSpawnedObjLock.Lock()
 	allSpawnedObj[*spawnMsg.Obj.NetGUID] = spawnMsg.Obj
-	channeld.RootLogger().Debug("stored UnrealObjectRef from spawn message", zap.Uint32("netId", *spawnMsg.Obj.NetGUID))
+	channeld.RootLogger().Debug("stored UnrealObjectRef from spawn message",
+		zap.Uint32("netId", *spawnMsg.Obj.NetGUID),
+		zap.Uint32("oldChId", oldChId),
+		zap.Uint32("newChId", *spawnMsg.ChannelId),
+	)
 }
 
 // Implement [channeld.MergeableChannelData]
 func (dst *TestRepChannelData) Merge(src proto.Message, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) error {
+	srcMsg, ok := src.(*TestRepChannelData)
 
 	if spatialNotifier != nil {
-		srcMsg, ok := src.(*TestRepChannelData)
 		if !ok {
 			return errors.New("src is not a TestRepChannelData")
 		}
@@ -154,6 +182,19 @@ func (dst *TestRepChannelData) Merge(src proto.Message, options *channeldpb.Chan
 
 	// FIXME: manual copy properties instead of using reflection
 	proto.Merge(dst, src)
+
+	// Remove the states from the maps
+	for netId, newActorState := range srcMsg.ActorStates {
+		if newActorState.Removed {
+			delete(dst.ActorStates, netId)
+			delete(dst.PawnStates, netId)
+			delete(dst.CharacterStates, netId)
+			delete(dst.PlayerStates, netId)
+			delete(dst.ControllerStates, netId)
+			delete(dst.PlayerControllerStates, netId)
+			continue
+		}
+	}
 
 	return nil
 }

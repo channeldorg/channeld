@@ -53,7 +53,7 @@
         "mode": "debug",
         "cwd": "${workspaceFolder}",
         "program": "examples/channeld-ue-tps/main.go",
-        "args": ["-cfsm=config/client_authoratative_fsm.json", "-dev", "-loglevel=-1", "-profile=cpu", "-ct=0", "-mcb=13"]
+        "args": ["-cfsm=config/client_authoratative_fsm.json", "-dev", "-loglevel=-1", "-ct=0", "-mcb=13"]
     },
     {
         "name": "Launch replay session",

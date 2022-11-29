@@ -39,6 +39,9 @@ message SpawnObjectMessage {
     UnrealObjectRef obj = 1;
     optional uint32 channelId = 2;
     optional uint32 localRole = 3;
+    optional uint32 owningConnId = 4;
+    // Only used by the spatial channel
+    optional FVector location = 5;
 }
 
 message ServerSpawnedPlayerMessage {
@@ -280,6 +283,12 @@ message GameStateBase {
     optional string gameModeClassName = 3;
     optional float replicatedWorldTimeSeconds = 4;
     optional bool bReplicatedHasBegunPlay = 5;
+}
+
+message PawnState {
+    UnrealObjectRef playerState = 1;
+    UnrealObjectRef controller = 2;
+    optional uint32 remoteViewPitch = 3;
 }
 
 // For customized FCharacterMoveResponseDataContainer::Serialize
