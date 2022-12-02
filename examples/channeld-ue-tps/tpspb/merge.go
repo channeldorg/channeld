@@ -42,10 +42,11 @@ func HandleUnrealSpawnObject(ctx channeld.MessageContext) {
 	// Update the message's spaital channelId based on the actor's location
 	oldChId := *spawnMsg.ChannelId
 	if spawnMsg.Location != nil {
+		// Swap the Y and Z as UE uses the Z-Up rule but channeld uses the Y-up rule.
 		spatialChId, err := channeld.GetSpatialController().GetChannelId(common.SpatialInfo{
 			X: float64(*spawnMsg.Location.X),
-			Y: float64(*spawnMsg.Location.Y),
-			Z: float64(*spawnMsg.Location.Z),
+			Y: float64(*spawnMsg.Location.Z),
+			Z: float64(*spawnMsg.Location.Y),
 		})
 		if err != nil {
 			ctx.Connection.Logger().Warn("failed to GetChannelId", zap.Error(err),
@@ -75,15 +76,14 @@ func HandleUnrealSpawnObject(ctx channeld.MessageContext) {
 
 // Implement [channeld.MergeableChannelData]
 func (dst *TestRepChannelData) Merge(src proto.Message, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) error {
-	srcMsg, ok := src.(*TestRepChannelData)
+	srcData, ok := src.(*TestRepChannelData)
+	if !ok {
+		return errors.New("src is not a TestRepChannelData")
+	}
 
 	if spatialNotifier != nil {
-		if !ok {
-			return errors.New("src is not a TestRepChannelData")
-		}
-
 		// src = the upcoming update, dst = existing channel data
-		for netId, newActorState := range srcMsg.ActorStates {
+		for netId, newActorState := range srcData.ActorStates {
 			oldActorState, exists := dst.ActorStates[netId]
 			if exists {
 				if newActorState.ReplicatedMovement != nil && newActorState.ReplicatedMovement.Location != nil &&
@@ -103,6 +103,7 @@ func (dst *TestRepChannelData) Merge(src proto.Message, options *channeldpb.Chan
 					}
 					if newX != *oldLoc.X || newY != *oldLoc.Y {
 						spatialNotifier.Notify(
+							// Swap the Y and Z as UE uses the Z-Up rule but channeld uses the Y-up rule.
 							common.SpatialInfo{
 								X: float64(*oldLoc.X),
 								Z: float64(*oldLoc.Y)},
@@ -112,7 +113,10 @@ func (dst *TestRepChannelData) Merge(src proto.Message, options *channeldpb.Chan
 							func() proto.Message {
 								defer allSpawnedObjLock.RLocker().Unlock()
 								allSpawnedObjLock.RLock()
-								return allSpawnedObj[netId]
+								return &unrealpb.HandoverData{
+									Obj:          allSpawnedObj[netId],
+									ClientConnId: oldActorState.OwningConnId,
+								}
 							},
 						)
 					}
@@ -121,70 +125,40 @@ func (dst *TestRepChannelData) Merge(src proto.Message, options *channeldpb.Chan
 		}
 	}
 
-	/*
+	// The maps can be nil after InitData().
+	if dst.ActorStates == nil {
+		dst.ActorStates = make(map[uint32]*unrealpb.ActorState)
+	}
+	if dst.PawnStates == nil {
+		dst.PawnStates = make(map[uint32]*unrealpb.PawnState)
+	}
+	if dst.CharacterStates == nil {
+		dst.CharacterStates = make(map[uint32]*unrealpb.CharacterState)
+	}
+	if dst.PlayerStates == nil {
+		dst.PlayerStates = make(map[uint32]*unrealpb.PlayerState)
+	}
+	if dst.ControllerStates == nil {
+		dst.ControllerStates = make(map[uint32]*unrealpb.ControllerState)
+	}
+	if dst.PlayerControllerStates == nil {
+		dst.PlayerControllerStates = make(map[uint32]*unrealpb.PlayerControllerState)
+	}
+	if dst.ActorComponentStates == nil {
+		dst.ActorComponentStates = make(map[uint32]*unrealpb.ActorComponentState)
+	}
+	if dst.SceneComponentStates == nil {
+		dst.SceneComponentStates = make(map[uint32]*unrealpb.SceneComponentState)
+	}
 
-		if dst.SceneComponentStates == nil {
-			dst.SceneComponentStates = make(map[uint32]*unrealpb.SceneComponentState)
-		}
+	// channeld.ReflectMerge(dst, src, options)
 
-		for k, v := range srcMsg.SceneComponentStates {
-			if v.Removed {
-				delete(dst.SceneComponentStates, k)
-				continue
-			}
+	if srcData.GameState != nil {
+		proto.Merge(dst.GameState, srcData.GameState)
+	}
 
-			trans, exists := dst.SceneComponentStates[k]
-			if exists {
-				if v.RelativeLocation != nil {
-					trans.RelativeLocation = v.RelativeLocation
-				}
-				if v.RelativeRotation != nil {
-					trans.RelativeRotation = v.RelativeRotation
-				}
-				if v.RelativeScale != nil {
-					trans.RelativeScale = v.RelativeScale
-				}
-			} else {
-				dst.SceneComponentStates[k] = v
-			}
-		}
-
-		for k, v := range srcMsg.CharacterStates {
-			if v.Removed {
-				delete(dst.CharacterStates, k)
-				continue
-			}
-
-			char, exists := dst.CharacterStates[k]
-			if exists {
-				if v.RootMotion != nil {
-					if char.RootMotion == nil {
-						char.RootMotion = v.RootMotion
-					} else {
-						// FIXME: manual copy properties instead of using reflection
-						proto.Merge(char.RootMotion, v.RootMotion)
-					}
-				}
-				if v.BasedMovement != nil {
-					if char.BasedMovement == nil {
-						char.BasedMovement = v.BasedMovement
-					} else {
-						proto.Merge(char.BasedMovement, v.BasedMovement)
-					}
-				}
-				// if v.HasServerLastTransformUpdateTimeStamp() {
-				if v.ProtoReflect().Has(v.ProtoReflect().Descriptor().Fields().ByNumber(4)) {
-					char.ServerLastTransformUpdateTimeStamp = v.ServerLastTransformUpdateTimeStamp
-				}
-			}
-		}
-	*/
-
-	// FIXME: manual copy properties instead of using reflection
-	proto.Merge(dst, src)
-
-	// Remove the states from the maps
-	for netId, newActorState := range srcMsg.ActorStates {
+	for netId, newActorState := range srcData.ActorStates {
+		// Remove the states from the maps
 		if newActorState.Removed {
 			delete(dst.ActorStates, netId)
 			delete(dst.PawnStates, netId)
@@ -193,6 +167,81 @@ func (dst *TestRepChannelData) Merge(src proto.Message, options *channeldpb.Chan
 			delete(dst.ControllerStates, netId)
 			delete(dst.PlayerControllerStates, netId)
 			continue
+		} else {
+			oldActorState, exists := dst.ActorStates[netId]
+			if exists {
+				proto.Merge(oldActorState, newActorState)
+			} else {
+				dst.ActorStates[netId] = newActorState
+			}
+		}
+	}
+
+	for netId, newPawnState := range srcData.PawnStates {
+		oldPawnState, exists := dst.PawnStates[netId]
+		if exists {
+			proto.Merge(oldPawnState, newPawnState)
+		} else {
+			dst.PawnStates[netId] = newPawnState
+		}
+	}
+
+	for netId, newCharacterState := range srcData.CharacterStates {
+		oldCharacterState, exists := dst.CharacterStates[netId]
+		if exists {
+			proto.Merge(oldCharacterState, newCharacterState)
+		} else {
+			dst.CharacterStates[netId] = newCharacterState
+		}
+	}
+
+	for netId, newPlayerState := range srcData.PlayerStates {
+		oldPlayerState, exists := dst.PlayerStates[netId]
+		if exists {
+			proto.Merge(oldPlayerState, newPlayerState)
+		} else {
+			dst.PlayerStates[netId] = newPlayerState
+		}
+	}
+
+	for netId, newControllerState := range srcData.ControllerStates {
+		oldControllerState, exists := dst.ControllerStates[netId]
+		if exists {
+			proto.Merge(oldControllerState, newControllerState)
+		} else {
+			dst.ControllerStates[netId] = newControllerState
+		}
+	}
+
+	for netId, newPlayerControllerState := range srcData.PlayerControllerStates {
+		oldPlayerControllerState, exists := dst.PlayerControllerStates[netId]
+		if exists {
+			proto.Merge(oldPlayerControllerState, newPlayerControllerState)
+		} else {
+			dst.PlayerControllerStates[netId] = newPlayerControllerState
+		}
+	}
+
+	for netId, newActorCompState := range srcData.ActorComponentStates {
+		if newActorCompState.Removed {
+			delete(dst.ActorComponentStates, netId)
+			delete(dst.SceneComponentStates, netId)
+		} else {
+			oldActorCompState, exists := dst.ActorComponentStates[netId]
+			if exists {
+				proto.Merge(oldActorCompState, newActorCompState)
+			} else {
+				dst.ActorComponentStates[netId] = newActorCompState
+			}
+		}
+	}
+
+	for netId, newSceneCompState := range srcData.SceneComponentStates {
+		oldSceneCompState, exists := dst.SceneComponentStates[netId]
+		if exists {
+			proto.Merge(oldSceneCompState, newSceneCompState)
+		} else {
+			dst.SceneComponentStates[netId] = newSceneCompState
 		}
 	}
 

@@ -54,6 +54,12 @@ message DestroyObjectMessage {
     uint32 reason = 2;
 }
 
+message HandoverData {
+    UnrealObjectRef obj = 1;
+    // The client that owns the object. Only set for Pawns and PlayerControllers.
+    optional uint32 clientConnId = 2;
+}
+
 
 message FRepMovement {
     optional FVector linearVelocity = 1;

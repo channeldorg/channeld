@@ -251,12 +251,12 @@ func mergeWithOptions(dst Message, src Message, options *channeldpb.ChannelDataM
 			)
 		}
 	} else {
-		reflectMerge(dst, src, options)
+		ReflectMerge(dst, src, options)
 	}
 }
 
 // Use protoreflect to merge. No need to write custom merge code but less efficient.
-func reflectMerge(dst Message, src Message, options *channeldpb.ChannelDataMergeOptions) {
+func ReflectMerge(dst Message, src Message, options *channeldpb.ChannelDataMergeOptions) {
 	proto.Merge(dst, src)
 
 	if options != nil {
