@@ -40,6 +40,12 @@ message TestMapMessage {
         int64 num = 2;
     }
     map<uint32, StringWrapper> kv2 = 2;
+
+    message NullableWrapper {
+        optional string content = 1;
+        optional int64 num = 2;
+    }
+    map<uint32, NullableWrapper> kv3 = 3;
 }
 
 message TestFieldMaskMessage {

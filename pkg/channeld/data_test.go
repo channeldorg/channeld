@@ -368,6 +368,7 @@ func TestProtobufMapMerge(t *testing.T) {
 	updateMsg.Kv[4] = "dd"
 
 	updateMsg.Kv2[1] = nil
+	updateMsg.Kv2[2] = &testpb.TestMapMessage_StringWrapper{Num: 3}
 
 	proto.Merge(testMsg, updateMsg)
 
@@ -380,7 +381,8 @@ func TestProtobufMapMerge(t *testing.T) {
 	assert.Equal(t, nil, testMsg.Kv2[1])
 	*/
 	assert.NotEqual(t, nil, testMsg.Kv2[1])
-	assert.Equal(t, "b", testMsg.Kv2[2].Content)
+
+	assert.Equal(t, int64(3), testMsg.Kv2[2].Num)
 	// The other properties should remain the same
-	assert.Equal(t, int64(2), testMsg.Kv2[2].Num)
+	assert.Equal(t, "b", testMsg.Kv2[2].Content)
 }
