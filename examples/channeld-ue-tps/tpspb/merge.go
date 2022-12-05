@@ -75,7 +75,7 @@ func HandleUnrealSpawnObject(ctx channeld.MessageContext) {
 }
 
 // Implement [channeld.MergeableChannelData]
-func (dst *TestRepChannelData) Merge(src proto.Message, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) error {
+func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) error {
 	srcData, ok := src.(*TestRepChannelData)
 	if !ok {
 		return errors.New("src is not a TestRepChannelData")
@@ -110,10 +110,10 @@ func (dst *TestRepChannelData) Merge(src proto.Message, options *channeldpb.Chan
 							common.SpatialInfo{
 								X: float64(newX),
 								Z: float64(newY)},
-							func() proto.Message {
+							func(handoverData chan common.Message) {
 								defer allSpawnedObjLock.RLocker().Unlock()
 								allSpawnedObjLock.RLock()
-								return &unrealpb.HandoverData{
+								handoverData <- &unrealpb.HandoverData{
 									Obj:          allSpawnedObj[netId],
 									ClientConnId: oldActorState.OwningConnId,
 								}

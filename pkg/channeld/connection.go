@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
+	"channeld.clewcat.com/channeld/pkg/common"
 	"channeld.clewcat.com/channeld/pkg/fsm"
 	"channeld.clewcat.com/channeld/pkg/replaypb"
 	"github.com/golang/snappy"
@@ -543,7 +544,7 @@ func (c *Connection) receiveMessage(mp *channeldpb.MessagePack) {
 		return
 	}
 
-	var msg Message
+	var msg common.Message
 	var handler MessageHandlerFunc
 	if mp.MsgType >= uint32(channeldpb.MessageType_USER_SPACE_START) && entry == nil {
 		// client -> channeld -> server

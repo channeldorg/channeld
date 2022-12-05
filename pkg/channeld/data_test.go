@@ -11,6 +11,7 @@ import (
 
 	"channeld.clewcat.com/channeld/internal/testpb"
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
+	"channeld.clewcat.com/channeld/pkg/common"
 	"github.com/indiest/fmutils"
 	"github.com/stretchr/testify/assert"
 
@@ -20,8 +21,8 @@ import (
 
 type testQueuedMessageSender struct {
 	MessageSender
-	msgQueue     []Message
-	msgProcessor func(Message) (Message, error)
+	msgQueue     []common.Message
+	msgProcessor func(common.Message) (common.Message, error)
 }
 
 func (s *testQueuedMessageSender) Send(c *Connection, ctx MessageContext) {
@@ -39,18 +40,18 @@ func addTestConnection(t channeldpb.ConnectionType) *Connection {
 	return addTestConnectionWithProcessor(t, nil)
 }
 
-func addTestConnectionWithProcessor(t channeldpb.ConnectionType, p func(Message) (Message, error)) *Connection {
+func addTestConnectionWithProcessor(t channeldpb.ConnectionType, p func(common.Message) (common.Message, error)) *Connection {
 	conn1, _ := net.Pipe()
 	c := AddConnection(conn1, t)
-	c.sender = &testQueuedMessageSender{msgQueue: make([]Message, 0), msgProcessor: p}
+	c.sender = &testQueuedMessageSender{msgQueue: make([]common.Message, 0), msgProcessor: p}
 	return c
 }
 
-func (c *Connection) testQueue() []Message {
+func (c *Connection) testQueue() []common.Message {
 	return c.sender.(*testQueuedMessageSender).msgQueue
 }
 
-func (c *Connection) latestMsg() Message {
+func (c *Connection) latestMsg() common.Message {
 	queue := c.testQueue()
 	if len(queue) > 0 {
 		return queue[len(queue)-1]
@@ -59,7 +60,7 @@ func (c *Connection) latestMsg() Message {
 	}
 }
 
-func testChannelDataMessageProcessor(msg Message) (Message, error) {
+func testChannelDataMessageProcessor(msg common.Message) (common.Message, error) {
 	// Extract the payload from the ChannelDataUpdatMessage
 	payload := msg.(*channeldpb.ChannelDataUpdateMessage).Data
 	updateMsg, err := payload.UnmarshalNew()

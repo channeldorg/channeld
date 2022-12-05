@@ -209,7 +209,7 @@ func (ch *Channel) IsRemoving() bool {
 	return ch.removing > 0
 }
 
-func (ch *Channel) PutMessage(msg Message, handler MessageHandlerFunc, conn *Connection, pack *channeldpb.MessagePack) {
+func (ch *Channel) PutMessage(msg common.Message, handler MessageHandlerFunc, conn *Connection, pack *channeldpb.MessagePack) {
 	if ch.IsRemoving() {
 		return
 	}

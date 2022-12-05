@@ -6,13 +6,12 @@ import (
 
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"channeld.clewcat.com/channeld/pkg/common"
-	"google.golang.org/protobuf/proto"
 )
 
 // Filter the merged list when the length of the merged list exceeds mergeOptions.ListSizeLimit
 var TimeSpanLimit time.Duration = time.Second * 10
 
-func (dst *ChatChannelData) Merge(src proto.Message, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) error {
+func (dst *ChatChannelData) Merge(src common.ChannelDataMessage, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) error {
 	srcMsg, ok := src.(*ChatChannelData)
 	if !ok {
 		return errors.New("src is not a ChatChannelData")

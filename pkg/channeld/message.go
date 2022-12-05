@@ -9,13 +9,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type Message = proto.Message //protoreflect.ProtoMessage
-
 // The context of a message for both sending and receiving
 type MessageContext struct {
 	MsgType channeldpb.MessageType
 	// The weak-typed Message object popped from the message queue
-	Msg       Message
+	Msg       common.Message
 	Broadcast uint32 //channeldpb.BroadcastType
 	StubId    uint32
 	// The original channelId in the Packet, could be different from Channel.id.
@@ -36,7 +34,7 @@ func (ctx *MessageContext) HasConnection() bool {
 
 type MessageHandlerFunc func(ctx MessageContext)
 type messageMapEntry struct {
-	msg     Message
+	msg     common.Message
 	handler MessageHandlerFunc
 }
 
@@ -55,7 +53,7 @@ var MessageMap = map[channeldpb.MessageType]*messageMapEntry{
 	channeldpb.MessageType_DEBUG_GET_SPATIAL_REGIONS: {&channeldpb.DebugGetSpatialRegionsMessage{}, handleGetSpatialRegionsMessage},
 }
 
-func RegisterMessageHandler(msgType uint32, msg Message, handler MessageHandlerFunc) {
+func RegisterMessageHandler(msgType uint32, msg common.Message, handler MessageHandlerFunc) {
 	MessageMap[channeldpb.MessageType(msgType)] = &messageMapEntry{msg, handler}
 }
 
