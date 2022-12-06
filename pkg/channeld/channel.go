@@ -22,10 +22,6 @@ const (
 	ChannelState_HANDOVER ChannelState = 2
 )
 
-// Each channel uses a goroutine and we can have at most millions of goroutines at the same time.
-// So we won't use 64-bit channel ID unless we use a distributed architecture for channeld itself.
-type ChannelId uint32
-
 // ChannelTime is the relative time since the channel created.
 type ChannelTime int64 // time.Duration
 
@@ -59,7 +55,7 @@ type ConnectionInChannel interface {
 }
 
 type Channel struct {
-	id                    ChannelId
+	id                    common.ChannelId
 	channelType           channeldpb.ChannelType
 	state                 ChannelState
 	ownerConnection       ConnectionInChannel
@@ -84,11 +80,11 @@ type Channel struct {
 }
 
 const (
-	GlobalChannelId ChannelId = 0
+	GlobalChannelId common.ChannelId = 0
 )
 
-var nextChannelId ChannelId
-var nextSpatialChannelId ChannelId
+var nextChannelId common.ChannelId
+var nextSpatialChannelId common.ChannelId
 
 // Cache the status so we don't have to check all the index in the sync map, until a channel is removed.
 var nonSpatialchannelFull bool = false
@@ -103,7 +99,7 @@ func InitChannels() {
 	globalChannel, _ = CreateChannel(channeldpb.ChannelType_GLOBAL, nil)
 }
 
-func GetChannel(id ChannelId) *Channel {
+func GetChannel(id common.ChannelId) *Channel {
 	ch, ok := allChannels.Load(id)
 	if ok {
 		return ch.(*Channel)
@@ -115,7 +111,7 @@ func GetChannel(id ChannelId) *Channel {
 var ErrNonSpatialChannelFull = errors.New("non-spatial channels are full")
 var ErrSpatialChannelFull = errors.New("spatial channels are full")
 
-func createChannelWithId(channelId ChannelId, t channeldpb.ChannelType, owner ConnectionInChannel) *Channel {
+func createChannelWithId(channelId common.ChannelId, t channeldpb.ChannelType, owner ConnectionInChannel) *Channel {
 	ch := &Channel{
 		id:                    channelId,
 		channelType:           t,
@@ -160,7 +156,7 @@ func CreateChannel(t channeldpb.ChannelType, owner ConnectionInChannel) (*Channe
 		return nil, errors.New("failed to create GLOBAL channel as it already exists")
 	}
 
-	var channelId ChannelId
+	var channelId common.ChannelId
 	var ok bool
 	if t != channeldpb.ChannelType_SPATIAL {
 		if nonSpatialchannelFull {

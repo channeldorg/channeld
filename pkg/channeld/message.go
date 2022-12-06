@@ -406,7 +406,7 @@ func handleRemoveChannel(ctx MessageContext) {
 		return
 	}
 
-	channelToRemove := GetChannel(ChannelId(msg.ChannelId))
+	channelToRemove := GetChannel(common.ChannelId(msg.ChannelId))
 	if channelToRemove == nil {
 		ctx.Connection.Logger().Error("invalid channelId for removing", zap.Uint32("channelId", msg.ChannelId))
 		return

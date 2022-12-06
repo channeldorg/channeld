@@ -1,7 +1,6 @@
 package channeld
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -55,7 +54,7 @@ type Connection struct {
 	conn            net.Conn
 	readBuffer      []byte
 	readPos         int
-	reader          *bufio.Reader
+	// reader          *bufio.Reader
 	// writer          *bufio.Writer
 	sender        MessageSender
 	sendQueue     chan MessageContext
@@ -521,7 +520,7 @@ func (c *Connection) isPacketRecordingEnabled() bool {
 }
 
 func (c *Connection) receiveMessage(mp *channeldpb.MessagePack) {
-	channel := GetChannel(ChannelId(mp.ChannelId))
+	channel := GetChannel(common.ChannelId(mp.ChannelId))
 	if channel == nil {
 		c.Logger().Warn("can't find channel",
 			zap.Uint32("channelId", mp.ChannelId),

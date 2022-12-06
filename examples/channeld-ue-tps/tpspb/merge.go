@@ -110,7 +110,7 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 							common.SpatialInfo{
 								X: float64(newX),
 								Z: float64(newY)},
-							func(handoverData chan common.Message) {
+							func(srcChannelId common.ChannelId, dstChannelId common.ChannelId, handoverData chan common.Message) {
 								defer allSpawnedObjLock.RLocker().Unlock()
 								allSpawnedObjLock.RLock()
 								handoverData <- &unrealpb.HandoverData{

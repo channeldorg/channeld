@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
+	"channeld.clewcat.com/channeld/pkg/common"
 )
 
 func TestConcurrentAccessChannels(t *testing.T) {
@@ -29,7 +30,7 @@ func TestConcurrentAccessChannels(t *testing.T) {
 		go func() {
 			counter := 0
 			for i := 0; i < 100; i++ {
-				if GetChannel(ChannelId(i)) != nil {
+				if GetChannel(common.ChannelId(i)) != nil {
 					counter++
 				}
 				time.Sleep(1 * time.Millisecond)

@@ -2,6 +2,10 @@ package common
 
 import "google.golang.org/protobuf/proto"
 
+// Each channel uses a goroutine and we can have at most millions of goroutines at the same time.
+// So we won't use 64-bit channel ID unless we use a distributed architecture for channeld itself.
+type ChannelId uint32
+
 type Message = proto.Message //protoreflect.ProtoMessage
 
 type ChannelDataMessage = proto.Message //protoreflect.Message
@@ -15,5 +19,9 @@ type SpatialInfo struct {
 }
 
 type SpatialInfoChangedNotifier interface {
-	Notify(oldInfo SpatialInfo, newInfo SpatialInfo, handoverDataProvider func(chan Message))
+	// The handover data provider has three parameters:
+	// srcChannelId: the channel that an object is handed over from.
+	// dstChannelId: the channel that an object is handed over to.
+	// handoverData: the data wrapped in ChannelDataHandoverMessage to be sent to the interested parties.
+	Notify(oldInfo SpatialInfo, newInfo SpatialInfo, handoverDataProvider func(ChannelId, ChannelId, chan Message))
 }

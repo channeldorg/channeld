@@ -205,14 +205,14 @@ func TestCreateSpatialChannels1(t *testing.T) {
 
 type testConnection struct {
 	sentMsgs           []MessageContext
-	subscribedChannels map[ChannelId]*Channel
+	subscribedChannels map[common.ChannelId]*Channel
 	closing            bool
 }
 
 func createTestConnection() *testConnection {
 	return &testConnection{
 		sentMsgs:           make([]MessageContext, 0),
-		subscribedChannels: make(map[ChannelId]*Channel),
+		subscribedChannels: make(map[common.ChannelId]*Channel),
 	}
 }
 
@@ -282,7 +282,7 @@ func TestGetChannelId2(t *testing.T) {
 		ServerInterestBorderSize: 2,
 	}
 
-	var channelId ChannelId
+	var channelId common.ChannelId
 	var err error
 	channelId, _ = ctl.GetChannelId(common.SpatialInfo{X: 0, Z: 0})
 	assert.Equal(t, GlobalSettings.SpatialChannelIdStart+0, channelId)
@@ -291,7 +291,7 @@ func TestGetChannelId2(t *testing.T) {
 	assert.Equal(t, GlobalSettings.SpatialChannelIdStart+1, channelId)
 
 	channelId, _ = ctl.GetChannelId(common.SpatialInfo{X: 0, Z: 50})
-	assert.Equal(t, GlobalSettings.SpatialChannelIdStart+ChannelId(ctl.GridCols), channelId)
+	assert.Equal(t, GlobalSettings.SpatialChannelIdStart+common.ChannelId(ctl.GridCols), channelId)
 
 	channelId, _ = ctl.GetChannelId(common.SpatialInfo{X: 899.99, Z: 399.99})
 	assert.Equal(t, GlobalSettings.SpatialChannelIdStart+9*8-1, channelId)
@@ -323,7 +323,7 @@ func TestGetChannelId1(t *testing.T) {
 		ServerInterestBorderSize: 2,
 	}
 
-	var channelId ChannelId
+	var channelId common.ChannelId
 	var err error
 	channelId, _ = ctl.GetChannelId(common.SpatialInfo{X: -450, Z: -200})
 	assert.Equal(t, GlobalSettings.SpatialChannelIdStart+0, channelId)
@@ -332,7 +332,7 @@ func TestGetChannelId1(t *testing.T) {
 	assert.Equal(t, GlobalSettings.SpatialChannelIdStart+1, channelId)
 
 	channelId, _ = ctl.GetChannelId(common.SpatialInfo{X: -450, Z: -150})
-	assert.Equal(t, GlobalSettings.SpatialChannelIdStart+ChannelId(ctl.GridCols), channelId)
+	assert.Equal(t, GlobalSettings.SpatialChannelIdStart+common.ChannelId(ctl.GridCols), channelId)
 
 	channelId, _ = ctl.GetChannelId(common.SpatialInfo{X: 0, Z: 0})
 	assert.Equal(t, GlobalSettings.SpatialChannelIdStart+9*4+4, channelId)
