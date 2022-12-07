@@ -2,7 +2,37 @@ syntax = "proto3";
 
 package unrealpb;
 
+import "google/protobuf/any.proto";
+
 option go_package = "channeld.clewcat.com/channeld/pkg/unrealpb";
+
+enum MessageType {
+    INVALID = 0;
+
+	// Used by LowLevelSend() in NetConnection/NetDriver.
+    LOW_LEVEL = 100;
+
+	// Used by ChanneldGameInstanceSubsystem to broadcast the ProtoMessageObject from server side. The message is packed as google::protobuf::any to support anonymous types.
+    ANY = 101;
+
+ 	// Used by ReplicationDriver to send/receive UE's native RPC.
+    // See @RemoteFunctionMessage
+    RPC = 102;
+
+    // Used by UE server to spawn objects on the client. 
+    // See @SpawnObjectMessage
+    SPAWN = 103;
+    
+    // Used by UE servers to destroy objects on the client.
+    // See @DestroyObjectMessage
+    DESTROY = 104;
+
+    // Used by channeld/spatial server to request/respond the context of handover.
+    //See @GetHandoverContextMessage and @GetHandoverContextResultMessage
+    HANDOVER_CONTEXT = 105;
+
+    SERVER_PLAYER_SPAWNED = 201;
+}
 
 // Maps to UE's FVector AND FRotator struct.
 // For FRotator, x = pitch, y = yaw, z = roll
@@ -54,10 +84,28 @@ message DestroyObjectMessage {
     uint32 reason = 2;
 }
 
-message HandoverData {
+message HandoverContext {
     UnrealObjectRef obj = 1;
     // The client that owns the object. Only set for Pawns and PlayerControllers.
     optional uint32 clientConnId = 2;
+}
+
+// channeld asks the spatial server about the context of a handover.
+message GetHandoverContextMessage {
+    uint32 netId = 1;
+}
+
+// The spatial server answers channels about which objects should be contained in the handover data.
+message GetHandoverContextResultMessage {
+    uint32 netId = 1;
+    repeated HandoverContext context = 2;
+}
+
+// Wrapped in ChannelDataHandoverMessage.data
+message HandoverData {
+    repeated HandoverContext context = 1;
+    // The channel data message for the destination server only.
+    optional google.protobuf.Any channelData = 2;
 }
 
 

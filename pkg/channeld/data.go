@@ -84,6 +84,13 @@ func (ch *Channel) Data() *ChannelData {
 	return ch.data
 }
 
+func (ch *Channel) GetDataMessage() common.ChannelDataMessage {
+	if ch.data == nil {
+		return nil
+	}
+	return ch.data.msg
+}
+
 func (ch *Channel) SetDataUpdateConnId(connId ConnectionId) {
 	ch.latestDataUpdateConnId = connId
 }

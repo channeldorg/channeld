@@ -375,6 +375,23 @@ func (ch *Channel) HasOwner() bool {
 	return ok && conn != nil && !conn.IsClosing()
 }
 
+func (chA *Channel) IsSameOwner(chB *Channel) bool {
+	return chA.HasOwner() && chB.HasOwner() && chA.ownerConnection == chB.ownerConnection
+}
+
+func (ch *Channel) SendToOwner(msgType uint32, msg common.Message) {
+	if !ch.HasOwner() {
+		return
+	}
+	ch.ownerConnection.Send(MessageContext{
+		MsgType:   channeldpb.MessageType(msgType),
+		Msg:       msg,
+		ChannelId: uint32(ch.id),
+		Broadcast: 0,
+		StubId:    0,
+	})
+}
+
 // Implementation for ConnectionInChannel interface
 func (c *Connection) IsNil() bool {
 	return c == nil

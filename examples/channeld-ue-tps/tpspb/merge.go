@@ -10,12 +10,14 @@ import (
 	"channeld.clewcat.com/channeld/pkg/unrealpb"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // Stores all UObjects ever spawned in server and sent to client.
 // Only in this way we can send the UnrealObjectRef as the handover data.
 var allSpawnedObj map[uint32]*unrealpb.UnrealObjectRef = make(map[uint32]*unrealpb.UnrealObjectRef)
 var allSpawnedObjLock sync.RWMutex
+var handoverDataProviders map[uint32]chan common.Message = make(map[uint32]chan common.Message)
 
 func HandleUnrealSpawnObject(ctx channeld.MessageContext) {
 	defer channeld.HandleServerToClientUserMessage(ctx)
@@ -74,6 +76,105 @@ func HandleUnrealSpawnObject(ctx channeld.MessageContext) {
 	)
 }
 
+func initStates(data *TestRepChannelData) {
+	if data.ActorStates == nil {
+		data.ActorStates = make(map[uint32]*unrealpb.ActorState)
+	}
+	if data.PawnStates == nil {
+		data.PawnStates = make(map[uint32]*unrealpb.PawnState)
+	}
+	if data.CharacterStates == nil {
+		data.CharacterStates = make(map[uint32]*unrealpb.CharacterState)
+	}
+	if data.PlayerStates == nil {
+		data.PlayerStates = make(map[uint32]*unrealpb.PlayerState)
+	}
+	if data.ControllerStates == nil {
+		data.ControllerStates = make(map[uint32]*unrealpb.ControllerState)
+	}
+	if data.PlayerControllerStates == nil {
+		data.PlayerControllerStates = make(map[uint32]*unrealpb.PlayerControllerState)
+	}
+	if data.ActorComponentStates == nil {
+		data.ActorComponentStates = make(map[uint32]*unrealpb.ActorComponentState)
+	}
+	if data.SceneComponentStates == nil {
+		data.SceneComponentStates = make(map[uint32]*unrealpb.SceneComponentState)
+	}
+}
+
+func collectStates(netId uint32, from *TestRepChannelData, to *TestRepChannelData) {
+	initStates(to)
+	actorState, exists := from.ActorStates[netId]
+	if exists {
+		to.ActorStates[netId] = actorState
+	}
+	pawnState, exists := from.PawnStates[netId]
+	if exists {
+		to.PawnStates[netId] = pawnState
+	}
+	characterState, exists := from.CharacterStates[netId]
+	if exists {
+		to.CharacterStates[netId] = characterState
+	}
+	playerState, exists := from.PlayerStates[netId]
+	if exists {
+		to.PlayerStates[netId] = playerState
+	}
+	controllerState, exists := from.ControllerStates[netId]
+	if exists {
+		to.ControllerStates[netId] = controllerState
+	}
+	playerControllerStates, exists := from.PlayerControllerStates[netId]
+	if exists {
+		to.PlayerControllerStates[netId] = playerControllerStates
+	}
+}
+
+func HandleHandoverContextResult(ctx channeld.MessageContext) {
+	msg, ok := ctx.Msg.(*unrealpb.GetHandoverContextResultMessage)
+	if !ok {
+		ctx.Connection.Logger().Error("message is not a GetHandoverContextResultMessage, will not be handled.")
+		return
+	}
+
+	provider, exists := handoverDataProviders[msg.NetId]
+	if !exists {
+		ctx.Connection.Logger().Error("could not find the handover data provider", zap.Uint32("netId", msg.NetId))
+		return
+	}
+
+	defer delete(handoverDataProviders, msg.NetId)
+
+	if ctx.Channel.GetDataMessage() == nil {
+		ctx.Channel.Logger().Error("channel data message is nil")
+		return
+	}
+	fullChannelData := ctx.Channel.GetDataMessage().(*TestRepChannelData)
+
+	handoverChannelData := &TestRepChannelData{}
+	for _, handoverCtx := range msg.Context {
+		// Make sure the object is fully exported, so the destination server can spawn it properly.
+		if handoverCtx.Obj.NetGUIDBunch == nil {
+			allSpawnedObjLock.RLock()
+			handoverCtx.Obj = allSpawnedObj[*handoverCtx.Obj.NetGUID]
+			allSpawnedObjLock.RLocker().Unlock()
+		}
+		collectStates(*handoverCtx.Obj.NetGUID, fullChannelData, handoverChannelData)
+	}
+
+	anyData, err := anypb.New(handoverChannelData)
+	if err != nil {
+		ctx.Connection.Logger().Error("failed to marshal handover data", zap.Error(err), zap.Uint32("netId", msg.NetId))
+		return
+	}
+
+	provider <- &unrealpb.HandoverData{
+		Context:     msg.Context,
+		ChannelData: anyData,
+	}
+}
+
 // Implement [channeld.MergeableChannelData]
 func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) error {
 	srcData, ok := src.(*TestRepChannelData)
@@ -111,11 +212,23 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 								X: float64(newX),
 								Z: float64(newY)},
 							func(srcChannelId common.ChannelId, dstChannelId common.ChannelId, handoverData chan common.Message) {
-								defer allSpawnedObjLock.RLocker().Unlock()
-								allSpawnedObjLock.RLock()
-								handoverData <- &unrealpb.HandoverData{
-									Obj:          allSpawnedObj[netId],
-									ClientConnId: oldActorState.OwningConnId,
+								// Handover happens within the spatial server - no need to ask the handover context.
+								if channeld.GetChannel(srcChannelId).IsSameOwner(channeld.GetChannel(dstChannelId)) {
+									defer allSpawnedObjLock.RLocker().Unlock()
+									allSpawnedObjLock.RLock()
+									handoverData <- &unrealpb.HandoverData{
+										Context: []*unrealpb.HandoverContext{
+											{
+												Obj:          allSpawnedObj[netId],
+												ClientConnId: oldActorState.OwningConnId,
+											},
+										},
+									}
+								} else {
+									handoverDataProviders[netId] = handoverData
+									channeld.GetChannel(srcChannelId).SendToOwner(uint32(unrealpb.MessageType_HANDOVER_CONTEXT), &unrealpb.GetHandoverContextMessage{
+										NetId: netId,
+									})
 								}
 							},
 						)
@@ -126,30 +239,7 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 	}
 
 	// The maps can be nil after InitData().
-	if dst.ActorStates == nil {
-		dst.ActorStates = make(map[uint32]*unrealpb.ActorState)
-	}
-	if dst.PawnStates == nil {
-		dst.PawnStates = make(map[uint32]*unrealpb.PawnState)
-	}
-	if dst.CharacterStates == nil {
-		dst.CharacterStates = make(map[uint32]*unrealpb.CharacterState)
-	}
-	if dst.PlayerStates == nil {
-		dst.PlayerStates = make(map[uint32]*unrealpb.PlayerState)
-	}
-	if dst.ControllerStates == nil {
-		dst.ControllerStates = make(map[uint32]*unrealpb.ControllerState)
-	}
-	if dst.PlayerControllerStates == nil {
-		dst.PlayerControllerStates = make(map[uint32]*unrealpb.PlayerControllerState)
-	}
-	if dst.ActorComponentStates == nil {
-		dst.ActorComponentStates = make(map[uint32]*unrealpb.ActorComponentState)
-	}
-	if dst.SceneComponentStates == nil {
-		dst.SceneComponentStates = make(map[uint32]*unrealpb.SceneComponentState)
-	}
+	initStates(dst)
 
 	// channeld.ReflectMerge(dst, src, options)
 
