@@ -44,22 +44,28 @@ enum BroadcastType {
     // No broadcast. All internal messages should use this type, and other types are ignored.
     NO_BROADCAST = 0x00;
 
-    // Broadcast the message to all the connections in the channel, the sender included.
-    ALL = 0x01;
-
-    // Broadcast the message to all the connections in the channel, the sender excluded.
-    ALL_BUT_SENDER = 0x02;
-
-    // Broadcast the message to all the connections in the channel, the owner excluded.
-    ALL_BUT_OWNER = 0x04;
-
     // Forward the message to the connection. Can only be used by the backend server.
     // This has the same behavior as sending the message to the PRIVATE channel owned by the target connection with BroadcastType = NO.
-    SINGLE_CONNECTION = 0x08; 
+    SINGLE_CONNECTION = 0x01; 
+
+    // Broadcast the message to all the connections in the channel, the sender included.
+    ALL = 0x02;
+
+    // Broadcast the message to all the connections in the channel, the sender excluded.
+    ALL_BUT_SENDER = 0x04;
+
+    // Broadcast the message to all the connections in the channel, the owner excluded.
+    ALL_BUT_OWNER = 0x06;
+
+    // Broadcast the message to all client connections in the channel.
+    ALL_BUT_CLIENT = 0x08;
+
+    // Broadcast the message to all server connections in the channel, the owner excluded.
+    ALL_BUT_SERVER = 0x10;
 
     // Broadcast the message to all the connections in all the adjacent(3x3) spatial channels. Ignored if the target channel is not a spatial channel.
     // To ignore the center spatial channel, use ADJACENT_CHANNELS | ALL_BUT_OWNER; to ignore the sender(spatial server), use ADJACENT_CHANNELS | ALL_BUT_SENDER.
-    ADJACENT_CHANNELS = 0x10;
+    ADJACENT_CHANNELS = 0x20;
 }
 
 enum ConnectionType {
@@ -272,7 +278,7 @@ message SubscribedToChannelResultMessage {
     ChannelType channelType = 4;
 }
 
-// Response: @UnsubscribedFromChannelResultMessage. The message sender, the subscribed connection, and the channel owner will receive the message respectively.
+// Response: @UnsubscribedFromChannelResultMessage. The message sender, the connection that unsubscribed, and the channel owner will receive the message respectively.
 message UnsubscribedFromChannelMessage {
     // The connection to be removed from the channel is not necessarily the one sends the message.
     // Remarks: only the channel owner or the GLOBAL channel can unsub another connection from the channel.

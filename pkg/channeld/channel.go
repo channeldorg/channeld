@@ -332,6 +332,12 @@ func (ch *Channel) Broadcast(ctx MessageContext) {
 		if channeldpb.BroadcastType_ALL_BUT_OWNER.Check(ctx.Broadcast) && conn == ch.ownerConnection {
 			continue
 		}
+		if channeldpb.BroadcastType_ALL_BUT_CLIENT.Check(ctx.Broadcast) && conn.GetConnectionType() == channeldpb.ConnectionType_CLIENT {
+			continue
+		}
+		if channeldpb.BroadcastType_ALL_BUT_SERVER.Check(ctx.Broadcast) && conn.GetConnectionType() == channeldpb.ConnectionType_SERVER {
+			continue
+		}
 		conn.Send(ctx)
 	}
 }

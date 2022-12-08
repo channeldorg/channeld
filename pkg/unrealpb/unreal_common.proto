@@ -32,6 +32,9 @@ enum MessageType {
     HANDOVER_CONTEXT = 105;
 
     SERVER_PLAYER_SPAWNED = 201;
+
+    // Used by the Master server to broadcast the player leave (@UnsubscribedFromChannelResultMessage) to the spatial servers.
+    SERVER_PLAYER_LEAVE = 202;
 }
 
 // Maps to UE's FVector AND FRotator struct.

@@ -552,7 +552,7 @@ func (c *Connection) receiveMessage(mp *channeldpb.MessagePack) {
 			msg = &channeldpb.ServerForwardMessage{ClientConnId: uint32(c.id), Payload: mp.MsgBody}
 			handler = handleClientToServerUserMessage
 		} else {
-			// server -> channeld -> client
+			// server -> channeld -> client/server
 			msg = &channeldpb.ServerForwardMessage{}
 			err := proto.Unmarshal(mp.MsgBody, msg)
 			if err != nil {

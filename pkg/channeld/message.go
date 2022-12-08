@@ -139,9 +139,11 @@ func HandleServerToClientUserMessage(ctx MessageContext) {
 			)
 		}
 
-	case channeldpb.BroadcastType_ALL, channeldpb.BroadcastType_ALL_BUT_SENDER, channeldpb.BroadcastType_ALL_BUT_OWNER:
-		ctx.Channel.Broadcast(ctx)
-
+		/*
+			case channeldpb.BroadcastType_ALL, channeldpb.BroadcastType_ALL_BUT_SENDER, channeldpb.BroadcastType_ALL_BUT_OWNER,
+				channeldpb.BroadcastType_ALL_BUT_CLIENT, channeldpb.BroadcastType_ALL_BUT_SERVER:
+				ctx.Channel.Broadcast(ctx)
+		*/
 	case channeldpb.BroadcastType_SINGLE_CONNECTION:
 		clientConn := GetConnection(ConnectionId(msg.ClientConnId))
 		if clientConn != nil {
@@ -154,7 +156,9 @@ func HandleServerToClientUserMessage(ctx MessageContext) {
 		}
 
 	default:
-		if channeldpb.BroadcastType_ADJACENT_CHANNELS.Check(ctx.Broadcast) {
+		if ctx.Broadcast >= uint32(channeldpb.BroadcastType_ALL) && ctx.Broadcast < uint32(channeldpb.BroadcastType_ADJACENT_CHANNELS) {
+			ctx.Channel.Broadcast(ctx)
+		} else if channeldpb.BroadcastType_ADJACENT_CHANNELS.Check(ctx.Broadcast) {
 			if ctx.Channel.channelType != channeldpb.ChannelType_SPATIAL {
 				ctx.Connection.Logger().Warn("BroadcastType_ADJACENT_CHANNELS only works for Spatial channel")
 				return
@@ -191,7 +195,15 @@ func HandleServerToClientUserMessage(ctx MessageContext) {
 				if channeldpb.BroadcastType_ALL_BUT_SENDER.Check(ctx.Broadcast) && conn == ctx.Connection {
 					continue
 				}
-				// Ignore the client
+				// Ignore the clients?
+				if channeldpb.BroadcastType_ALL_BUT_CLIENT.Check(ctx.Broadcast) && conn.GetConnectionType() == channeldpb.ConnectionType_CLIENT {
+					continue
+				}
+				// Ignore the servers?
+				if channeldpb.BroadcastType_ALL_BUT_SERVER.Check(ctx.Broadcast) && conn.GetConnectionType() == channeldpb.ConnectionType_SERVER {
+					continue
+				}
+				// Ignore the client specified in the ServerForwardMessage
 				if conn.Id() == ConnectionId(msg.ClientConnId) {
 					continue
 				}
