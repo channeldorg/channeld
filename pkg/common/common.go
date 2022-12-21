@@ -1,6 +1,10 @@
 package common
 
-import "google.golang.org/protobuf/proto"
+import (
+	"fmt"
+
+	"google.golang.org/protobuf/proto"
+)
 
 // Each channel uses a goroutine and we can have at most millions of goroutines at the same time.
 // So we won't use 64-bit channel ID unless we use a distributed architecture for channeld itself.
@@ -22,6 +26,10 @@ type SpatialInfoChangedNotifier interface {
 	// The handover data provider has three parameters:
 	// srcChannelId: the channel that an object is handed over from.
 	// dstChannelId: the channel that an object is handed over to.
-	// handoverData: the data wrapped in ChannelDataHandoverMessage to be sent to the interested parties.
+	// handoverData: the data wrapped in ChannelDataHandoverMessage to be sent to the interested parties. If the chan signals nil, no handover will happen.
 	Notify(oldInfo SpatialInfo, newInfo SpatialInfo, handoverDataProvider func(ChannelId, ChannelId, chan Message))
+}
+
+func (s *SpatialInfo) String() string {
+	return fmt.Sprintf("(%.4f, %.4f, %.4f)", s.X, s.Y, s.Z)
 }

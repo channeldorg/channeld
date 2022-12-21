@@ -146,6 +146,12 @@ func HandleHandoverContextResult(ctx channeld.MessageContext) {
 
 	defer delete(handoverDataProviders, msg.NetId)
 
+	// No context - no handover will happen
+	if len(msg.Context) == 0 {
+		provider <- nil
+		return
+	}
+
 	if ctx.Channel.GetDataMessage() == nil {
 		ctx.Channel.Logger().Error("channel data message is nil")
 		return
@@ -154,13 +160,35 @@ func HandleHandoverContextResult(ctx channeld.MessageContext) {
 
 	handoverChannelData := &TestRepChannelData{}
 	for _, handoverCtx := range msg.Context {
+		if handoverCtx.Obj == nil || handoverCtx.Obj.NetGUID == nil || *handoverCtx.Obj.NetGUID == 0 {
+			ctx.Connection.Logger().Error("corrupted handover context", zap.Uint32("netId", msg.NetId))
+			continue
+		}
 		// Make sure the object is fully exported, so the destination server can spawn it properly.
 		if handoverCtx.Obj.NetGUIDBunch == nil {
 			allSpawnedObjLock.RLock()
-			handoverCtx.Obj = allSpawnedObj[*handoverCtx.Obj.NetGUID]
+			objRef, exists := allSpawnedObj[*handoverCtx.Obj.NetGUID]
 			allSpawnedObjLock.RLocker().Unlock()
+			if exists {
+				handoverCtx.Obj = objRef
+			} else {
+				ctx.Connection.Logger().Warn("handover obj is not fully exported yet", zap.Uint32("netId", msg.NetId))
+			}
 		}
 		collectStates(*handoverCtx.Obj.NetGUID, fullChannelData, handoverChannelData)
+	}
+
+	// Don't forget to merge the handover channel data to the dst channel, otherwise it may miss some states.
+	dstChannel := channeld.GetChannel(common.ChannelId(msg.DstChannelId))
+	if dstChannel != nil {
+		dstChannelDataMsg := dstChannel.GetDataMessage()
+		if dstChannelDataMsg == nil {
+			dstChannel.Data().OnUpdate(handoverChannelData, dstChannel.GetTime(), nil)
+		} else {
+			// Should we let the dst channel fan out the update?
+			// For now we don't. It's easier for the UE servers to control the sequence of spawning and update.
+			dstChannelDataMsg.(*TestRepChannelData).Merge(handoverChannelData, nil, nil)
+		}
 	}
 
 	anyData, err := anypb.New(handoverChannelData)
@@ -227,8 +255,11 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 								} else {
 									handoverDataProviders[netId] = handoverData
 									channeld.GetChannel(srcChannelId).SendToOwner(uint32(unrealpb.MessageType_HANDOVER_CONTEXT), &unrealpb.GetHandoverContextMessage{
-										NetId: netId,
+										NetId:        netId,
+										SrcChannelId: uint32(srcChannelId),
+										DstChannelId: uint32(dstChannelId),
 									})
+									channeld.RootLogger().Info("getting handover context from src server", zap.Uint32("srcChannelId", uint32(srcChannelId)))
 								}
 							},
 						)

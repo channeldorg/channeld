@@ -8,6 +8,7 @@ import (
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"channeld.clewcat.com/channeld/pkg/common"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -358,12 +359,12 @@ var dataMarshalOptions = protojson.MarshalOptions{Multiline: false}
 func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, newInfo common.SpatialInfo, handoverDataProvider func(common.ChannelId, common.ChannelId, chan common.Message)) {
 	srcChannelId, err := ctl.GetChannelId(oldInfo)
 	if err != nil {
-		rootLogger.Error("failed to calculate srcChannelId", zap.Error(err))
+		rootLogger.Error("failed to calculate srcChannelId", zap.Error(err), zap.String("oldInfo", oldInfo.String()))
 		return
 	}
 	dstChannelId, err := ctl.GetChannelId(newInfo)
 	if err != nil {
-		rootLogger.Error("failed to calculate dstChannelId", zap.Error(err))
+		rootLogger.Error("failed to calculate dstChannelId", zap.Error(err), zap.String("newInfo", newInfo.String()))
 		return
 	}
 	// No migration between channels
@@ -394,11 +395,13 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 	go func() {
 		handoverData := <-c
 		if handoverData == nil {
-			rootLogger.Error("failed to provider handover channel data", zap.Uint32("srcChannelId", uint32(srcChannelId)), zap.Uint32("dstChannelId", uint32(dstChannelId)))
+			rootLogger.Info("handover will not happen as no data is provided", zap.Uint32("srcChannelId", uint32(srcChannelId)), zap.Uint32("dstChannelId", uint32(dstChannelId)))
 			return
 		}
-		rootLogger.Debug("handover channel data", zap.Uint32("srcChannelId", uint32(srcChannelId)), zap.Uint32("dstChannelId", uint32(dstChannelId)),
-			zap.String("data", dataMarshalOptions.Format(handoverData)))
+		if rootLogger.Core().Enabled(zapcore.Level(VerboseLevel)) {
+			rootLogger.Verbose("handover data", zap.Uint32("srcChannelId", uint32(srcChannelId)), zap.Uint32("dstChannelId", uint32(dstChannelId)),
+				zap.String("data", dataMarshalOptions.Format(handoverData)))
+		}
 
 		anyData, err := anypb.New(handoverData)
 		if err != nil {

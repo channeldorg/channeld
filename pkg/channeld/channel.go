@@ -387,6 +387,7 @@ func (chA *Channel) IsSameOwner(chB *Channel) bool {
 
 func (ch *Channel) SendToOwner(msgType uint32, msg common.Message) {
 	if !ch.HasOwner() {
+		ch.Logger().Warn("channel has no owner to send message", zap.Uint32("msgType", msgType))
 		return
 	}
 	ch.ownerConnection.Send(MessageContext{

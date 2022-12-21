@@ -222,7 +222,7 @@ message ChannelDataMergeOptions {
 // The message should have channelId = 0 in order to be handled.
 // Response: @CreateChannelResultMessage, if the MessageType is CREATE_CHANNEL and the channelType is not SPATIAL. The GLOBAL channel owner will also receive this message.
 // Response: @CreateSpatialChannelsResultMessage, if the MessageType is CREATE_SPATIAL_CHANNEL and the channelType is SPATIAL. The GLOBAL channel owner will also receive this message.
-// Response: @SubscribedToChannelResultMessage. The channel creator will also be subscripbed to the channel immediately after the creation.
+// Response: @SubscribedToChannelResultMessage. The channel creator will also be subscribed to the channel immediately after the creation.
 message CreateChannelMessage {
     ChannelType channelType = 1;
     string metadata = 2;
@@ -334,15 +334,15 @@ message QuerySpatialChannelResultMessage {
     repeated uint32 channelId = 1;
 }
 
+// ALL connections in the source AND destination channels receive this messge when a handover happpned.
 message ChannelDataHandoverMessage {
     uint32 srcChannelId = 1;
     uint32 dstChannelId = 2;
     
     // The ID of the client connection that triggered the handover. If the handover is triggered by server (e.g. NPC movement), the value will be 0.
-    // The client will be received @UnsubscribedFromChannelResultMessage and @SubscribedToChannelResultMessage.
     uint32 contextConnId = 3;
 
-    // The spatial channel data that migrate from the source channel to the destination channel.
+    // The data that migrate from the source channel to the destination channel. It can be the spatial channel data or anything, as long as the spatial servers can use it to process the handover.
     google.protobuf.Any data = 4;
 }
 

@@ -576,7 +576,7 @@ func (c *Connection) receiveMessage(mp *channeldpb.MessagePack) {
 
 	channel.PutMessage(msg, handler, c, mp)
 
-	c.Logger().Trace("received message", zap.Uint32("msgType", mp.MsgType), zap.Int("size", len(mp.MsgBody)))
+	c.Logger().VeryVerbose("received message", zap.Uint32("msgType", mp.MsgType), zap.Int("size", len(mp.MsgBody)))
 	//c.Logger().Debug("received message", zap.Uint32("msgType", mp.MsgType), zap.Int("size", len(mp.MsgBody)))
 
 	msgReceived.WithLabelValues(c.connectionType.String()).Inc() /*.WithLabelValues(
@@ -624,7 +624,7 @@ func (c *Connection) flush() {
 		})
 		size = proto.Size(&p)
 
-		c.Logger().Trace("sent message", zap.Uint32("msgType", uint32(mc.MsgType)), zap.Int("size", len(msgBody)))
+		c.Logger().VeryVerbose("sent message", zap.Uint32("msgType", uint32(mc.MsgType)), zap.Int("size", len(msgBody)))
 
 		msgSent.WithLabelValues(c.connectionType.String()).Inc() /*.WithLabelValues(
 			strconv.FormatUint(uint64(e.Channel.id), 10),

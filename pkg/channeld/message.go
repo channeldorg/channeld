@@ -63,26 +63,11 @@ func handleClientToServerUserMessage(ctx MessageContext) {
 		ctx.Connection.Logger().Error("message is not a ServerForwardMessage, will not be handled.")
 		return
 	}
-	if len(msg.Payload) < 128 {
-		ctx.Connection.Logger().Debug("forward user-space message from client to server",
-			zap.Uint32("msgType", uint32(ctx.MsgType)),
-			zap.Uint32("clientConnId", msg.ClientConnId),
-			zap.Uint32("channelId", uint32(ctx.Channel.id)),
-			zap.Uint32("broadcastType", ctx.Broadcast),
-			zap.Int("payloadSize", len(msg.Payload)),
-		)
-	} else {
-		ctx.Connection.Logger().Info("forward user-space message from client to server",
-			zap.Uint32("msgType", uint32(ctx.MsgType)),
-			zap.Uint32("clientConnId", msg.ClientConnId),
-			zap.Uint32("channelId", uint32(ctx.Channel.id)),
-			zap.Uint32("broadcastType", ctx.Broadcast),
-			zap.Int("payloadSize", len(msg.Payload)),
-		)
-	}
 
+	var channelOwnerConnId uint32 = 0
 	if ctx.Channel.HasOwner() {
 		ctx.Channel.ownerConnection.Send(ctx)
+		channelOwnerConnId = uint32(ctx.Channel.ownerConnection.Id())
 	} else if ctx.Broadcast > 0 {
 		if ctx.Channel.enableClientBroadcast {
 			ctx.Channel.Broadcast(ctx)
@@ -92,11 +77,33 @@ func handleClientToServerUserMessage(ctx MessageContext) {
 				zap.String("channelType", ctx.Channel.channelType.String()),
 				zap.Uint32("channelId", uint32(ctx.Channel.id)),
 			)
+			return
 		}
 	} else {
 		ctx.Channel.Logger().Error("channel has no owner to forward the user-space messaged",
 			zap.Uint32("msgType", uint32(ctx.MsgType)),
 			zap.Uint32("connId", uint32(ctx.Connection.Id())),
+		)
+		return
+	}
+
+	if len(msg.Payload) < 128 {
+		ctx.Connection.Logger().Verbose("forward user-space message from client to server",
+			zap.Uint32("msgType", uint32(ctx.MsgType)),
+			zap.Uint32("clientConnId", msg.ClientConnId),
+			zap.Uint32("channelId", uint32(ctx.Channel.id)),
+			zap.Uint32("channelOwner", channelOwnerConnId),
+			zap.Uint32("broadcastType", ctx.Broadcast),
+			zap.Int("payloadSize", len(msg.Payload)),
+		)
+	} else {
+		ctx.Connection.Logger().Debug("forward user-space message from client to server",
+			zap.Uint32("msgType", uint32(ctx.MsgType)),
+			zap.Uint32("clientConnId", msg.ClientConnId),
+			zap.Uint32("channelId", uint32(ctx.Channel.id)),
+			zap.Uint32("channelOwner", channelOwnerConnId),
+			zap.Uint32("broadcastType", ctx.Broadcast),
+			zap.Int("payloadSize", len(msg.Payload)),
 		)
 	}
 }
@@ -109,7 +116,7 @@ func HandleServerToClientUserMessage(ctx MessageContext) {
 	}
 
 	if len(msg.Payload) < 128 {
-		ctx.Connection.Logger().Debug("forward user-space message from server to client",
+		ctx.Connection.Logger().Verbose("forward user-space message from server to client",
 			zap.Uint32("msgType", uint32(ctx.MsgType)),
 			zap.Uint32("clientConnId", msg.ClientConnId),
 			zap.Uint32("channelId", uint32(ctx.Channel.id)),
@@ -117,7 +124,7 @@ func HandleServerToClientUserMessage(ctx MessageContext) {
 			zap.Int("payloadSize", len(msg.Payload)),
 		)
 	} else {
-		ctx.Connection.Logger().Info("forward user-space message from server to client",
+		ctx.Connection.Logger().Debug("forward user-space message from server to client",
 			zap.Uint32("msgType", uint32(ctx.MsgType)),
 			zap.Uint32("clientConnId", msg.ClientConnId),
 			zap.Uint32("channelId", uint32(ctx.Channel.id)),

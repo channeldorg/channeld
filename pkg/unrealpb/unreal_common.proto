@@ -96,12 +96,16 @@ message HandoverContext {
 // channeld asks the spatial server about the context of a handover.
 message GetHandoverContextMessage {
     uint32 netId = 1;
+    uint32 srcChannelId = 2;
+    uint32 dstChannelId = 3;
 }
 
-// The spatial server answers channels about which objects should be contained in the handover data.
+// The spatial server answers channeld about which objects should be contained in the handover data.
 message GetHandoverContextResultMessage {
     uint32 netId = 1;
-    repeated HandoverContext context = 2;
+    uint32 srcChannelId = 2;
+    uint32 dstChannelId = 3;
+    repeated HandoverContext context = 4;
 }
 
 // Wrapped in ChannelDataHandoverMessage.data

@@ -946,7 +946,7 @@ func (x *ChannelDataMergeOptions) GetShouldCheckRemovableMapField() bool {
 // The message should have channelId = 0 in order to be handled.
 // Response: @CreateChannelResultMessage, if the MessageType is CREATE_CHANNEL and the channelType is not SPATIAL. The GLOBAL channel owner will also receive this message.
 // Response: @CreateSpatialChannelsResultMessage, if the MessageType is CREATE_SPATIAL_CHANNEL and the channelType is SPATIAL. The GLOBAL channel owner will also receive this message.
-// Response: @SubscribedToChannelResultMessage. The channel creator will also be subscripbed to the channel immediately after the creation.
+// Response: @SubscribedToChannelResultMessage. The channel creator will also be subscribed to the channel immediately after the creation.
 type CreateChannelMessage struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
