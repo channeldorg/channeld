@@ -17,6 +17,8 @@ import (
 // Only in this way we can send the UnrealObjectRef as the handover data.
 var allSpawnedObj map[uint32]*unrealpb.UnrealObjectRef = make(map[uint32]*unrealpb.UnrealObjectRef)
 var allSpawnedObjLock sync.RWMutex
+
+// Stores stubs for providing the handover data. The stub will be removed when the source server answers the handover context.
 var handoverDataProviders map[uint32]chan common.Message = make(map[uint32]chan common.Message)
 
 func HandleUnrealSpawnObject(ctx channeld.MessageContext) {
@@ -191,16 +193,22 @@ func HandleHandoverContextResult(ctx channeld.MessageContext) {
 		}
 	}
 
-	anyData, err := anypb.New(handoverChannelData)
-	if err != nil {
-		ctx.Connection.Logger().Error("failed to marshal handover data", zap.Error(err), zap.Uint32("netId", msg.NetId))
-		return
+	handoverData := &unrealpb.HandoverData{
+		Context: msg.Context,
 	}
 
-	provider <- &unrealpb.HandoverData{
-		Context:     msg.Context,
-		ChannelData: anyData,
+	srcChannel := channeld.GetChannel(common.ChannelId(msg.SrcChannelId))
+	// Only provide channel data for cross-server handover
+	if srcChannel != nil && dstChannel != nil && !srcChannel.IsSameOwner(dstChannel) {
+		anyData, err := anypb.New(handoverChannelData)
+		if err != nil {
+			ctx.Connection.Logger().Error("failed to marshal handover data", zap.Error(err), zap.Uint32("netId", msg.NetId))
+			return
+		}
+		handoverData.ChannelData = anyData
 	}
+
+	provider <- handoverData
 }
 
 // Implement [channeld.MergeableChannelData]
@@ -240,7 +248,8 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 								X: float64(newX),
 								Z: float64(newY)},
 							func(srcChannelId common.ChannelId, dstChannelId common.ChannelId, handoverData chan common.Message) {
-								// Handover happens within the spatial server - no need to ask the handover context.
+								/* No matter if it's cross-server, always ask for the handover context.
+								// Handover happens within the spatial server - no need to ask for the handover context.
 								if channeld.GetChannel(srcChannelId).IsSameOwner(channeld.GetChannel(dstChannelId)) {
 									defer allSpawnedObjLock.RLocker().Unlock()
 									allSpawnedObjLock.RLock()
@@ -252,7 +261,7 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 											},
 										},
 									}
-								} else {
+								} else*/{
 									handoverDataProviders[netId] = handoverData
 									channeld.GetChannel(srcChannelId).SendToOwner(uint32(unrealpb.MessageType_HANDOVER_CONTEXT), &unrealpb.GetHandoverContextMessage{
 										NetId:        netId,
