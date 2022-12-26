@@ -116,7 +116,7 @@ func HandleServerToClientUserMessage(ctx MessageContext) {
 	}
 
 	if len(msg.Payload) < 128 {
-		ctx.Connection.Logger().Verbose("forward user-space message from server to client",
+		ctx.Connection.Logger().Verbose("forward user-space message from server to client/server",
 			zap.Uint32("msgType", uint32(ctx.MsgType)),
 			zap.Uint32("clientConnId", msg.ClientConnId),
 			zap.Uint32("channelId", uint32(ctx.Channel.id)),
@@ -124,7 +124,7 @@ func HandleServerToClientUserMessage(ctx MessageContext) {
 			zap.Int("payloadSize", len(msg.Payload)),
 		)
 	} else {
-		ctx.Connection.Logger().Debug("forward user-space message from server to client",
+		ctx.Connection.Logger().Debug("forward user-space message from server to client/server",
 			zap.Uint32("msgType", uint32(ctx.MsgType)),
 			zap.Uint32("clientConnId", msg.ClientConnId),
 			zap.Uint32("channelId", uint32(ctx.Channel.id)),
@@ -152,9 +152,19 @@ func HandleServerToClientUserMessage(ctx MessageContext) {
 				ctx.Channel.Broadcast(ctx)
 		*/
 	case channeldpb.BroadcastType_SINGLE_CONNECTION:
-		clientConn := GetConnection(ConnectionId(msg.ClientConnId))
-		if clientConn != nil {
-			clientConn.Send(ctx)
+		var conn *Connection = nil
+		if msg.ClientConnId == 0 {
+			// server to server
+			if ctx.Channel.HasOwner() {
+				conn = ctx.Channel.ownerConnection.(*Connection)
+			}
+		} else {
+			// server to client
+			conn = GetConnection(ConnectionId(msg.ClientConnId))
+		}
+
+		if conn != nil {
+			conn.Send(ctx)
 		} else {
 			ctx.Connection.Logger().Warn("cannot forward the message as the target connection does not exist",
 				zap.Uint32("msgType", uint32(ctx.MsgType)),
