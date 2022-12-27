@@ -221,6 +221,13 @@ func (ch *Channel) PutMessage(msg common.Message, handler MessageHandlerFunc, co
 	}, handler: handler}
 }
 
+func (ch *Channel) PutMessageContext(ctx MessageContext, handler MessageHandlerFunc) {
+	if ch.IsRemoving() {
+		return
+	}
+	ch.inMsgQueue <- channelMessage{ctx: ctx, handler: handler}
+}
+
 func (ch *Channel) GetTime() ChannelTime {
 	return ChannelTime(time.Since(ch.startTime))
 }

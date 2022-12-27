@@ -22,8 +22,6 @@ var allSpawnedObjLock sync.RWMutex
 var handoverDataProviders map[uint32]chan common.Message = make(map[uint32]chan common.Message)
 
 func HandleUnrealSpawnObject(ctx channeld.MessageContext) {
-	defer channeld.HandleServerToClientUserMessage(ctx)
-
 	// server -> channeld -> client
 	msg, ok := ctx.Msg.(*channeldpb.ServerForwardMessage)
 	if !ok {
@@ -43,7 +41,12 @@ func HandleUnrealSpawnObject(ctx channeld.MessageContext) {
 		return
 	}
 
-	// Update the message's spaital channelId based on the actor's location
+	if spawnMsg.Obj.NetGUID == nil || *spawnMsg.Obj.NetGUID == 0 {
+		ctx.Connection.Logger().Error("invalid NetGUID in SpawnObjectMessage")
+		return
+	}
+
+	// Update the message's spatial channelId based on the actor's location
 	oldChId := *spawnMsg.ChannelId
 	if spawnMsg.Location != nil {
 		// Swap the Y and Z as UE uses the Z-Up rule but channeld uses the Y-up rule.
@@ -64,8 +67,22 @@ func HandleUnrealSpawnObject(ctx channeld.MessageContext) {
 			newPayload, err := proto.Marshal(spawnMsg)
 			if err == nil {
 				msg.Payload = newPayload
+				// Update the channel and let the new channel handle the message. Otherwise race conditions may happen.
+				ctx.Channel = channeld.GetChannel(spatialChId)
+				if ctx.Channel != nil {
+					ctx.Channel.PutMessageContext(ctx, channeld.HandleServerToClientUserMessage)
+				} else {
+					ctx.Connection.Logger().Error("failed to handle the ServerForwardMessage as the new spatial channel doesn't exist", zap.Uint32("newChId", *spawnMsg.ChannelId))
+				}
+			} else {
+				ctx.Connection.Logger().Error("failed to marshal the new payload")
 			}
+		} else {
+			// ChannelId is not updated; handle the forward message in current channel.
+			channeld.HandleServerToClientUserMessage(ctx)
 		}
+	} else {
+		channeld.HandleServerToClientUserMessage(ctx)
 	}
 
 	defer allSpawnedObjLock.Unlock()
