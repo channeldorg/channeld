@@ -7,6 +7,7 @@ import (
 	"channeld.clewcat.com/channeld/examples/channeld-ue-tps/tpspb"
 	"channeld.clewcat.com/channeld/pkg/channeld"
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
+	"channeld.clewcat.com/channeld/pkg/common"
 	"channeld.clewcat.com/channeld/pkg/unrealpb"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -51,6 +52,12 @@ func main() {
 
 	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_SPAWN), &channeldpb.ServerForwardMessage{}, tpspb.HandleUnrealSpawnObject)
 	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_HANDOVER_CONTEXT), &unrealpb.GetHandoverContextResultMessage{}, tpspb.HandleHandoverContextResult)
+
+	channeld.Event_GlobalChannelUnpossessed.Listen(func(struct{}) {
+		// Global server exits. Clear up all the cache.
+		tpspb.AllSpawnedObj = make(map[uint32]*unrealpb.UnrealObjectRef)
+		tpspb.HandoverDataProviders = make(map[uint32]chan common.Message)
+	})
 
 	// Setup Prometheus
 	http.Handle("/metrics", promhttp.Handler())

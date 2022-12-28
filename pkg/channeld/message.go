@@ -313,6 +313,7 @@ func handleCreateChannel(ctx MessageContext) {
 		newChannel = globalChannel
 		if !globalChannel.HasOwner() {
 			globalChannel.ownerConnection = ctx.Connection
+			Event_GlobalChannelPossessed.Broadcast(globalChannel)
 			ctx.Connection.Logger().Info("owned the GLOBAL channel")
 		} else {
 			ctx.Connection.Logger().Error("illegal attemp to create the GLOBAL channel")

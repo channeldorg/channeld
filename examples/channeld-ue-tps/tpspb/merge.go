@@ -15,11 +15,11 @@ import (
 
 // Stores all UObjects ever spawned in server and sent to client.
 // Only in this way we can send the UnrealObjectRef as the handover data.
-var allSpawnedObj map[uint32]*unrealpb.UnrealObjectRef = make(map[uint32]*unrealpb.UnrealObjectRef)
+var AllSpawnedObj map[uint32]*unrealpb.UnrealObjectRef = make(map[uint32]*unrealpb.UnrealObjectRef)
 var allSpawnedObjLock sync.RWMutex
 
 // Stores stubs for providing the handover data. The stub will be removed when the source server answers the handover context.
-var handoverDataProviders map[uint32]chan common.Message = make(map[uint32]chan common.Message)
+var HandoverDataProviders map[uint32]chan common.Message = make(map[uint32]chan common.Message)
 
 func HandleUnrealSpawnObject(ctx channeld.MessageContext) {
 	// server -> channeld -> client
@@ -87,7 +87,7 @@ func HandleUnrealSpawnObject(ctx channeld.MessageContext) {
 
 	defer allSpawnedObjLock.Unlock()
 	allSpawnedObjLock.Lock()
-	allSpawnedObj[*spawnMsg.Obj.NetGUID] = spawnMsg.Obj
+	AllSpawnedObj[*spawnMsg.Obj.NetGUID] = spawnMsg.Obj
 	channeld.RootLogger().Debug("stored UnrealObjectRef from spawn message",
 		zap.Uint32("netId", *spawnMsg.Obj.NetGUID),
 		zap.Uint32("oldChId", oldChId),
@@ -157,13 +157,13 @@ func HandleHandoverContextResult(ctx channeld.MessageContext) {
 		return
 	}
 
-	provider, exists := handoverDataProviders[msg.NetId]
+	provider, exists := HandoverDataProviders[msg.NetId]
 	if !exists {
 		ctx.Connection.Logger().Error("could not find the handover data provider", zap.Uint32("netId", msg.NetId))
 		return
 	}
 
-	defer delete(handoverDataProviders, msg.NetId)
+	defer delete(HandoverDataProviders, msg.NetId)
 
 	// No context - no handover will happen
 	if len(msg.Context) == 0 {
@@ -186,7 +186,7 @@ func HandleHandoverContextResult(ctx channeld.MessageContext) {
 		// Make sure the object is fully exported, so the destination server can spawn it properly.
 		if handoverCtx.Obj.NetGUIDBunch == nil {
 			allSpawnedObjLock.RLock()
-			objRef, exists := allSpawnedObj[*handoverCtx.Obj.NetGUID]
+			objRef, exists := AllSpawnedObj[*handoverCtx.Obj.NetGUID]
 			allSpawnedObjLock.RLocker().Unlock()
 			if exists {
 				handoverCtx.Obj = objRef
@@ -279,7 +279,7 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 										},
 									}
 								} else*/{
-									handoverDataProviders[netId] = handoverData
+									HandoverDataProviders[netId] = handoverData
 									channeld.GetChannel(srcChannelId).SendToOwner(uint32(unrealpb.MessageType_HANDOVER_CONTEXT), &unrealpb.GetHandoverContextMessage{
 										NetId:        netId,
 										SrcChannelId: uint32(srcChannelId),

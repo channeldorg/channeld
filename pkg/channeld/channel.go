@@ -148,6 +148,7 @@ func createChannelWithId(channelId common.ChannelId, t channeldpb.ChannelType, o
 
 	channelNum.WithLabelValues(ch.channelType.String()).Inc()
 
+	Event_ChannelCreated.Broadcast(ch)
 	return ch
 }
 
@@ -199,6 +200,8 @@ func RemoveChannel(ch *Channel) {
 	}
 
 	channelNum.WithLabelValues(ch.channelType.String()).Dec()
+
+	Event_ChannelRemoved.Broadcast(ch.id)
 }
 
 func (ch *Channel) IsRemoving() bool {
@@ -287,6 +290,9 @@ func (ch *Channel) tickConnections() {
 				if ownerConn == conn {
 					// Reset the owner if it's removed
 					ch.ownerConnection = nil
+					if ch.channelType == channeldpb.ChannelType_GLOBAL {
+						Event_GlobalChannelUnpossessed.Broadcast(struct{}{})
+					}
 					conn.Logger().Info("found removed ownner connection of channel", zap.Uint32("channelId", uint32(ch.id)))
 					if GlobalSettings.GetChannelSettings(ch.channelType).RemoveChannelAfterOwnerRemoved {
 						atomic.AddInt32(&ch.removing, 1)
