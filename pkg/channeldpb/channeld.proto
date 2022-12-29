@@ -37,7 +37,7 @@ message MessagePack {
 Connection Type | Broadcast_NO     | Broadacst_ALL                                       | Broadcast_SINGLE_CONNECTION
 ------------------------------------------------------------------------------------------------------------------------
 Client          | forward to owner | broadcast if no owner && enableClientBroadcast      | same as Broadacst_ALL
-Server          | forward to owner | broadcast (same for ALL_BUT_SENDER & ALL_BUT_OWNER) | forward to client connection
+Server          | forward to owner | broadcast (same for ALL_BUT_XXXX) | forward to client connection
 */
 // Can be used as the Flags-style enum in C#. See https://groups.google.com/g/protobuf/c/L105Q4NIk0U?pli=1.
 enum BroadcastType {

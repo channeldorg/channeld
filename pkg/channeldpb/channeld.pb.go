@@ -610,6 +610,7 @@ type ServerForwardMessage struct {
 	unknownFields protoimpl.UnknownFields
 
 	// The client that sends the user-space message to server or server sends the user-space message to.
+	// If a server sends to channeld with clientConnId = 0, the message will be forwarded to the channel owner.
 	ClientConnId uint32 `protobuf:"varint,1,opt,name=clientConnId,proto3" json:"clientConnId,omitempty"`
 	// The user-space message. channeld leaves it as the original binary format.
 	Payload []byte `protobuf:"bytes,2,opt,name=payload,proto3" json:"payload,omitempty"`
@@ -1828,6 +1829,7 @@ func (x *QuerySpatialChannelResultMessage) GetChannelId() []uint32 {
 	return nil
 }
 
+// ALL connections in the source AND destination channels receive this messge when a handover happpned.
 type ChannelDataHandoverMessage struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1836,9 +1838,8 @@ type ChannelDataHandoverMessage struct {
 	SrcChannelId uint32 `protobuf:"varint,1,opt,name=srcChannelId,proto3" json:"srcChannelId,omitempty"`
 	DstChannelId uint32 `protobuf:"varint,2,opt,name=dstChannelId,proto3" json:"dstChannelId,omitempty"`
 	// The ID of the client connection that triggered the handover. If the handover is triggered by server (e.g. NPC movement), the value will be 0.
-	// The client will be received @UnsubscribedFromChannelResultMessage and @SubscribedToChannelResultMessage.
 	ContextConnId uint32 `protobuf:"varint,3,opt,name=contextConnId,proto3" json:"contextConnId,omitempty"`
-	// The spatial channel data that migrate from the source channel to the destination channel.
+	// The data that migrate from the source channel to the destination channel. It can be the spatial channel data or anything, as long as the spatial servers can use it to process the handover.
 	Data *anypb.Any `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
 }
 
