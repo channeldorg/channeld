@@ -10,6 +10,10 @@ message TestRepGameState {
     optional int32 jumps = 1;
 }
 
+message TestRepPlayerControllerState {
+    unrealpb.UnrealObjectRef testRepActor = 1;
+}
+
 message TestRepChannelData {
     unrealpb.GameStateBase gameState = 1;
     map<uint32, unrealpb.ActorState> actorStates = 2;
@@ -21,6 +25,7 @@ message TestRepChannelData {
     map<uint32, unrealpb.ActorComponentState> actorComponentStates = 8;
     map<uint32, unrealpb.SceneComponentState> sceneComponentStates = 9;
     TestRepGameState testGameState = 10;
+    map<uint32, TestRepPlayerControllerState> testRepPlayerControllerStates = 11;
 }
 
 message GlobalChannelData {

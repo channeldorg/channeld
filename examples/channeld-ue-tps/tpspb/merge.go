@@ -114,6 +114,9 @@ func initStates(data *TestRepChannelData) {
 	if data.PlayerControllerStates == nil {
 		data.PlayerControllerStates = make(map[uint32]*unrealpb.PlayerControllerState)
 	}
+	if data.TestRepPlayerControllerStates == nil {
+		data.TestRepPlayerControllerStates = make(map[uint32]*TestRepPlayerControllerState)
+	}
 	if data.ActorComponentStates == nil {
 		data.ActorComponentStates = make(map[uint32]*unrealpb.ActorComponentState)
 	}
@@ -147,6 +150,10 @@ func collectStates(netId uint32, from *TestRepChannelData, to *TestRepChannelDat
 	playerControllerStates, exists := from.PlayerControllerStates[netId]
 	if exists {
 		to.PlayerControllerStates[netId] = playerControllerStates
+	}
+	testRepPlayerControllerStates, exists := from.TestRepPlayerControllerStates[netId]
+	if exists {
+		to.TestRepPlayerControllerStates[netId] = testRepPlayerControllerStates
 	}
 }
 
@@ -303,6 +310,9 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 	if srcData.GameState != nil {
 		proto.Merge(dst.GameState, srcData.GameState)
 	}
+	if srcData.TestGameState != nil {
+		proto.Merge(dst.TestGameState, srcData.TestGameState)
+	}
 
 	for netId, newActorState := range srcData.ActorStates {
 		// Remove the states from the maps
@@ -313,6 +323,7 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 			delete(dst.PlayerStates, netId)
 			delete(dst.ControllerStates, netId)
 			delete(dst.PlayerControllerStates, netId)
+			delete(dst.TestRepPlayerControllerStates, netId)
 			continue
 		} else {
 			oldActorState, exists := dst.ActorStates[netId]
@@ -366,6 +377,15 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 			proto.Merge(oldPlayerControllerState, newPlayerControllerState)
 		} else {
 			dst.PlayerControllerStates[netId] = newPlayerControllerState
+		}
+	}
+
+	for netId, newTestRepPlayerControllerState := range srcData.TestRepPlayerControllerStates {
+		oldTestRepPlayerControllerState, exists := dst.TestRepPlayerControllerStates[netId]
+		if exists {
+			proto.Merge(oldTestRepPlayerControllerState, newTestRepPlayerControllerState)
+		} else {
+			dst.TestRepPlayerControllerStates[netId] = newTestRepPlayerControllerState
 		}
 	}
 
