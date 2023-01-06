@@ -27,28 +27,31 @@ func main() {
 	channeld.RegisterChannelDataType(channeldpb.ChannelType_SPATIAL, &tpspb.TestRepChannelData{})
 
 	channeld.InitSpatialController(&channeld.StaticGrid2DSpatialController{
-		// WorldOffsetX: -40,
-		// WorldOffsetZ: -40,
-		// GridWidth:    8,
-		// GridHeight:   8,
-		// GridCols:     10,
-		// GridRows:     10,
 
-		WorldOffsetX: -1000,
-		WorldOffsetZ: -1000,
-		GridWidth:    1000,
-		GridHeight:   1000,
-		GridCols:     2,
-		GridRows:     2,
-		ServerCols:   1,
-		ServerRows:   2,
-		// GridWidth:                10,
-		// GridHeight:               10,
-		// GridCols:                 1,
-		// GridRows:                 1,
-		// ServerCols:               1,
-		// ServerRows:               1,
-		ServerInterestBorderSize: 0})
+		/* 2x2
+		 */
+		WorldOffsetX:             -1000,
+		WorldOffsetZ:             -1000,
+		GridWidth:                1000,
+		GridHeight:               1000,
+		GridCols:                 2,
+		GridRows:                 2,
+		ServerCols:               1,
+		ServerRows:               2,
+		ServerInterestBorderSize: 0,
+
+		/* 4x1
+		WorldOffsetX:             -2000,
+		WorldOffsetZ:             -500,
+		GridWidth:                1000,
+		GridHeight:               1000,
+		GridCols:                 4,
+		GridRows:                 1,
+		ServerCols:               2,
+		ServerRows:               1,
+		ServerInterestBorderSize: 1,
+		*/
+	})
 
 	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_SPAWN), &channeldpb.ServerForwardMessage{}, tpspb.HandleUnrealSpawnObject)
 	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_HANDOVER_CONTEXT), &unrealpb.GetHandoverContextResultMessage{}, tpspb.HandleHandoverContextResult)
@@ -56,7 +59,7 @@ func main() {
 	channeld.Event_GlobalChannelUnpossessed.Listen(func(struct{}) {
 		// Global server exits. Clear up all the cache.
 		tpspb.AllSpawnedObj = make(map[uint32]*unrealpb.UnrealObjectRef)
-		tpspb.HandoverDataProviders = make(map[uint32]chan common.Message)
+		tpspb.HandoverDataProviders = make(map[uint64]chan common.Message)
 	})
 
 	// Setup Prometheus

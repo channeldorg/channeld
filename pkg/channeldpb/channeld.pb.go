@@ -1830,6 +1830,7 @@ func (x *QuerySpatialChannelResultMessage) GetChannelId() []uint32 {
 }
 
 // ALL connections in the source AND destination channels receive this messge when a handover happpned.
+// Handover means an object moves from a spatial channel to another. It doesn't necessarily mean the objece moves from a spatial server to another.
 type ChannelDataHandoverMessage struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

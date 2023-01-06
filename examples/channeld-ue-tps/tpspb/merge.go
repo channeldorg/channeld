@@ -19,7 +19,11 @@ var AllSpawnedObj map[uint32]*unrealpb.UnrealObjectRef = make(map[uint32]*unreal
 var allSpawnedObjLock sync.RWMutex
 
 // Stores stubs for providing the handover data. The stub will be removed when the source server answers the handover context.
-var HandoverDataProviders map[uint32]chan common.Message = make(map[uint32]chan common.Message)
+var HandoverDataProviders map[uint64]chan common.Message = make(map[uint64]chan common.Message)
+
+func getHandoverStub(netId uint32, srcChannelId uint32) uint64 {
+	return uint64(srcChannelId)<<32 | uint64(netId)
+}
 
 func HandleUnrealSpawnObject(ctx channeld.MessageContext) {
 	// server -> channeld -> client
@@ -164,13 +168,14 @@ func HandleHandoverContextResult(ctx channeld.MessageContext) {
 		return
 	}
 
-	provider, exists := HandoverDataProviders[msg.NetId]
+	stubId := getHandoverStub(msg.NetId, msg.SrcChannelId)
+	provider, exists := HandoverDataProviders[stubId]
 	if !exists {
 		ctx.Connection.Logger().Error("could not find the handover data provider", zap.Uint32("netId", msg.NetId))
 		return
 	}
 
-	defer delete(HandoverDataProviders, msg.NetId)
+	defer delete(HandoverDataProviders, stubId)
 
 	// No context - no handover will happen
 	if len(msg.Context) == 0 {
@@ -249,25 +254,27 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 			if exists {
 				if newActorState.ReplicatedMovement != nil && newActorState.ReplicatedMovement.Location != nil &&
 					oldActorState.ReplicatedMovement != nil && oldActorState.ReplicatedMovement.Location != nil {
-					oldLoc := oldActorState.ReplicatedMovement.Location
 					newLoc := newActorState.ReplicatedMovement.Location
+					oldLoc := oldActorState.ReplicatedMovement.Location
+
 					var newX, newY float32
 					if newLoc.X != nil {
 						newX = *newLoc.X
 					} else {
-						newX = *oldLoc.X
+						// Use GetX/Y() to avoid violation memory access!
+						newX = oldLoc.GetX()
 					}
 					if newLoc.Y != nil {
 						newY = *newLoc.Y
 					} else {
-						newY = *oldLoc.Y
+						newY = oldLoc.GetY()
 					}
 					if newX != *oldLoc.X || newY != *oldLoc.Y {
 						spatialNotifier.Notify(
 							// Swap the Y and Z as UE uses the Z-Up rule but channeld uses the Y-up rule.
 							common.SpatialInfo{
-								X: float64(*oldLoc.X),
-								Z: float64(*oldLoc.Y)},
+								X: float64(oldLoc.GetX()),
+								Z: float64(oldLoc.GetY())},
 							common.SpatialInfo{
 								X: float64(newX),
 								Z: float64(newY)},
@@ -286,7 +293,7 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 										},
 									}
 								} else*/{
-									HandoverDataProviders[netId] = handoverData
+									HandoverDataProviders[getHandoverStub(netId, uint32(srcChannelId))] = handoverData
 									channeld.GetChannel(srcChannelId).SendToOwner(uint32(unrealpb.MessageType_HANDOVER_CONTEXT), &unrealpb.GetHandoverContextMessage{
 										NetId:        netId,
 										SrcChannelId: uint32(srcChannelId),

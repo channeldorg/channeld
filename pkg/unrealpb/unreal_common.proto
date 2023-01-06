@@ -93,7 +93,7 @@ message HandoverContext {
     optional uint32 clientConnId = 2;
 }
 
-// channeld asks the spatial server about the context of a handover.
+// When a handover is potentially happening, channeld asks the spatial server about the context of a handover.
 message GetHandoverContextMessage {
     uint32 netId = 1;
     uint32 srcChannelId = 2;

@@ -599,7 +599,7 @@ func (x *HandoverContext) GetClientConnId() uint32 {
 	return 0
 }
 
-// channeld asks the spatial server about the context of a handover.
+// When a handover is potentially happening, channeld asks the spatial server about the context of a handover.
 type GetHandoverContextMessage struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
