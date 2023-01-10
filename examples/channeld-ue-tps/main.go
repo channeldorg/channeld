@@ -55,6 +55,7 @@ func main() {
 
 	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_SPAWN), &channeldpb.ServerForwardMessage{}, tpspb.HandleUnrealSpawnObject)
 	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_HANDOVER_CONTEXT), &unrealpb.GetHandoverContextResultMessage{}, tpspb.HandleHandoverContextResult)
+	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_GET_UNREAL_OBJECT_REF), &unrealpb.GetUnrealObjectRefMessage{}, tpspb.HandleGetUnrealObjectRef)
 
 	channeld.Event_GlobalChannelUnpossessed.Listen(func(struct{}) {
 		// Global server exits. Clear up all the cache.

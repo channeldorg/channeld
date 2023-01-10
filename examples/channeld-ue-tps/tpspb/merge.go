@@ -25,6 +25,28 @@ func getHandoverStub(netId uint32, srcChannelId uint32) uint64 {
 	return uint64(srcChannelId)<<32 | uint64(netId)
 }
 
+func HandleGetUnrealObjectRef(ctx channeld.MessageContext) {
+	msg, ok := ctx.Msg.(*unrealpb.GetUnrealObjectRefMessage)
+	if !ok {
+		ctx.Connection.Logger().Error("message is not a GetUnrealObjectRefMessage, will not be handled.")
+		return
+	}
+
+	resultMsg := &unrealpb.GetUnrealObjectRefResultMessage{}
+	resultMsg.ObjRef = make([]*unrealpb.UnrealObjectRef, 0)
+
+	defer allSpawnedObjLock.RLocker().Unlock()
+	allSpawnedObjLock.RLock()
+	for _, netId := range msg.NetGUID {
+		objRef, exists := AllSpawnedObj[netId]
+		if exists {
+			resultMsg.ObjRef = append(resultMsg.ObjRef, objRef)
+		}
+	}
+	ctx.Msg = resultMsg
+	ctx.Connection.Send(ctx)
+}
+
 func HandleUnrealSpawnObject(ctx channeld.MessageContext) {
 	// server -> channeld -> client
 	msg, ok := ctx.Msg.(*channeldpb.ServerForwardMessage)

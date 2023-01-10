@@ -31,6 +31,11 @@ enum MessageType {
     //See @GetHandoverContextMessage and @GetHandoverContextResultMessage
     HANDOVER_CONTEXT = 105;
 
+    // Get the full-exported UnrealObjectRefs by the specific NetworkGUIDs.
+    // Used by UE clients to spawn objects from ChannelDataUpdate.
+    // See @GetUnrealObjectRefMessage and @GetUnrealObjectRefResultMessage
+    GET_UNREAL_OBJECT_REF = 106;
+
     SERVER_PLAYER_SPAWNED = 201;
 
     // Used by the Master server to broadcast the player leave (@UnsubscribedFromChannelResultMessage) to the spatial servers.
@@ -114,6 +119,15 @@ message HandoverData {
     // The channel data message for the destination server only.
     optional google.protobuf.Any channelData = 2;
 }
+
+message GetUnrealObjectRefMessage {
+    repeated uint32 netGUID = 1;
+}
+
+message GetUnrealObjectRefResultMessage {
+    repeated UnrealObjectRef objRef = 1;
+}
+
 
 
 message FRepMovement {
