@@ -122,6 +122,12 @@ func HandleUnrealSpawnObject(ctx channeld.MessageContext) {
 }
 
 func initStates(data *TestRepChannelData) {
+	if data.GameState == nil {
+		data.GameState = &unrealpb.GameStateBase{}
+	}
+	if data.TestGameState == nil {
+		data.TestGameState = &TestRepGameState{}
+	}
 	if data.ActorStates == nil {
 		data.ActorStates = make(map[uint32]*unrealpb.ActorState)
 	}
