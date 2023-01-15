@@ -297,7 +297,7 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 					} else {
 						newY = oldLoc.GetY()
 					}
-					if newX != *oldLoc.X || newY != *oldLoc.Y {
+					if newX != oldLoc.GetX() || newY != oldLoc.GetY() {
 						spatialNotifier.Notify(
 							// Swap the Y and Z as UE uses the Z-Up rule but channeld uses the Y-up rule.
 							common.SpatialInfo{

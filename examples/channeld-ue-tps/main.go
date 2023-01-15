@@ -51,6 +51,18 @@ func main() {
 		ServerRows:               1,
 		ServerInterestBorderSize: 1,
 		*/
+
+		/* 6x6
+		WorldOffsetX:             -15000,
+		WorldOffsetZ:             -15000,
+		GridWidth:                5000,
+		GridHeight:               5000,
+		GridCols:                 6,
+		GridRows:                 6,
+		ServerCols:               2,
+		ServerRows:               2,
+		ServerInterestBorderSize: 1,
+		*/
 	})
 
 	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_SPAWN), &channeldpb.ServerForwardMessage{}, tpspb.HandleUnrealSpawnObject)
