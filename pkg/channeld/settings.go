@@ -56,6 +56,7 @@ type ACLSettingsType struct {
 type ChannelSettingsType struct {
 	TickIntervalMs                 uint
 	DefaultFanOutIntervalMs        uint32
+	DefaultFanOutDelayMs           int32
 	RemoveChannelAfterOwnerRemoved bool
 	ACLSettings                    ACLSettingsType
 }
@@ -72,6 +73,7 @@ var GlobalSettings = GlobalSettingsType{
 		channeldpb.ChannelType_GLOBAL: {
 			TickIntervalMs:                 10,
 			DefaultFanOutIntervalMs:        20,
+			DefaultFanOutDelayMs:           0,
 			RemoveChannelAfterOwnerRemoved: false,
 		},
 	},

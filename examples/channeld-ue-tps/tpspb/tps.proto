@@ -4,7 +4,7 @@ package tpspb;
 
 import "unreal_common.proto";
 
-option go_package = "channeld.clewcat.com/examples/channeld-ue-tps/tpspb";
+option go_package = "channeld.clewcat.com/channeld/examples/channeld-ue-tps/tpspb";
 
 message TestRepChannelData {
     unrealpb.GameStateBase gameState = 1;
