@@ -28,7 +28,7 @@
 
 # Tests
 - [x] Unit tests
-- [ ] Smoke tests
+- [ ] Benchmark tests
 - [ ] Scale tests
 
 # SDKs
@@ -61,7 +61,8 @@
     - [x] Integrate with Unreal's networking stack
     - [x] Integrate with Unreal's Replication system
     - [ ] Replication codegen
-    - [ ] Multi-server support
+    - [x] Multi-server support
+    - [ ] Client interest management
     - [ ] Editor toolbar extension
     - [ ] KCP support
     - [ ] Data traffic compression

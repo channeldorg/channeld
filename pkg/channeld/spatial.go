@@ -8,6 +8,7 @@ import (
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"channeld.clewcat.com/channeld/pkg/common"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -16,11 +17,11 @@ type SpatialController interface {
 	// Notify() is called in the spatial channels (shared instance)
 	common.SpatialInfoChangedNotifier
 	// Called in GLOBAL and spatial channels
-	GetChannelId(info common.SpatialInfo) (ChannelId, error)
+	GetChannelId(info common.SpatialInfo) (common.ChannelId, error)
 	// Called in GLOBAL channel
 	GetRegions() ([]*channeldpb.SpatialRegion, error)
 	// Called in any spatial channel
-	GetAdjacentChannels(spatialChannelId ChannelId) ([]ChannelId, error)
+	GetAdjacentChannels(spatialChannelId common.ChannelId) ([]common.ChannelId, error)
 	// Create spatial channels for a spatial server.
 	// Called in GLOBAL channel
 	CreateChannels(ctx MessageContext) ([]*Channel, error)
@@ -33,6 +34,10 @@ var spatialController SpatialController
 
 func InitSpatialController(controller SpatialController) {
 	spatialController = controller
+}
+
+func GetSpatialController() SpatialController {
+	return spatialController
 }
 
 const (
@@ -82,15 +87,15 @@ type StaticGrid2DSpatialController struct {
 	serverConnections []ConnectionInChannel
 }
 
-func (ctl *StaticGrid2DSpatialController) GetChannelId(info common.SpatialInfo) (ChannelId, error) {
+func (ctl *StaticGrid2DSpatialController) GetChannelId(info common.SpatialInfo) (common.ChannelId, error) {
 	return ctl.GetChannelIdWithOffset(info, ctl.WorldOffsetX, ctl.WorldOffsetZ)
 }
 
-func (ctl *StaticGrid2DSpatialController) GetChannelIdNoOffset(info common.SpatialInfo) (ChannelId, error) {
+func (ctl *StaticGrid2DSpatialController) GetChannelIdNoOffset(info common.SpatialInfo) (common.ChannelId, error) {
 	return ctl.GetChannelIdWithOffset(info, 0, 0)
 }
 
-func (ctl *StaticGrid2DSpatialController) GetChannelIdWithOffset(info common.SpatialInfo, offsetX float64, offsetZ float64) (ChannelId, error) {
+func (ctl *StaticGrid2DSpatialController) GetChannelIdWithOffset(info common.SpatialInfo, offsetX float64, offsetZ float64) (common.ChannelId, error) {
 	gridX := int(math.Floor((info.X - offsetX) / ctl.GridWidth))
 	if gridX < 0 || gridX >= int(ctl.GridCols) {
 		return 0, fmt.Errorf("gridX=%d when X=%f. GridX should be in [0,%d)", gridX, info.X, ctl.GridCols)
@@ -100,7 +105,7 @@ func (ctl *StaticGrid2DSpatialController) GetChannelIdWithOffset(info common.Spa
 		return 0, fmt.Errorf("gridY=%d when Z=%f. GridY should be in [0,%d)", gridY, info.Z, ctl.GridRows)
 	}
 	index := uint32(gridX) + uint32(gridY)*ctl.GridCols
-	return ChannelId(index) + GlobalSettings.SpatialChannelIdStart, nil
+	return common.ChannelId(index) + GlobalSettings.SpatialChannelIdStart, nil
 }
 
 func (ctl *StaticGrid2DSpatialController) GetRegions() ([]*channeldpb.SpatialRegion, error) {
@@ -142,18 +147,18 @@ func (ctl *StaticGrid2DSpatialController) GetRegions() ([]*channeldpb.SpatialReg
 	return regions, nil
 }
 
-func (ctl *StaticGrid2DSpatialController) GetAdjacentChannels(spatialChannelId ChannelId) ([]ChannelId, error) {
+func (ctl *StaticGrid2DSpatialController) GetAdjacentChannels(spatialChannelId common.ChannelId) ([]common.ChannelId, error) {
 	index := uint32(spatialChannelId - GlobalSettings.SpatialChannelIdStart)
 	gridX := int32(index % ctl.GridCols)
 	gridY := int32(index / ctl.GridCols)
-	channelIds := make([]ChannelId, 0)
+	channelIds := make([]common.ChannelId, 0)
 	for y := gridY - 1; y <= gridY+1; y++ {
-		if y < 0 || y >= int32(ctl.GridRows-1) {
+		if y < 0 || y > int32(ctl.GridRows-1) {
 			continue
 		}
 
 		for x := gridX - 1; x <= gridX+1; x++ {
-			if x < 0 || x >= int32(ctl.GridCols-1) {
+			if x < 0 || x > int32(ctl.GridCols-1) {
 				continue
 			}
 			if x == gridX && y == gridY {
@@ -161,7 +166,7 @@ func (ctl *StaticGrid2DSpatialController) GetAdjacentChannels(spatialChannelId C
 			}
 
 			channelIndex := uint32(x) + uint32(y)*ctl.GridCols
-			channelIds = append(channelIds, ChannelId(channelIndex)+GlobalSettings.SpatialChannelIdStart)
+			channelIds = append(channelIds, common.ChannelId(channelIndex)+GlobalSettings.SpatialChannelIdStart)
 		}
 	}
 	return channelIds, nil
@@ -190,7 +195,7 @@ func (ctl *StaticGrid2DSpatialController) CreateChannels(ctx MessageContext) ([]
 		serverGridRows++
 	}
 
-	channelIds := make([]ChannelId, serverGridCols*serverGridRows)
+	channelIds := make([]common.ChannelId, serverGridCols*serverGridRows)
 	serverX := serverIndex % ctl.ServerCols
 	serverY := serverIndex / ctl.ServerCols
 	var spatialInfo common.SpatialInfo
@@ -351,15 +356,15 @@ func (ctl *StaticGrid2DSpatialController) subToAdjacentChannels(serverIndex uint
 var dataMarshalOptions = protojson.MarshalOptions{Multiline: false}
 
 // Runs in the source spatial channel (shared instance)
-func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, newInfo common.SpatialInfo, handoverDataProvider func() common.ChannelDataMessage) {
+func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, newInfo common.SpatialInfo, handoverDataProvider func(common.ChannelId, common.ChannelId, chan common.Message)) {
 	srcChannelId, err := ctl.GetChannelId(oldInfo)
 	if err != nil {
-		rootLogger.Error("failed to calculate srcChannelId", zap.Error(err))
+		rootLogger.Error("failed to calculate srcChannelId", zap.Error(err), zap.String("oldInfo", oldInfo.String()))
 		return
 	}
 	dstChannelId, err := ctl.GetChannelId(newInfo)
 	if err != nil {
-		rootLogger.Error("failed to calculate dstChannelId", zap.Error(err))
+		rootLogger.Error("failed to calculate dstChannelId", zap.Error(err), zap.String("newInfo", newInfo.String()))
 		return
 	}
 	// No migration between channels
@@ -386,61 +391,72 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 	}
 
 	// Handover data is provider by the Merger [channeld.MergeableChannelData]
-	handoverData := handoverDataProvider()
-	if handoverData == nil {
-		rootLogger.Error("failed to provider handover channel data", zap.Uint32("srcChannelId", uint32(srcChannelId)), zap.Uint32("dstChannelId", uint32(dstChannelId)))
-		return
-	}
-	rootLogger.Debug("handover channel data", zap.Uint32("srcChannelId", uint32(srcChannelId)), zap.Uint32("dstChannelId", uint32(dstChannelId)),
-		zap.String("data", dataMarshalOptions.Format(handoverData)))
+	c := make(chan common.Message)
+	go func() {
+		handoverData := <-c
+		if handoverData == nil {
+			rootLogger.Info("handover will not happen as no data is provided", zap.Uint32("srcChannelId", uint32(srcChannelId)), zap.Uint32("dstChannelId", uint32(dstChannelId)))
+			return
+		}
+		if rootLogger.Core().Enabled(zapcore.Level(VerboseLevel)) {
+			rootLogger.Verbose("handover data", zap.Uint32("srcChannelId", uint32(srcChannelId)), zap.Uint32("dstChannelId", uint32(dstChannelId)),
+				zap.String("data", dataMarshalOptions.Format(handoverData)))
+		}
 
-	anyData, err := anypb.New(handoverData)
-	if err != nil {
-		rootLogger.Error("failed to marshall handover data", zap.Error(err))
-		return
-	}
+		anyData, err := anypb.New(handoverData)
+		if err != nil {
+			rootLogger.Error("failed to marshall handover data", zap.Error(err))
+			return
+		}
 
-	/*
-		newChannel.PutMessage(&channeldpb.ChannelDataUpdateMessage{
-			Data: anyData,
-		}, handleChannelDataUpdate, internalDummyConnection, &channeldpb.MessagePack{
-			MsgType:   uint32(channeldpb.MessageType_CHANNEL_DATA_UPDATE),
-			Broadcast: channeldpb.BroadcastType_NO_BROADCAST,
-			StubId:    0,
-			ChannelId: uint32(dstChannelId),
-		})
-	*/
+		/*
+			newChannel.PutMessage(&channeldpb.ChannelDataUpdateMessage{
+				Data: anyData,
+			}, handleChannelDataUpdate, internalDummyConnection, &channeldpb.MessagePack{
+				MsgType:   uint32(channeldpb.MessageType_CHANNEL_DATA_UPDATE),
+				Broadcast: channeldpb.BroadcastType_NO_BROADCAST,
+				StubId:    0,
+				ChannelId: uint32(dstChannelId),
+			})
+		*/
 
-	handoverMsg := &channeldpb.ChannelDataHandoverMessage{
-		SrcChannelId:  uint32(srcChannelId),
-		DstChannelId:  uint32(dstChannelId),
-		Data:          anyData,
-		ContextConnId: uint32(srcChannel.latestDataUpdateConnId),
-	}
+		handoverMsg := &channeldpb.ChannelDataHandoverMessage{
+			SrcChannelId:  uint32(srcChannelId),
+			DstChannelId:  uint32(dstChannelId),
+			Data:          anyData,
+			ContextConnId: uint32(srcChannel.latestDataUpdateConnId),
+		}
 
-	// Avoid duplicate sending
-	// Race Condition: reading dstChannel's subscribedConnections in srcChannel
-	conns := dstChannel.GetAllConnections()
-	for conn := range srcChannel.subscribedConnections {
-		if _, exists := conns[conn]; !exists {
+		// Use GetAllConnections() to avoid race condition
+		srcChannelConns := srcChannel.GetAllConnections()
+		dstChanenlConns := dstChannel.GetAllConnections()
+		// Send the handover message to all connections in the srcChannel
+		for conn := range srcChannelConns {
+			// Avoid duplicate sending
+			if _, exists := dstChanenlConns[conn]; !exists {
+				conn.Send(MessageContext{
+					MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
+					Msg:       handoverMsg,
+					Broadcast: 0,
+					StubId:    0,
+					ChannelId: uint32(srcChannelId),
+				})
+			}
+		}
+
+		// Send the handover message to all connections in the dstChannel
+		for conn := range dstChanenlConns {
 			conn.Send(MessageContext{
 				MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
 				Msg:       handoverMsg,
 				Broadcast: 0,
 				StubId:    0,
-				ChannelId: uint32(srcChannelId),
+				ChannelId: uint32(dstChannelId),
 			})
 		}
-	}
-	for conn := range conns {
-		conn.Send(MessageContext{
-			MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
-			Msg:       handoverMsg,
-			Broadcast: 0,
-			StubId:    0,
-			ChannelId: uint32(dstChannelId),
-		})
-	}
+	}()
+
+	handoverDataProvider(srcChannelId, dstChannelId, c)
 }
 
 func (ctl *StaticGrid2DSpatialController) initServerConnections() {

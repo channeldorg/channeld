@@ -37,29 +37,35 @@ message MessagePack {
 Connection Type | Broadcast_NO     | Broadacst_ALL                                       | Broadcast_SINGLE_CONNECTION
 ------------------------------------------------------------------------------------------------------------------------
 Client          | forward to owner | broadcast if no owner && enableClientBroadcast      | same as Broadacst_ALL
-Server          | forward to owner | broadcast (same for ALL_BUT_SENDER & ALL_BUT_OWNER) | forward to client connection
+Server          | forward to owner | broadcast (same for ALL_BUT_XXXX) | forward to client connection
 */
 // Can be used as the Flags-style enum in C#. See https://groups.google.com/g/protobuf/c/L105Q4NIk0U?pli=1.
 enum BroadcastType {
     // No broadcast. All internal messages should use this type, and other types are ignored.
     NO_BROADCAST = 0x00;
 
-    // Broadcast the message to all the connections in the channel, the sender included.
-    ALL = 0x01;
-
-    // Broadcast the message to all the connections in the channel, the sender excluded.
-    ALL_BUT_SENDER = 0x02;
-
-    // Broadcast the message to all the connections in the channel, the owner excluded.
-    ALL_BUT_OWNER = 0x04;
-
     // Forward the message to the connection. Can only be used by the backend server.
     // This has the same behavior as sending the message to the PRIVATE channel owned by the target connection with BroadcastType = NO.
-    SINGLE_CONNECTION = 0x08; 
+    SINGLE_CONNECTION = 0x01; 
+
+    // Broadcast the message to all the connections in the channel, the sender included.
+    ALL = 0x02;
+
+    // Broadcast the message to all the connections in the channel, the sender excluded.
+    ALL_BUT_SENDER = 0x04;
+
+    // Broadcast the message to all the connections in the channel, the owner excluded.
+    ALL_BUT_OWNER = 0x06;
+
+    // Broadcast the message to all client connections in the channel.
+    ALL_BUT_CLIENT = 0x08;
+
+    // Broadcast the message to all server connections in the channel, the owner excluded.
+    ALL_BUT_SERVER = 0x10;
 
     // Broadcast the message to all the connections in all the adjacent(3x3) spatial channels. Ignored if the target channel is not a spatial channel.
     // To ignore the center spatial channel, use ADJACENT_CHANNELS | ALL_BUT_OWNER; to ignore the sender(spatial server), use ADJACENT_CHANNELS | ALL_BUT_SENDER.
-    ADJACENT_CHANNELS = 0x10;
+    ADJACENT_CHANNELS = 0x20;
 }
 
 enum ConnectionType {
@@ -137,6 +143,7 @@ enum MessageType {
 // Users don't need to use this message directly if they are using a client library.
 message ServerForwardMessage {
     // The client that sends the user-space message to server or server sends the user-space message to.
+    // If a server sends to channeld with clientConnId = 0, the message will be forwarded to the channel owner.
     uint32 clientConnId = 1;
     // The user-space message. channeld leaves it as the original binary format.
     bytes payload = 2;
@@ -216,7 +223,7 @@ message ChannelDataMergeOptions {
 // The message should have channelId = 0 in order to be handled.
 // Response: @CreateChannelResultMessage, if the MessageType is CREATE_CHANNEL and the channelType is not SPATIAL. The GLOBAL channel owner will also receive this message.
 // Response: @CreateSpatialChannelsResultMessage, if the MessageType is CREATE_SPATIAL_CHANNEL and the channelType is SPATIAL. The GLOBAL channel owner will also receive this message.
-// Response: @SubscribedToChannelResultMessage. The channel creator will also be subscripbed to the channel immediately after the creation.
+// Response: @SubscribedToChannelResultMessage. The channel creator will also be subscribed to the channel immediately after the creation.
 message CreateChannelMessage {
     ChannelType channelType = 1;
     string metadata = 2;
@@ -272,7 +279,7 @@ message SubscribedToChannelResultMessage {
     ChannelType channelType = 4;
 }
 
-// Response: @UnsubscribedFromChannelResultMessage. The message sender, the subscribed connection, and the channel owner will receive the message respectively.
+// Response: @UnsubscribedFromChannelResultMessage. The message sender, the connection that unsubscribed, and the channel owner will receive the message respectively.
 message UnsubscribedFromChannelMessage {
     // The connection to be removed from the channel is not necessarily the one sends the message.
     // Remarks: only the channel owner or the GLOBAL channel can unsub another connection from the channel.
@@ -328,15 +335,16 @@ message QuerySpatialChannelResultMessage {
     repeated uint32 channelId = 1;
 }
 
+// ALL connections in the source AND destination channels receive this messge when a handover happpned.
+// Handover means an object moves from a spatial channel to another. It doesn't necessarily mean the objece moves from a spatial server to another.
 message ChannelDataHandoverMessage {
     uint32 srcChannelId = 1;
     uint32 dstChannelId = 2;
     
     // The ID of the client connection that triggered the handover. If the handover is triggered by server (e.g. NPC movement), the value will be 0.
-    // The client will be received @UnsubscribedFromChannelResultMessage and @SubscribedToChannelResultMessage.
     uint32 contextConnId = 3;
 
-    // The spatial channel data that migrate from the source channel to the destination channel.
+    // The data that migrate from the source channel to the destination channel. It can be the spatial channel data or anything, as long as the spatial servers can use it to process the handover.
     google.protobuf.Any data = 4;
 }
 

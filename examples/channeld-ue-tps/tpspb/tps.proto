@@ -6,13 +6,28 @@ import "unreal_common.proto";
 
 option go_package = "channeld.clewcat.com/channeld/examples/channeld-ue-tps/tpspb";
 
+message TestRepGameState {
+    optional int32 jumps = 1;
+}
+
+message TestRepPlayerControllerState {
+    unrealpb.UnrealObjectRef testRepActor = 1;
+}
+
 message TestRepChannelData {
     unrealpb.GameStateBase gameState = 1;
     map<uint32, unrealpb.ActorState> actorStates = 2;
-    map<uint32, unrealpb.CharacterState> characterStates = 3;
-    map<uint32, unrealpb.PlayerState> playerStates = 4;
-    map<uint32, unrealpb.ControllerState> controllerStates = 5;
-    map<uint32, unrealpb.PlayerControllerState> playerControllerStates = 6;
-    map<uint32, unrealpb.ActorComponentState> actorComponentStates = 7;
-    map<uint32, unrealpb.SceneComponentState> sceneComponentStates = 8;
+    map<uint32, unrealpb.PawnState> pawnStates = 3;
+    map<uint32, unrealpb.CharacterState> characterStates = 4;
+    map<uint32, unrealpb.PlayerState> playerStates = 5;
+    map<uint32, unrealpb.ControllerState> controllerStates = 6;
+    map<uint32, unrealpb.PlayerControllerState> playerControllerStates = 7;
+    map<uint32, unrealpb.ActorComponentState> actorComponentStates = 8;
+    map<uint32, unrealpb.SceneComponentState> sceneComponentStates = 9;
+    TestRepGameState testGameState = 10;
+    map<uint32, TestRepPlayerControllerState> testRepPlayerControllerStates = 11;
+}
+
+message GlobalChannelData {
+    unrealpb.GameStateBase gameState = 1;
 }

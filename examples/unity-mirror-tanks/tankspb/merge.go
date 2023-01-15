@@ -9,7 +9,7 @@ import (
 )
 
 // Implement [channeld.MergeableChannelData]
-func (dst *TankGameChannelData) Merge(src proto.Message, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) error {
+func (dst *TankGameChannelData) Merge(src common.ChannelDataMessage, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) error {
 	srcMsg, ok := src.(*TankGameChannelData)
 	if !ok {
 		return errors.New("src is not a TankGameChannelData")

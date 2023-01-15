@@ -2,6 +2,8 @@ package channeld
 
 import (
 	"sync"
+
+	"channeld.clewcat.com/channeld/pkg/common"
 )
 
 func GetNextId(m *map[uint32]interface{}, start uint32, min uint32, max uint32) (uint32, bool) {
@@ -19,7 +21,7 @@ func GetNextId(m *map[uint32]interface{}, start uint32, min uint32, max uint32) 
 	return 0, false
 }
 
-func GetNextIdSync(m *sync.Map, start ChannelId, min ChannelId, max ChannelId) (ChannelId, bool) {
+func GetNextIdSync(m *sync.Map, start common.ChannelId, min common.ChannelId, max common.ChannelId) (common.ChannelId, bool) {
 	for i := min; i <= max; i++ {
 		if _, exists := m.Load(start); !exists {
 			return start, true

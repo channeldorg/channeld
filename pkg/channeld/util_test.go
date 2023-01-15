@@ -4,6 +4,7 @@ import (
 	"sync"
 	"testing"
 
+	"channeld.clewcat.com/channeld/pkg/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -45,7 +46,7 @@ func BenchmarkGetNextId(b *testing.B) {
 
 func TestGetNextIdSync(t *testing.T) {
 	m := sync.Map{}
-	var index ChannelId = 1
+	var index common.ChannelId = 1
 	var ok bool
 
 	index, _ = GetNextIdSync(&m, index, 1, 3)
@@ -68,7 +69,7 @@ func TestGetNextIdSync(t *testing.T) {
 // 3x slower as of BenchmarkGetNextId
 func BenchmarkGetNextIdSync(b *testing.B) {
 	m := sync.Map{}
-	var index ChannelId = 1
+	var index common.ChannelId = 1
 	var ok bool
 
 	for i := 0; i < b.N; i++ {

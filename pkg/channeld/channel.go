@@ -22,10 +22,6 @@ const (
 	ChannelState_HANDOVER ChannelState = 2
 )
 
-// Each channel uses a goroutine and we can have at most millions of goroutines at the same time.
-// So we won't use 64-bit channel ID unless we use a distributed architecture for channeld itself.
-type ChannelId uint32
-
 // ChannelTime is the relative time since the channel created.
 type ChannelTime int64 // time.Duration
 
@@ -59,7 +55,7 @@ type ConnectionInChannel interface {
 }
 
 type Channel struct {
-	id                    ChannelId
+	id                    common.ChannelId
 	channelType           channeldpb.ChannelType
 	state                 ChannelState
 	ownerConnection       ConnectionInChannel
@@ -84,11 +80,11 @@ type Channel struct {
 }
 
 const (
-	GlobalChannelId ChannelId = 0
+	GlobalChannelId common.ChannelId = 0
 )
 
-var nextChannelId ChannelId
-var nextSpatialChannelId ChannelId
+var nextChannelId common.ChannelId
+var nextSpatialChannelId common.ChannelId
 
 // Cache the status so we don't have to check all the index in the sync map, until a channel is removed.
 var nonSpatialchannelFull bool = false
@@ -103,7 +99,7 @@ func InitChannels() {
 	globalChannel, _ = CreateChannel(channeldpb.ChannelType_GLOBAL, nil)
 }
 
-func GetChannel(id ChannelId) *Channel {
+func GetChannel(id common.ChannelId) *Channel {
 	ch, ok := allChannels.Load(id)
 	if ok {
 		return ch.(*Channel)
@@ -115,7 +111,7 @@ func GetChannel(id ChannelId) *Channel {
 var ErrNonSpatialChannelFull = errors.New("non-spatial channels are full")
 var ErrSpatialChannelFull = errors.New("spatial channels are full")
 
-func createChannelWithId(channelId ChannelId, t channeldpb.ChannelType, owner ConnectionInChannel) *Channel {
+func createChannelWithId(channelId common.ChannelId, t channeldpb.ChannelType, owner ConnectionInChannel) *Channel {
 	ch := &Channel{
 		id:                    channelId,
 		channelType:           t,
@@ -152,6 +148,7 @@ func createChannelWithId(channelId ChannelId, t channeldpb.ChannelType, owner Co
 
 	channelNum.WithLabelValues(ch.channelType.String()).Inc()
 
+	Event_ChannelCreated.Broadcast(ch)
 	return ch
 }
 
@@ -160,7 +157,7 @@ func CreateChannel(t channeldpb.ChannelType, owner ConnectionInChannel) (*Channe
 		return nil, errors.New("failed to create GLOBAL channel as it already exists")
 	}
 
-	var channelId ChannelId
+	var channelId common.ChannelId
 	var ok bool
 	if t != channeldpb.ChannelType_SPATIAL {
 		if nonSpatialchannelFull {
@@ -203,13 +200,15 @@ func RemoveChannel(ch *Channel) {
 	}
 
 	channelNum.WithLabelValues(ch.channelType.String()).Dec()
+
+	Event_ChannelRemoved.Broadcast(ch.id)
 }
 
 func (ch *Channel) IsRemoving() bool {
 	return ch.removing > 0
 }
 
-func (ch *Channel) PutMessage(msg Message, handler MessageHandlerFunc, conn *Connection, pack *channeldpb.MessagePack) {
+func (ch *Channel) PutMessage(msg common.Message, handler MessageHandlerFunc, conn *Connection, pack *channeldpb.MessagePack) {
 	if ch.IsRemoving() {
 		return
 	}
@@ -223,6 +222,13 @@ func (ch *Channel) PutMessage(msg Message, handler MessageHandlerFunc, conn *Con
 		ChannelId:   pack.ChannelId,
 		arrivalTime: ch.GetTime(),
 	}, handler: handler}
+}
+
+func (ch *Channel) PutMessageContext(ctx MessageContext, handler MessageHandlerFunc) {
+	if ch.IsRemoving() {
+		return
+	}
+	ch.inMsgQueue <- channelMessage{ctx: ctx, handler: handler}
 }
 
 func (ch *Channel) GetTime() ChannelTime {
@@ -284,6 +290,9 @@ func (ch *Channel) tickConnections() {
 				if ownerConn == conn {
 					// Reset the owner if it's removed
 					ch.ownerConnection = nil
+					if ch.channelType == channeldpb.ChannelType_GLOBAL {
+						Event_GlobalChannelUnpossessed.Broadcast(struct{}{})
+					}
 					conn.Logger().Info("found removed ownner connection of channel", zap.Uint32("channelId", uint32(ch.id)))
 					if GlobalSettings.GetChannelSettings(ch.channelType).RemoveChannelAfterOwnerRemoved {
 						atomic.AddInt32(&ch.removing, 1)
@@ -336,6 +345,12 @@ func (ch *Channel) Broadcast(ctx MessageContext) {
 		if channeldpb.BroadcastType_ALL_BUT_OWNER.Check(ctx.Broadcast) && conn == ch.ownerConnection {
 			continue
 		}
+		if channeldpb.BroadcastType_ALL_BUT_CLIENT.Check(ctx.Broadcast) && conn.GetConnectionType() == channeldpb.ConnectionType_CLIENT {
+			continue
+		}
+		if channeldpb.BroadcastType_ALL_BUT_SERVER.Check(ctx.Broadcast) && conn.GetConnectionType() == channeldpb.ConnectionType_SERVER {
+			continue
+		}
 		conn.Send(ctx)
 	}
 }
@@ -377,6 +392,24 @@ func (ch *Channel) Logger() *Logger {
 func (ch *Channel) HasOwner() bool {
 	conn, ok := ch.ownerConnection.(*Connection)
 	return ok && conn != nil && !conn.IsClosing()
+}
+
+func (chA *Channel) IsSameOwner(chB *Channel) bool {
+	return chA.HasOwner() && chB.HasOwner() && chA.ownerConnection == chB.ownerConnection
+}
+
+func (ch *Channel) SendToOwner(msgType uint32, msg common.Message) {
+	if !ch.HasOwner() {
+		ch.Logger().Warn("channel has no owner to send message", zap.Uint32("msgType", msgType))
+		return
+	}
+	ch.ownerConnection.Send(MessageContext{
+		MsgType:   channeldpb.MessageType(msgType),
+		Msg:       msg,
+		ChannelId: uint32(ch.id),
+		Broadcast: 0,
+		StubId:    0,
+	})
 }
 
 // Implementation for ConnectionInChannel interface

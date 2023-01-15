@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
+	"channeld.clewcat.com/channeld/pkg/common"
 	"github.com/pkg/profile"
 )
 
@@ -38,7 +39,7 @@ type GlobalSettingsType struct {
 
 	ConnectionAuthTimeoutMs int64
 
-	SpatialChannelIdStart ChannelId
+	SpatialChannelIdStart common.ChannelId
 
 	ChannelSettings map[channeldpb.ChannelType]ChannelSettingsType
 
@@ -166,7 +167,7 @@ func (s *GlobalSettingsType) ParseFlag() error {
 	}
 
 	if scs != nil {
-		s.SpatialChannelIdStart = ChannelId(*scs)
+		s.SpatialChannelIdStart = common.ChannelId(*scs)
 	}
 
 	if mcb != nil {

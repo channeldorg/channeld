@@ -9,13 +9,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type Message = proto.Message //protoreflect.ProtoMessage
-
 // The context of a message for both sending and receiving
 type MessageContext struct {
 	MsgType channeldpb.MessageType
 	// The weak-typed Message object popped from the message queue
-	Msg       Message
+	Msg       common.Message
 	Broadcast uint32 //channeldpb.BroadcastType
 	StubId    uint32
 	// The original channelId in the Packet, could be different from Channel.id.
@@ -36,7 +34,7 @@ func (ctx *MessageContext) HasConnection() bool {
 
 type MessageHandlerFunc func(ctx MessageContext)
 type messageMapEntry struct {
-	msg     Message
+	msg     common.Message
 	handler MessageHandlerFunc
 }
 
@@ -55,7 +53,7 @@ var MessageMap = map[channeldpb.MessageType]*messageMapEntry{
 	channeldpb.MessageType_DEBUG_GET_SPATIAL_REGIONS: {&channeldpb.DebugGetSpatialRegionsMessage{}, handleGetSpatialRegionsMessage},
 }
 
-func RegisterMessageHandler(msgType uint32, msg Message, handler MessageHandlerFunc) {
+func RegisterMessageHandler(msgType uint32, msg common.Message, handler MessageHandlerFunc) {
 	MessageMap[channeldpb.MessageType(msgType)] = &messageMapEntry{msg, handler}
 }
 
@@ -65,26 +63,11 @@ func handleClientToServerUserMessage(ctx MessageContext) {
 		ctx.Connection.Logger().Error("message is not a ServerForwardMessage, will not be handled.")
 		return
 	}
-	if len(msg.Payload) < 128 {
-		ctx.Connection.Logger().Debug("forward user-space message from client to server",
-			zap.Uint32("msgType", uint32(ctx.MsgType)),
-			zap.Uint32("clientConnId", msg.ClientConnId),
-			zap.Uint32("channelId", uint32(ctx.Channel.id)),
-			zap.Uint32("broadcastType", ctx.Broadcast),
-			zap.Int("payloadSize", len(msg.Payload)),
-		)
-	} else {
-		ctx.Connection.Logger().Info("forward user-space message from client to server",
-			zap.Uint32("msgType", uint32(ctx.MsgType)),
-			zap.Uint32("clientConnId", msg.ClientConnId),
-			zap.Uint32("channelId", uint32(ctx.Channel.id)),
-			zap.Uint32("broadcastType", ctx.Broadcast),
-			zap.Int("payloadSize", len(msg.Payload)),
-		)
-	}
 
+	var channelOwnerConnId uint32 = 0
 	if ctx.Channel.HasOwner() {
 		ctx.Channel.ownerConnection.Send(ctx)
+		channelOwnerConnId = uint32(ctx.Channel.ownerConnection.Id())
 	} else if ctx.Broadcast > 0 {
 		if ctx.Channel.enableClientBroadcast {
 			ctx.Channel.Broadcast(ctx)
@@ -94,16 +77,38 @@ func handleClientToServerUserMessage(ctx MessageContext) {
 				zap.String("channelType", ctx.Channel.channelType.String()),
 				zap.Uint32("channelId", uint32(ctx.Channel.id)),
 			)
+			return
 		}
 	} else {
 		ctx.Channel.Logger().Error("channel has no owner to forward the user-space messaged",
 			zap.Uint32("msgType", uint32(ctx.MsgType)),
 			zap.Uint32("connId", uint32(ctx.Connection.Id())),
 		)
+		return
+	}
+
+	if len(msg.Payload) < 128 {
+		ctx.Connection.Logger().Verbose("forward user-space message from client to server",
+			zap.Uint32("msgType", uint32(ctx.MsgType)),
+			zap.Uint32("clientConnId", msg.ClientConnId),
+			zap.Uint32("channelId", uint32(ctx.Channel.id)),
+			zap.Uint32("channelOwner", channelOwnerConnId),
+			zap.Uint32("broadcastType", ctx.Broadcast),
+			zap.Int("payloadSize", len(msg.Payload)),
+		)
+	} else {
+		ctx.Connection.Logger().Debug("forward user-space message from client to server",
+			zap.Uint32("msgType", uint32(ctx.MsgType)),
+			zap.Uint32("clientConnId", msg.ClientConnId),
+			zap.Uint32("channelId", uint32(ctx.Channel.id)),
+			zap.Uint32("channelOwner", channelOwnerConnId),
+			zap.Uint32("broadcastType", ctx.Broadcast),
+			zap.Int("payloadSize", len(msg.Payload)),
+		)
 	}
 }
 
-func handleServerToClientUserMessage(ctx MessageContext) {
+func HandleServerToClientUserMessage(ctx MessageContext) {
 	msg, ok := ctx.Msg.(*channeldpb.ServerForwardMessage)
 	if !ok {
 		ctx.Connection.Logger().Error("message is not a ServerForwardMessage, will not be handled.")
@@ -111,7 +116,7 @@ func handleServerToClientUserMessage(ctx MessageContext) {
 	}
 
 	if len(msg.Payload) < 128 {
-		ctx.Connection.Logger().Debug("forward user-space message from server to client",
+		ctx.Connection.Logger().Verbose("forward user-space message from server to client/server",
 			zap.Uint32("msgType", uint32(ctx.MsgType)),
 			zap.Uint32("clientConnId", msg.ClientConnId),
 			zap.Uint32("channelId", uint32(ctx.Channel.id)),
@@ -119,7 +124,7 @@ func handleServerToClientUserMessage(ctx MessageContext) {
 			zap.Int("payloadSize", len(msg.Payload)),
 		)
 	} else {
-		ctx.Connection.Logger().Info("forward user-space message from server to client",
+		ctx.Connection.Logger().Debug("forward user-space message from server to client/server",
 			zap.Uint32("msgType", uint32(ctx.MsgType)),
 			zap.Uint32("clientConnId", msg.ClientConnId),
 			zap.Uint32("channelId", uint32(ctx.Channel.id)),
@@ -141,13 +146,25 @@ func handleServerToClientUserMessage(ctx MessageContext) {
 			)
 		}
 
-	case channeldpb.BroadcastType_ALL, channeldpb.BroadcastType_ALL_BUT_SENDER, channeldpb.BroadcastType_ALL_BUT_OWNER:
-		ctx.Channel.Broadcast(ctx)
-
+		/*
+			case channeldpb.BroadcastType_ALL, channeldpb.BroadcastType_ALL_BUT_SENDER, channeldpb.BroadcastType_ALL_BUT_OWNER,
+				channeldpb.BroadcastType_ALL_BUT_CLIENT, channeldpb.BroadcastType_ALL_BUT_SERVER:
+				ctx.Channel.Broadcast(ctx)
+		*/
 	case channeldpb.BroadcastType_SINGLE_CONNECTION:
-		clientConn := GetConnection(ConnectionId(msg.ClientConnId))
-		if clientConn != nil {
-			clientConn.Send(ctx)
+		var conn *Connection = nil
+		if msg.ClientConnId == 0 {
+			// server to server
+			if ctx.Channel.HasOwner() {
+				conn = ctx.Channel.ownerConnection.(*Connection)
+			}
+		} else {
+			// server to client
+			conn = GetConnection(ConnectionId(msg.ClientConnId))
+		}
+
+		if conn != nil {
+			conn.Send(ctx)
 		} else {
 			ctx.Connection.Logger().Warn("cannot forward the message as the target connection does not exist",
 				zap.Uint32("msgType", uint32(ctx.MsgType)),
@@ -156,7 +173,9 @@ func handleServerToClientUserMessage(ctx MessageContext) {
 		}
 
 	default:
-		if channeldpb.BroadcastType_ADJACENT_CHANNELS.Check(ctx.Broadcast) {
+		if ctx.Broadcast >= uint32(channeldpb.BroadcastType_ALL) && ctx.Broadcast < uint32(channeldpb.BroadcastType_ADJACENT_CHANNELS) {
+			ctx.Channel.Broadcast(ctx)
+		} else if channeldpb.BroadcastType_ADJACENT_CHANNELS.Check(ctx.Broadcast) {
 			if ctx.Channel.channelType != channeldpb.ChannelType_SPATIAL {
 				ctx.Connection.Logger().Warn("BroadcastType_ADJACENT_CHANNELS only works for Spatial channel")
 				return
@@ -193,7 +212,15 @@ func handleServerToClientUserMessage(ctx MessageContext) {
 				if channeldpb.BroadcastType_ALL_BUT_SENDER.Check(ctx.Broadcast) && conn == ctx.Connection {
 					continue
 				}
-				// Ignore the client
+				// Ignore the clients?
+				if channeldpb.BroadcastType_ALL_BUT_CLIENT.Check(ctx.Broadcast) && conn.GetConnectionType() == channeldpb.ConnectionType_CLIENT {
+					continue
+				}
+				// Ignore the servers?
+				if channeldpb.BroadcastType_ALL_BUT_SERVER.Check(ctx.Broadcast) && conn.GetConnectionType() == channeldpb.ConnectionType_SERVER {
+					continue
+				}
+				// Ignore the client specified in the ServerForwardMessage
 				if conn.Id() == ConnectionId(msg.ClientConnId) {
 					continue
 				}
@@ -286,6 +313,7 @@ func handleCreateChannel(ctx MessageContext) {
 		newChannel = globalChannel
 		if !globalChannel.HasOwner() {
 			globalChannel.ownerConnection = ctx.Connection
+			Event_GlobalChannelPossessed.Broadcast(globalChannel)
 			ctx.Connection.Logger().Info("owned the GLOBAL channel")
 		} else {
 			ctx.Connection.Logger().Error("illegal attemp to create the GLOBAL channel")
@@ -408,7 +436,7 @@ func handleRemoveChannel(ctx MessageContext) {
 		return
 	}
 
-	channelToRemove := GetChannel(ChannelId(msg.ChannelId))
+	channelToRemove := GetChannel(common.ChannelId(msg.ChannelId))
 	if channelToRemove == nil {
 		ctx.Connection.Logger().Error("invalid channelId for removing", zap.Uint32("channelId", msg.ChannelId))
 		return
@@ -497,9 +525,9 @@ func handleSubToChannel(ctx MessageContext) {
 		return
 	}
 
-	var connToSub ConnectionInChannel
+	var connToSub *Connection
 	if ctx.Connection.GetConnectionType() == channeldpb.ConnectionType_CLIENT {
-		connToSub = ctx.Connection
+		connToSub = ctx.Connection.(*Connection)
 	} else {
 		// Only the server can specify a ConnId.
 		connToSub = GetConnection(ConnectionId(msg.ConnId))

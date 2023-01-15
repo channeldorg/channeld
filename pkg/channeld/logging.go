@@ -16,7 +16,13 @@ type Logger struct {
 
 var rootLogger *Logger //*zap.Logger
 
-const TraceLevel LogLevel = -2
+func RootLogger() *Logger {
+	return rootLogger
+}
+
+const VerboseLevel LogLevel = -2
+const VeryVerboseLevel LogLevel = -3
+const TraceLevel LogLevel = -4
 
 /*
 func (l LogLevel) String() string {
@@ -27,6 +33,24 @@ func (l LogLevel) String() string {
 	}
 }
 */
+
+func (logger *Logger) Verbose(msg string, fields ...zap.Field) {
+	if logger == nil {
+		return
+	}
+	if ce := logger.Check(zapcore.Level(VerboseLevel), msg); ce != nil {
+		ce.Write(fields...)
+	}
+}
+
+func (logger *Logger) VeryVerbose(msg string, fields ...zap.Field) {
+	if logger == nil {
+		return
+	}
+	if ce := logger.Check(zapcore.Level(VeryVerboseLevel), msg); ce != nil {
+		ce.Write(fields...)
+	}
+}
 
 func (logger *Logger) Trace(msg string, fields ...zap.Field) {
 	if logger == nil {

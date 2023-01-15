@@ -65,6 +65,9 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.Channel
 		ch.data.maxFanOutIntervalMs = cs.options.FanOutIntervalMs
 	}
 	ch.subscribedConnections[c] = cs
+	ch.Logger().Debug("subscribed connection",
+		zap.Uint32("connId", uint32(c.Id())),
+		zap.String("dataAccess", channeldpb.ChannelDataAccess_name[int32(cs.options.DataAccess)]))
 	return cs
 }
 
@@ -81,6 +84,7 @@ func (c *Connection) UnsubscribeFromChannel(ch *Channel) (*channeldpb.ChannelSub
 		ch.fanOutQueue.Remove(cs.fanOutElement)
 		delete(ch.subscribedConnections, c)
 	}
+	ch.Logger().Debug("unsubscribed connection", zap.Uint32("connId", uint32(c.Id())))
 	return &cs.options, nil
 }
 
@@ -119,6 +123,8 @@ func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel, connToSub C
 	// 	SubOptions: &ch.subscribedConnections[c.id].options,
 	// }
 	c.Send(ctx)
+
+	c.Logger().Debug("sent SUB_TO_CHANNEL", zap.Uint32("channelId", ctx.ChannelId), zap.Uint32("connToSub", uint32(connToSub.Id())))
 }
 
 func (c *Connection) sendUnsubscribed(ctx MessageContext, ch *Channel, connToUnsub *Connection, stubId uint32) {

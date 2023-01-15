@@ -1,9 +1,9 @@
 package channeld
 
 import (
-	"bufio"
 	"io"
 	"log"
+	"net"
 	"sync"
 	"testing"
 	"time"
@@ -21,15 +21,63 @@ func init() {
 	InitLogs()
 }
 
+type pipelineConn struct {
+	net.Conn
+	r *io.PipeReader
+	w *io.PipeWriter
+}
+
+func (c *pipelineConn) Read(b []byte) (n int, err error) {
+	return c.r.Read(b)
+}
+
+func (c *pipelineConn) Write(b []byte) (n int, err error) {
+	return c.w.Write(b)
+}
+
+func (c *pipelineConn) Close() error {
+	err1 := c.r.Close()
+	err2 := c.w.Close()
+	if err1 != nil {
+		return err1
+	}
+	if err2 != nil {
+		return err2
+	}
+	return nil
+}
+
+func (c *pipelineConn) LocalAddr() net.Addr {
+	return nil
+}
+
+func (c *pipelineConn) RemoteAddr() net.Addr {
+	return nil
+}
+
+func (c *pipelineConn) SetDeadline(t time.Time) error {
+	return nil
+}
+
+func (c *pipelineConn) SetReadDeadline(t time.Time) error {
+	return nil
+}
+
+func (c *pipelineConn) SetWriteDeadline(t time.Time) error {
+	return nil
+}
+
 func TestDropPacket(t *testing.T) {
 	pipeReader, pipeWriter := io.Pipe()
 	c := &Connection{
-		reader: bufio.NewReader(pipeReader),
-		logger: rootLogger,
+		conn:       &pipelineConn{r: pipeReader, w: pipeWriter},
+		readBuffer: make([]byte, 1024),
+		logger:     rootLogger,
 	}
 
+	end := false
 	go func() {
-		for {
+		for !end {
 			c.receive()
 		}
 	}()
@@ -52,6 +100,8 @@ func TestDropPacket(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 100)
 	pipeWriter.Write([]byte{0})
+
+	end = true
 }
 
 func TestKCPConnection(t *testing.T) {

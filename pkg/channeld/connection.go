@@ -1,7 +1,6 @@
 package channeld
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
+	"channeld.clewcat.com/channeld/pkg/common"
 	"channeld.clewcat.com/channeld/pkg/fsm"
 	"channeld.clewcat.com/channeld/pkg/replaypb"
 	"github.com/golang/snappy"
@@ -54,7 +54,7 @@ type Connection struct {
 	conn            net.Conn
 	readBuffer      []byte
 	readPos         int
-	reader          *bufio.Reader
+	// reader          *bufio.Reader
 	// writer          *bufio.Writer
 	sender        MessageSender
 	sendQueue     chan MessageContext
@@ -520,7 +520,7 @@ func (c *Connection) isPacketRecordingEnabled() bool {
 }
 
 func (c *Connection) receiveMessage(mp *channeldpb.MessagePack) {
-	channel := GetChannel(ChannelId(mp.ChannelId))
+	channel := GetChannel(common.ChannelId(mp.ChannelId))
 	if channel == nil {
 		c.Logger().Warn("can't find channel",
 			zap.Uint32("channelId", mp.ChannelId),
@@ -543,7 +543,7 @@ func (c *Connection) receiveMessage(mp *channeldpb.MessagePack) {
 		return
 	}
 
-	var msg Message
+	var msg common.Message
 	var handler MessageHandlerFunc
 	if mp.MsgType >= uint32(channeldpb.MessageType_USER_SPACE_START) && entry == nil {
 		// client -> channeld -> server
@@ -552,14 +552,14 @@ func (c *Connection) receiveMessage(mp *channeldpb.MessagePack) {
 			msg = &channeldpb.ServerForwardMessage{ClientConnId: uint32(c.id), Payload: mp.MsgBody}
 			handler = handleClientToServerUserMessage
 		} else {
-			// server -> channeld -> client
+			// server -> channeld -> client/server
 			msg = &channeldpb.ServerForwardMessage{}
 			err := proto.Unmarshal(mp.MsgBody, msg)
 			if err != nil {
 				c.Logger().Error("unmarshalling ServerForwardMessage", zap.Error(err))
 				return
 			}
-			handler = handleServerToClientUserMessage
+			handler = HandleServerToClientUserMessage
 		}
 	} else {
 		handler = entry.handler
@@ -576,7 +576,7 @@ func (c *Connection) receiveMessage(mp *channeldpb.MessagePack) {
 
 	channel.PutMessage(msg, handler, c, mp)
 
-	c.Logger().Trace("received message", zap.Uint32("msgType", mp.MsgType), zap.Int("size", len(mp.MsgBody)))
+	c.Logger().VeryVerbose("received message", zap.Uint32("msgType", mp.MsgType), zap.Int("size", len(mp.MsgBody)))
 	//c.Logger().Debug("received message", zap.Uint32("msgType", mp.MsgType), zap.Int("size", len(mp.MsgBody)))
 
 	msgReceived.WithLabelValues(c.connectionType.String()).Inc() /*.WithLabelValues(
@@ -624,7 +624,7 @@ func (c *Connection) flush() {
 		})
 		size = proto.Size(&p)
 
-		c.Logger().Trace("sent message", zap.Uint32("msgType", uint32(mc.MsgType)), zap.Int("size", len(msgBody)))
+		c.Logger().VeryVerbose("sent message", zap.Uint32("msgType", uint32(mc.MsgType)), zap.Int("size", len(msgBody)))
 
 		msgSent.WithLabelValues(c.connectionType.String()).Inc() /*.WithLabelValues(
 			strconv.FormatUint(uint64(e.Channel.id), 10),

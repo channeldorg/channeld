@@ -72,7 +72,7 @@ func ReflectChannelData(channelType channeldpb.ChannelType, mergeOptions *channe
 	}, nil
 }
 
-func (ch *Channel) InitData(dataMsg Message, mergeOptions *channeldpb.ChannelDataMergeOptions) {
+func (ch *Channel) InitData(dataMsg common.ChannelDataMessage, mergeOptions *channeldpb.ChannelDataMergeOptions) {
 	ch.data = &ChannelData{
 		msg:             dataMsg,
 		updateMsgBuffer: list.New(),
@@ -84,11 +84,18 @@ func (ch *Channel) Data() *ChannelData {
 	return ch.data
 }
 
+func (ch *Channel) GetDataMessage() common.ChannelDataMessage {
+	if ch.data == nil {
+		return nil
+	}
+	return ch.data.msg
+}
+
 func (ch *Channel) SetDataUpdateConnId(connId ConnectionId) {
 	ch.latestDataUpdateConnId = connId
 }
 
-func (d *ChannelData) OnUpdate(updateMsg Message, t ChannelTime, spatialNotifier common.SpatialInfoChangedNotifier) {
+func (d *ChannelData) OnUpdate(updateMsg common.ChannelDataMessage, t ChannelTime, spatialNotifier common.SpatialInfoChangedNotifier) {
 	if d.msg == nil {
 		d.msg = updateMsg
 	} else {
@@ -229,11 +236,11 @@ func (ch *Channel) fanOutDataUpdate(conn ConnectionInChannel, cs *ChannelSubscri
 
 // Implement this interface to manually merge the channel data. In most cases it can be MUCH more efficient than the default reflection-based merge.
 type MergeableChannelData interface {
-	Message
-	Merge(src Message, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) error
+	common.Message
+	Merge(src common.ChannelDataMessage, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) error
 }
 
-func mergeWithOptions(dst Message, src Message, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) {
+func mergeWithOptions(dst common.ChannelDataMessage, src common.ChannelDataMessage, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) {
 	mergeable, ok := dst.(MergeableChannelData)
 	if ok {
 		if options == nil {
@@ -251,12 +258,12 @@ func mergeWithOptions(dst Message, src Message, options *channeldpb.ChannelDataM
 			)
 		}
 	} else {
-		reflectMerge(dst, src, options)
+		ReflectMerge(dst, src, options)
 	}
 }
 
 // Use protoreflect to merge. No need to write custom merge code but less efficient.
-func reflectMerge(dst Message, src Message, options *channeldpb.ChannelDataMergeOptions) {
+func ReflectMerge(dst common.ChannelDataMessage, src common.ChannelDataMessage, options *channeldpb.ChannelDataMergeOptions) {
 	proto.Merge(dst, src)
 
 	if options != nil {
