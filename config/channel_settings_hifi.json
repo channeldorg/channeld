@@ -1,6 +1,6 @@
 {
     "1": {
-        "TickIntervalMs": 10,
+        "TickIntervalMs": 20,
         "DefaultFanOutIntervalMs": 20,
         "DefaultFanOutDelayMs": 0,
         "RemoveChannelAfterOwnerRemoved": false,
@@ -11,7 +11,7 @@
         }
     },
     "2": {
-        "TickIntervalMs": 10,
+        "TickIntervalMs": 20,
         "DefaultFanOutIntervalMs": 20,
         "DefaultFanOutDelayMs": 0,
         "RemoveChannelAfterOwnerRemoved": true,
@@ -22,7 +22,7 @@
         }
     },
     "3": {
-        "TickIntervalMs": 10,
+        "TickIntervalMs": 20,
         "DefaultFanOutIntervalMs": 20,
         "DefaultFanOutDelayMs": 0,
         "RemoveChannelAfterOwnerRemoved": true,
@@ -33,7 +33,7 @@
         }
     },
     "4": {
-        "TickIntervalMs": 10,
+        "TickIntervalMs": 20,
         "DefaultFanOutIntervalMs": 20,
         "DefaultFanOutDelayMs": 0,
         "RemoveChannelAfterOwnerRemoved": true,
