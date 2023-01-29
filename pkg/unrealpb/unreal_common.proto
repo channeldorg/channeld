@@ -140,12 +140,12 @@ message FRepMovement {
 }
 
 message FRepAttachment {
-    UnrealObjectRef attachParent = 1;
-    FVector locationOffset = 2;
-    FVector relativeScale = 3;
-    FVector rotationOffset = 4;
-    string attachSocket = 5;
-    ActorComponentRef attachComponent = 6;
+    optional UnrealObjectRef attachParent = 1;
+    optional FVector locationOffset = 2;
+    optional FVector relativeScale = 3;
+    optional FVector rotationOffset = 4;
+    optional string attachSocket = 5;
+    optional ActorComponentRef attachComponent = 6;
 }
 
 message ActorState {
