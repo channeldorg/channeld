@@ -249,7 +249,7 @@ func HandleHandoverContextResult(ctx channeld.MessageContext) {
 	if dstChannel != nil {
 		dstChannelDataMsg := dstChannel.GetDataMessage()
 		if dstChannelDataMsg == nil {
-			dstChannel.Data().OnUpdate(handoverChannelData, dstChannel.GetTime(), nil)
+			dstChannel.Data().OnUpdate(handoverChannelData, dstChannel.GetTime(), 0, nil)
 		} else {
 			// Should we let the dst channel fan out the update?
 			// For now we don't. It's easier for the UE servers to control the sequence of spawning and update.

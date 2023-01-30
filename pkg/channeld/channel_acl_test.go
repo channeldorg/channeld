@@ -40,7 +40,7 @@ func (c *aclTestConnection) Send(ctx MessageContext) {
 
 func (c *aclTestConnection) SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) *ChannelSubscription {
 	return &ChannelSubscription{
-		options: channeldpb.ChannelSubscriptionOptions{},
+		options: *defaultSubOptions(ch.channelType),
 	}
 }
 

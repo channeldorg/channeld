@@ -49,7 +49,7 @@ func TestMergeByTimeSpanLimit(t *testing.T) {
 	startTime := time.Now()
 	MsgNum := 100
 	updateData := &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s1")}
-	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
+	testChannel.Data().OnUpdate(updateData, channelStartTime, 0, nil)
 	// 0 -> 100
 	assert.Equal(t, 100, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
@@ -59,7 +59,7 @@ func TestMergeByTimeSpanLimit(t *testing.T) {
 	startTime = time.Now()
 	MsgNum = 10
 	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s2")}
-	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
+	testChannel.Data().OnUpdate(updateData, channelStartTime, 0, nil)
 	// 100 -> 110
 	assert.Equal(t, 110, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
@@ -69,7 +69,7 @@ func TestMergeByTimeSpanLimit(t *testing.T) {
 	startTime = time.Now()
 	MsgNum = 200
 	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s3")}
-	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
+	testChannel.Data().OnUpdate(updateData, channelStartTime, 0, nil)
 	// 110 -> 310
 	assert.Equal(t, 310, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
@@ -79,7 +79,7 @@ func TestMergeByTimeSpanLimit(t *testing.T) {
 	startTime = time.Now()
 	MsgNum = 5
 	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s4")}
-	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
+	testChannel.Data().OnUpdate(updateData, channelStartTime, 0, nil)
 	// 310 -> 215
 	// - s1:100
 	// + s4:5
@@ -91,7 +91,7 @@ func TestMergeByTimeSpanLimit(t *testing.T) {
 	startTime = time.Now()
 	MsgNum = 0
 	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s5")}
-	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
+	testChannel.Data().OnUpdate(updateData, channelStartTime, 0, nil)
 	// 215 -> 205
 	// - s2:10
 	assert.Equal(t, 205, len(channelData.ChatMessages))
@@ -102,7 +102,7 @@ func TestMergeByTimeSpanLimit(t *testing.T) {
 	startTime = time.Now()
 	MsgNum = 0
 	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s6")}
-	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
+	testChannel.Data().OnUpdate(updateData, channelStartTime, 0, nil)
 	// 205 -> 100
 	// - s3:105
 	assert.Equal(t, 100, len(channelData.ChatMessages))
@@ -113,7 +113,7 @@ func TestMergeByTimeSpanLimit(t *testing.T) {
 	startTime = time.Now()
 	MsgNum = 120
 	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s7")}
-	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
+	testChannel.Data().OnUpdate(updateData, channelStartTime, 0, nil)
 	// 100 -> 120
 	// - s3:95
 	// - s4:5
@@ -126,7 +126,7 @@ func TestMergeByTimeSpanLimit(t *testing.T) {
 	startTime = time.Now()
 	MsgNum = 0
 	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s8")}
-	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
+	testChannel.Data().OnUpdate(updateData, channelStartTime, 0, nil)
 	// 120 -> 120
 	assert.Equal(t, 120, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
@@ -136,7 +136,7 @@ func TestMergeByTimeSpanLimit(t *testing.T) {
 	startTime = time.Now()
 	MsgNum = 0
 	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s9")}
-	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
+	testChannel.Data().OnUpdate(updateData, channelStartTime, 0, nil)
 	// 120 -> 120
 	assert.Equal(t, 120, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
@@ -146,7 +146,7 @@ func TestMergeByTimeSpanLimit(t *testing.T) {
 	startTime = time.Now()
 	MsgNum = 0
 	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s10")}
-	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
+	testChannel.Data().OnUpdate(updateData, channelStartTime, 0, nil)
 	// 120 -> 100
 	// - s7:20
 	assert.Equal(t, 100, len(channelData.ChatMessages))
@@ -178,7 +178,7 @@ func TestMergeWithoutTimeSpanLimit(t *testing.T) {
 	startTime := time.Now()
 	MsgNum := 100
 	updateData := &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s1")}
-	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
+	testChannel.Data().OnUpdate(updateData, channelStartTime, 0, nil)
 	// 0 -> 100
 	assert.Equal(t, 100, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
@@ -188,7 +188,7 @@ func TestMergeWithoutTimeSpanLimit(t *testing.T) {
 	startTime = time.Now()
 	MsgNum = 10
 	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s2")}
-	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
+	testChannel.Data().OnUpdate(updateData, channelStartTime, 0, nil)
 	assert.Equal(t, 100, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
 	// ---------------- step 2 ----------------
@@ -197,7 +197,7 @@ func TestMergeWithoutTimeSpanLimit(t *testing.T) {
 	startTime = time.Now()
 	MsgNum = 200
 	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s3")}
-	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
+	testChannel.Data().OnUpdate(updateData, channelStartTime, 0, nil)
 	assert.Equal(t, 100, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
 	// ---------------- step 3 ----------------
@@ -227,7 +227,7 @@ func TestMergeByLongTimeSpanLimit(t *testing.T) {
 	startTime := time.Now()
 	MsgNum := 100
 	updateData := &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s1")}
-	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
+	testChannel.Data().OnUpdate(updateData, channelStartTime, 0, nil)
 	// 0 -> 100
 	assert.Equal(t, 100, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
@@ -237,7 +237,7 @@ func TestMergeByLongTimeSpanLimit(t *testing.T) {
 	startTime = time.Now()
 	MsgNum = 10
 	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s2")}
-	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
+	testChannel.Data().OnUpdate(updateData, channelStartTime, 0, nil)
 	assert.Equal(t, 110, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
 	// ---------------- step 2 ----------------
@@ -246,7 +246,7 @@ func TestMergeByLongTimeSpanLimit(t *testing.T) {
 	startTime = time.Now()
 	MsgNum = 200
 	updateData = &ChatChannelData{ChatMessages: genTestingMsgs(MsgNum, startTime.UnixMilli(), "s3")}
-	testChannel.Data().OnUpdate(updateData, channelStartTime, nil)
+	testChannel.Data().OnUpdate(updateData, channelStartTime, 0, nil)
 	assert.Equal(t, 310, len(channelData.ChatMessages))
 	time.Sleep(sendInterval - time.Since(startTime))
 	// ---------------- step 3 ----------------

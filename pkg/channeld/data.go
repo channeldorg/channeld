@@ -33,8 +33,9 @@ type fanOutConnection struct {
 }
 
 type updateMsgBufferElement struct {
-	updateMsg   common.ChannelDataMessage
-	arrivalTime ChannelTime
+	updateMsg    common.ChannelDataMessage
+	arrivalTime  ChannelTime
+	senderConnId ConnectionId
 }
 
 const (
@@ -95,7 +96,7 @@ func (ch *Channel) SetDataUpdateConnId(connId ConnectionId) {
 	ch.latestDataUpdateConnId = connId
 }
 
-func (d *ChannelData) OnUpdate(updateMsg common.ChannelDataMessage, t ChannelTime, spatialNotifier common.SpatialInfoChangedNotifier) {
+func (d *ChannelData) OnUpdate(updateMsg common.ChannelDataMessage, t ChannelTime, senderConnId ConnectionId, spatialNotifier common.SpatialInfoChangedNotifier) {
 	if d.msg == nil {
 		d.msg = updateMsg
 	} else {
@@ -103,8 +104,9 @@ func (d *ChannelData) OnUpdate(updateMsg common.ChannelDataMessage, t ChannelTim
 	}
 
 	d.updateMsgBuffer.PushBack(&updateMsgBufferElement{
-		updateMsg:   updateMsg,
-		arrivalTime: t,
+		updateMsg:    updateMsg,
+		arrivalTime:  t,
+		senderConnId: senderConnId,
 	})
 	if d.updateMsgBuffer.Len() > MaxUpdateMsgBufferSize {
 		oldest := d.updateMsgBuffer.Front()
@@ -143,7 +145,7 @@ func (ch *Channel) tickData(t ChannelTime) {
 			   |------FanOutDelay------|---FanOutInterval---|
 			   subTime                 firstFanOutTime      secondFanOutTime
 		*/
-		nextFanOutTime := foc.lastFanOutTime.AddMs(cs.options.FanOutIntervalMs)
+		nextFanOutTime := foc.lastFanOutTime.AddMs(*cs.options.FanOutIntervalMs)
 		if t >= nextFanOutTime {
 
 			var lastUpdateTime ChannelTime
@@ -175,7 +177,14 @@ func (ch *Channel) tickData(t ChannelTime) {
 						zap.Int64("lastUpdateTime", int64(lastUpdateTime)/1000),
 						zap.Int64("arrivalTime", int64(be.arrivalTime)/1000),
 						zap.Int64("nextFanOutTime", int64(nextFanOutTime)/1000),
+						zap.Uint32("senderConnId", uint32(be.senderConnId)),
 					)
+
+					if be.senderConnId == conn.Id() && *cs.options.SkipSelfUpdateFanOut {
+						bufp = bufp.Next()
+						continue
+					}
+
 					if be.arrivalTime >= lastUpdateTime && be.arrivalTime <= nextFanOutTime {
 						if accumulatedUpdateMsg == nil {
 							accumulatedUpdateMsg = proto.Clone(be.updateMsg)

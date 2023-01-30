@@ -637,7 +637,7 @@ func handleChannelDataUpdate(ctx MessageContext) {
 	// Only channel owner or writable subsciptors can update the data
 	if ctx.Channel.ownerConnection != ctx.Connection {
 		cs := ctx.Channel.subscribedConnections[ctx.Connection]
-		if cs == nil || cs.options.DataAccess != channeldpb.ChannelDataAccess_WRITE_ACCESS {
+		if cs == nil || *cs.options.DataAccess != channeldpb.ChannelDataAccess_WRITE_ACCESS {
 			ctx.Connection.Logger().Warn("attempt to update channel data but has no access",
 				zap.String("channelType", ctx.Channel.channelType.String()),
 				zap.Uint32("channelId", uint32(ctx.Channel.id)),
@@ -672,7 +672,7 @@ func handleChannelDataUpdate(ctx MessageContext) {
 			ctx.Channel.SetDataUpdateConnId(ConnectionId(msg.ContextConnId))
 		}
 	}
-	ctx.Channel.Data().OnUpdate(updateMsg, ctx.arrivalTime, ctx.Channel.spatialNotifier)
+	ctx.Channel.Data().OnUpdate(updateMsg, ctx.arrivalTime, ctx.Connection.Id(), ctx.Channel.spatialNotifier)
 }
 
 func handleDisconnect(ctx MessageContext) {

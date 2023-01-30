@@ -247,7 +247,7 @@ func (c *testConnection) Send(ctx MessageContext) {
 func (c *testConnection) SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) *ChannelSubscription {
 	c.subscribedChannels[ch.id] = ch
 	return &ChannelSubscription{
-		options: channeldpb.ChannelSubscriptionOptions{},
+		options: *defaultSubOptions(ch.channelType),
 	}
 }
 

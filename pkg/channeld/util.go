@@ -43,3 +43,7 @@ func HashString(s string) uint32 {
 	}
 	return hash
 }
+
+func Pointer[K any](val K) *K {
+	return &val
+}

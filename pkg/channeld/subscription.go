@@ -6,6 +6,7 @@ import (
 
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 )
 
 type ChannelSubscription struct {
@@ -14,6 +15,17 @@ type ChannelSubscription struct {
 	//lastFanOutTime time.Time
 	subTime       ChannelTime
 	fanOutElement *list.Element
+}
+
+func defaultSubOptions(t channeldpb.ChannelType) *channeldpb.ChannelSubscriptionOptions {
+	options := &channeldpb.ChannelSubscriptionOptions{
+		DataAccess:           Pointer(channeldpb.ChannelDataAccess_WRITE_ACCESS),
+		DataFieldMasks:       make([]string, 0),
+		FanOutDelayMs:        proto.Int32(GlobalSettings.GetChannelSettings(t).DefaultFanOutDelayMs),
+		FanOutIntervalMs:     proto.Uint32(GlobalSettings.GetChannelSettings(t).DefaultFanOutIntervalMs),
+		SkipSelfUpdateFanOut: proto.Bool(false),
+	}
+	return options
 }
 
 func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) *ChannelSubscription {
@@ -28,30 +40,21 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.Channel
 	}
 
 	cs := &ChannelSubscription{
+		options: *defaultSubOptions(ch.channelType),
 		// Send the whole data to the connection when subscribed
 		//fanOutDataMsg: ch.Data().msg,
 		subTime: ch.GetTime(),
 	}
+
 	if options != nil {
-		cs.options = channeldpb.ChannelSubscriptionOptions{
-			DataAccess:       options.DataAccess,
-			DataFieldMasks:   options.DataFieldMasks,
-			FanOutIntervalMs: options.FanOutIntervalMs,
-			FanOutDelayMs:    options.FanOutDelayMs,
-		}
-	} else {
-		cs.options = channeldpb.ChannelSubscriptionOptions{
-			DataAccess:       channeldpb.ChannelDataAccess_WRITE_ACCESS,
-			DataFieldMasks:   make([]string, 0),
-			FanOutIntervalMs: GlobalSettings.GetChannelSettings(ch.channelType).DefaultFanOutIntervalMs,
-			FanOutDelayMs:    GlobalSettings.GetChannelSettings(ch.channelType).DefaultFanOutDelayMs,
-		}
+		proto.Merge(&cs.options, options)
 	}
+
 	cs.fanOutElement = ch.fanOutQueue.PushFront(&fanOutConnection{
 		conn:           c,
 		hadFirstFanOut: false,
 		// Delay the first fanout, to solve the spawn & update order issue in Mirror & UE.
-		lastFanOutTime: ch.GetTime().OffsetMs(cs.options.FanOutDelayMs),
+		lastFanOutTime: ch.GetTime().OffsetMs(*cs.options.FanOutDelayMs),
 	})
 	// rootLogger.Info("conn sub to channel",
 	// 	zap.Uint32("connId", uint32(cs.fanOutElement.Value.(*fanOutConnection).conn.Id())),
@@ -61,13 +64,17 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.Channel
 	// )
 
 	// Records the maximum fan-out interval for checking if the oldest update message is removable when the buffer is overflowed.
-	if ch.data != nil && ch.data.maxFanOutIntervalMs < cs.options.FanOutIntervalMs {
-		ch.data.maxFanOutIntervalMs = cs.options.FanOutIntervalMs
+	if ch.data != nil && ch.data.maxFanOutIntervalMs < *cs.options.FanOutIntervalMs {
+		ch.data.maxFanOutIntervalMs = *cs.options.FanOutIntervalMs
 	}
 	ch.subscribedConnections[c] = cs
 	ch.Logger().Debug("subscribed connection",
 		zap.Uint32("connId", uint32(c.Id())),
-		zap.String("dataAccess", channeldpb.ChannelDataAccess_name[int32(cs.options.DataAccess)]))
+		zap.String("dataAccess", channeldpb.ChannelDataAccess_name[int32(*cs.options.DataAccess)]),
+		zap.Uint32("fanOutIntervalMs", *cs.options.FanOutIntervalMs),
+		zap.Int32("fanOutDelayMs", *cs.options.FanOutDelayMs),
+		zap.Bool("skipSelfUpdateFanOut", *cs.options.SkipSelfUpdateFanOut),
+	)
 	return cs
 }
 

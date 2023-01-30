@@ -89,9 +89,10 @@ func TestFanOutChannelData(t *testing.T) {
 	testChannel.tickInterval = time.Hour
 
 	c0.SubscribeToChannel(testChannel, nil)
-	c1.SubscribeToChannel(testChannel, &channeldpb.ChannelSubscriptionOptions{
-		FanOutIntervalMs: 50,
-	})
+	subOptions1 := &channeldpb.ChannelSubscriptionOptions{
+		FanOutIntervalMs: proto.Uint32(50),
+	}
+	c1.SubscribeToChannel(testChannel, subOptions1)
 
 	channelStartTime := ChannelTime(100 * int64(time.Millisecond))
 	// F0 = the whole data
@@ -100,9 +101,10 @@ func TestFanOutChannelData(t *testing.T) {
 	assert.Equal(t, 0, len(c2.testQueue()))
 	assert.EqualValues(t, dataMsg.Num, c1.latestMsg().(*testpb.TestChannelDataMessage).Num)
 
-	c2.SubscribeToChannel(testChannel, &channeldpb.ChannelSubscriptionOptions{
-		FanOutIntervalMs: 100,
-	})
+	subOptions2 := &channeldpb.ChannelSubscriptionOptions{
+		FanOutIntervalMs: proto.Uint32(100),
+	}
+	c2.SubscribeToChannel(testChannel, subOptions2)
 	// F1 = no data, F7 = the whole data
 	testChannel.tickData(channelStartTime.AddMs(50))
 	assert.Equal(t, 1, len(c1.testQueue()))
@@ -111,7 +113,7 @@ func TestFanOutChannelData(t *testing.T) {
 
 	// U1 arrives
 	u1 := &testpb.TestChannelDataMessage{Text: "b"}
-	testChannel.Data().OnUpdate(u1, channelStartTime.AddMs(60), nil)
+	testChannel.Data().OnUpdate(u1, channelStartTime.AddMs(60), c1.Id(), nil)
 
 	// F2 = U1
 	testChannel.tickData(channelStartTime.AddMs(100))
@@ -124,7 +126,7 @@ func TestFanOutChannelData(t *testing.T) {
 
 	// U2 arrives
 	u2 := &testpb.TestChannelDataMessage{Text: "c"}
-	testChannel.Data().OnUpdate(u2, channelStartTime.AddMs(120), nil)
+	testChannel.Data().OnUpdate(u2, channelStartTime.AddMs(120), c2.Id(), nil)
 
 	// F8=U1+U2; F3 = U2
 	testChannel.tickData(channelStartTime.AddMs(150))
@@ -169,21 +171,21 @@ func BenchmarkCustomMergeMap(b *testing.B) {
 
 func TestMergeSubOptions(t *testing.T) {
 	subOptions := &channeldpb.ChannelSubscriptionOptions{
-		DataAccess:       channeldpb.ChannelDataAccess_WRITE_ACCESS,
-		FanOutIntervalMs: 100,
-		FanOutDelayMs:    200,
+		DataAccess:       Pointer(channeldpb.ChannelDataAccess_WRITE_ACCESS),
+		FanOutIntervalMs: proto.Uint32(100),
+		FanOutDelayMs:    proto.Int32(200),
 	}
 
 	updateOptions := &channeldpb.ChannelSubscriptionOptions{
-		DataAccess:       channeldpb.ChannelDataAccess_READ_ACCESS,
-		FanOutIntervalMs: 50,
+		DataAccess:       Pointer(channeldpb.ChannelDataAccess_READ_ACCESS),
+		FanOutIntervalMs: proto.Uint32(50),
 	}
 
 	proto.Merge(subOptions, updateOptions)
 
-	assert.EqualValues(t, 50, subOptions.FanOutIntervalMs)
+	assert.EqualValues(t, 50, *subOptions.FanOutIntervalMs)
 	//assert.False(t, subOptions.CanUpdateData)
-	assert.EqualValues(t, channeldpb.ChannelDataAccess_READ_ACCESS, subOptions.DataAccess)
+	assert.EqualValues(t, channeldpb.ChannelDataAccess_READ_ACCESS, *subOptions.DataAccess)
 }
 
 func TestListRemoveElement(t *testing.T) {
