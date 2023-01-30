@@ -14,7 +14,7 @@ message TestRepPlayerControllerState {
     unrealpb.UnrealObjectRef testRepActor = 1;
 }
 
-message TestNPCControllerState {
+message TestNPCState {
     optional bool bMoving = 1;
     optional unrealpb.FVector goalLocation = 2;
 }
@@ -31,7 +31,7 @@ message TestRepChannelData {
     map<uint32, unrealpb.SceneComponentState> sceneComponentStates = 9;
     TestRepGameState testGameState = 10;
     map<uint32, TestRepPlayerControllerState> testRepPlayerControllerStates = 11;
-    map<uint32, TestNPCControllerState> testNPCControllerStates = 12;
+    map<uint32, TestNPCState> testNPCStates = 12;
 }
 
 message GlobalChannelData {

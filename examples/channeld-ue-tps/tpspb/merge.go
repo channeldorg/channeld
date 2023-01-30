@@ -149,6 +149,9 @@ func initStates(data *TestRepChannelData) {
 	if data.TestRepPlayerControllerStates == nil {
 		data.TestRepPlayerControllerStates = make(map[uint32]*TestRepPlayerControllerState)
 	}
+	if data.TestNPCStates == nil {
+		data.TestNPCStates = make(map[uint32]*TestNPCState)
+	}
 	if data.ActorComponentStates == nil {
 		data.ActorComponentStates = make(map[uint32]*unrealpb.ActorComponentState)
 	}
@@ -186,6 +189,10 @@ func collectStates(netId uint32, from *TestRepChannelData, to *TestRepChannelDat
 	testRepPlayerControllerStates, exists := from.TestRepPlayerControllerStates[netId]
 	if exists {
 		to.TestRepPlayerControllerStates[netId] = testRepPlayerControllerStates
+	}
+	testNPCStates, exists := from.TestNPCStates[netId]
+	if exists {
+		to.TestNPCStates[netId] = testNPCStates
 	}
 }
 
@@ -359,6 +366,7 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 			delete(dst.ControllerStates, netId)
 			delete(dst.PlayerControllerStates, netId)
 			delete(dst.TestRepPlayerControllerStates, netId)
+			delete(dst.TestNPCStates, netId)
 			continue
 		} else {
 			oldActorState, exists := dst.ActorStates[netId]
@@ -421,6 +429,15 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 			proto.Merge(oldTestRepPlayerControllerState, newTestRepPlayerControllerState)
 		} else {
 			dst.TestRepPlayerControllerStates[netId] = newTestRepPlayerControllerState
+		}
+	}
+
+	for netId, newTestNPCState := range srcData.TestNPCStates {
+		oldTestNPCState, exists := dst.TestNPCStates[netId]
+		if exists {
+			proto.Merge(oldTestNPCState, newTestNPCState)
+		} else {
+			dst.TestNPCStates[netId] = newTestNPCState
 		}
 	}
 
