@@ -80,7 +80,8 @@ func main() {
 	go http.ListenAndServe(":8080", nil)
 
 	go channeld.StartListening(channeldpb.ConnectionType_SERVER, channeld.GlobalSettings.ServerNetwork, channeld.GlobalSettings.ServerAddress)
-	// FIXME: After all the server connections are established, the client connection should be listened.*/
-	channeld.StartListening(channeldpb.ConnectionType_CLIENT, channeld.GlobalSettings.ClientNetwork, channeld.GlobalSettings.ClientAddress)
 
+	// After the Master server owned the GLOBAL channel, the client connection should be listened.*/
+	<-channeld.Event_GlobalChannelPossessed.Wait()
+	channeld.StartListening(channeldpb.ConnectionType_CLIENT, channeld.GlobalSettings.ClientNetwork, channeld.GlobalSettings.ClientAddress)
 }
