@@ -334,7 +334,11 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 										SrcChannelId: uint32(srcChannelId),
 										DstChannelId: uint32(dstChannelId),
 									})
-									channeld.RootLogger().Info("getting handover context from src server", zap.Uint32("srcChannelId", uint32(srcChannelId)))
+									channeld.RootLogger().Info("getting handover context from src server",
+										zap.Uint32("srcChannelId", uint32(srcChannelId)),
+										zap.Float32("oldX", oldLoc.GetX()), zap.Float32("oldY", oldLoc.GetY()),
+										zap.Float32("newX", newX), zap.Float32("newY", newY),
+									)
 								}
 							},
 						)

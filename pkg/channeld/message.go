@@ -468,13 +468,17 @@ func handleRemoveChannel(ctx MessageContext) {
 	}
 	RemoveChannel(channelToRemove)
 
+	var logger *Logger
 	if ctx.HasConnection() {
-		ctx.Connection.Logger().Info("removed channel",
-			zap.String("channelType", channelToRemove.channelType.String()),
-			zap.Uint32("channelId", uint32(channelToRemove.id)),
-			zap.Int("subs", len(channelToRemove.subscribedConnections)),
-		)
+		logger = ctx.Connection.Logger()
+	} else {
+		logger = RootLogger()
 	}
+	logger.Info("removed channel",
+		zap.String("channelType", channelToRemove.channelType.String()),
+		zap.Uint32("channelId", uint32(channelToRemove.id)),
+		zap.Int("subs", len(channelToRemove.subscribedConnections)),
+	)
 }
 
 func handleListChannel(ctx MessageContext) {
