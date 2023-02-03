@@ -25,6 +25,7 @@ import (
 type ConnectionId uint32
 
 const MaxPacketSize int = 0x00ffff
+const PacketHeaderSize int = 5
 
 //type ConnectionState int32
 
@@ -48,6 +49,7 @@ func (s *queuedMessageSender) Send(c *Connection, ctx MessageContext) {
 }
 
 type Connection struct {
+	ConnectionInChannel
 	id              ConnectionId
 	connectionType  channeldpb.ConnectionType
 	compressionType channeldpb.CompressionType
@@ -56,18 +58,19 @@ type Connection struct {
 	readPos         int
 	// reader          *bufio.Reader
 	// writer          *bufio.Writer
-	sender        MessageSender
-	sendQueue     chan MessageContext
-	fsm           *fsm.FiniteStateMachine
-	logger        *Logger
-	state         int32 // Don't put the connection state into the FSM as 1) the FSM's states are user-defined. 2) the FSM is not goroutine-safe.
-	connTime      time.Time
-	closeHandlers []func()
-	replaySession *replaypb.ReplaySession
+	sender               MessageSender
+	sendQueue            chan MessageContext
+	pit                  string
+	fsm                  *fsm.FiniteStateMachine
+	fsmDisallowedCounter int
+	logger               *Logger
+	state                int32 // Don't put the connection state into the FSM as 1) the FSM's states are user-defined. 2) the FSM is not goroutine-safe.
+	connTime             time.Time
+	closeHandlers        []func()
+	replaySession        *replaypb.ReplaySession
 }
 
 var allConnections sync.Map // map[ConnectionId]*Connection
-var unauthenticatedConnections sync.Map
 var nextConnectionId uint32 = 0
 var serverFsm fsm.FiniteStateMachine
 var clientFsm fsm.FiniteStateMachine
@@ -104,21 +107,6 @@ func InitConnections(serverFsmPath string, clientFsmPath string) {
 	go checkUnauthConns()
 }
 
-func checkUnauthConns() {
-	for {
-		unauthenticatedConnections.Range(func(_, v interface{}) bool {
-			conn := v.(*Connection)
-			if conn.state == ConnectionState_UNAUTHENTICATED &&
-				time.Since(conn.connTime).Milliseconds() >= GlobalSettings.ConnectionAuthTimeoutMs {
-				conn.Close()
-			}
-			return true
-		})
-
-		time.Sleep(time.Millisecond * 500)
-	}
-}
-
 func GetConnection(id ConnectionId) *Connection {
 	v, ok := allConnections.Load(id)
 	if ok {
@@ -140,7 +128,7 @@ func startGoroutines(connection *Connection) {
 		}
 	}()
 
-	// flush goroutine
+	// tick & flush goroutine
 	go func() {
 		for !connection.IsClosing() {
 			connection.flush()
@@ -180,6 +168,16 @@ func StartListening(t channeldpb.ConnectionType, network string, address string)
 		if err != nil {
 			rootLogger.Error("failed to accept connection", zap.Error(err))
 		} else {
+
+			// Check if the IP address is banned.
+			ip := GetIP(conn.RemoteAddr())
+			_, banned := ipBlacklist[ip]
+			if banned {
+				securityLogger.Info("refused connection of banned IP address", zap.String("ip", ip))
+				conn.Close()
+				continue
+			}
+
 			connection := AddConnection(conn, t)
 			connection.Logger().Debug("accepted connection")
 			startGoroutines(connection)
@@ -239,8 +237,9 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 		readPos:         0,
 		// reader:    bufio.NewReaderSize(c, readerSize),
 		// writer:    bufio.NewWriterSize(c, writerSize),
-		sender:    &queuedMessageSender{},
-		sendQueue: make(chan MessageContext, 128),
+		sender:               &queuedMessageSender{},
+		sendQueue:            make(chan MessageContext, 128),
+		fsmDisallowedCounter: 0,
 		logger: &Logger{rootLogger.With(
 			zap.String("connType", t.String()),
 			zap.Uint32("connId", nextConnectionId),
@@ -272,7 +271,9 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 
 	allConnections.Store(connection.id, connection)
 
-	unauthenticatedConnections.Store(connection.id, connection)
+	if GlobalSettings.ConnectionAuthTimeoutMs > 0 {
+		unauthenticatedConnections.Store(connection.id, connection)
+	}
 
 	connectionNum.WithLabelValues(t.String()).Inc()
 
@@ -341,14 +342,14 @@ func (c *Connection) receive() {
 	}
 
 	c.readPos += bytesRead
-	if c.readPos < 5 {
+	if c.readPos < PacketHeaderSize {
 		// Unfinished header
 		fragmentedPacketCount.WithLabelValues(c.connectionType.String()).Inc()
 		return
 	}
 
 	/*
-		tag := c.readBuffer[:5]
+		tag := c.readBuffer[:PacketHeaderSize]
 		if tag[0] != 67 {
 			c.readPos = 0
 			c.Logger().Warn("invalid tag, the packet will be dropped",
@@ -370,13 +371,13 @@ func (c *Connection) receive() {
 			return
 		}
 
-		fullSize := 5 + packetSize
+		fullSize := PacketHeaderSize + packetSize
 		if c.readPos < fullSize {
 			// Unfinished packet
 			return
 		}
 
-		bytes := c.readBuffer[5:fullSize]
+		bytes := c.readBuffer[PacketHeaderSize:fullSize]
 
 		bytesReceived.WithLabelValues(c.connectionType.String()).Add(float64(fullSize))
 
@@ -432,7 +433,7 @@ func (c *Connection) receive() {
 }
 
 func (c *Connection) readPacket(bufPos *int) *channeldpb.Packet {
-	tag := c.readBuffer[*bufPos : *bufPos+5]
+	tag := c.readBuffer[*bufPos : *bufPos+PacketHeaderSize]
 	if tag[0] != 67 {
 		c.readPos = 0
 		packetDropped.WithLabelValues(c.connectionType.String()).Inc()
@@ -456,7 +457,7 @@ func (c *Connection) readPacket(bufPos *int) *channeldpb.Packet {
 		return nil
 	}
 
-	fullSize := 5 + packetSize
+	fullSize := PacketHeaderSize + packetSize
 	if c.readPos < fullSize {
 		// Unfinished packet
 		fragmentedPacketCount.WithLabelValues(c.connectionType.String()).Inc()
@@ -470,7 +471,7 @@ func (c *Connection) readPacket(bufPos *int) *channeldpb.Packet {
 		return nil
 	}
 
-	bytes := c.readBuffer[*bufPos+5 : *bufPos+fullSize]
+	bytes := c.readBuffer[*bufPos+PacketHeaderSize : *bufPos+fullSize]
 
 	bytesReceived.WithLabelValues(c.connectionType.String()).Add(float64(fullSize))
 
@@ -536,6 +537,7 @@ func (c *Connection) receiveMessage(mp *channeldpb.MessagePack) {
 	}
 
 	if !c.fsm.IsAllowed(mp.MsgType) {
+		Event_FsmDisallowed.Broadcast(c)
 		c.Logger().Warn("message is not allowed for current state",
 			zap.Uint32("msgType", mp.MsgType),
 			zap.String("connState", c.fsm.CurrentState().Name),
@@ -689,13 +691,20 @@ func (c *Connection) GetConnectionType() channeldpb.ConnectionType {
 	return c.connectionType
 }
 
-func (c *Connection) OnAuthenticated() {
+func (c *Connection) OnAuthenticated(pit string) {
 	if c.IsClosing() {
 		return
 	}
+
 	atomic.StoreInt32(&c.state, ConnectionState_AUTHENTICATED)
+
 	unauthenticatedConnections.Delete(c.id)
-	c.fsm.MoveToNextState()
+
+	c.pit = pit
+
+	if !c.fsm.MoveToNextState() {
+		c.Logger().Error("no state found after the authenticated state")
+	}
 }
 
 func (c *Connection) String() string {
@@ -704,6 +713,13 @@ func (c *Connection) String() string {
 
 func (c *Connection) Logger() *Logger {
 	return c.logger
+}
+
+func (c *Connection) RemoteAddr() net.Addr {
+	if c.IsClosing() {
+		return nil
+	}
+	return c.conn.RemoteAddr()
 }
 
 func (c *Connection) recordPacket(p *channeldpb.Packet) {

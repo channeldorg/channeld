@@ -29,6 +29,18 @@ func (provider *AlwaysFailAuthProvider) DoAuth(connId ConnectionId, pit string, 
 	return channeldpb.AuthResultMessage_INVALID_LT, nil
 }
 
+type FixedPasswordAuthProvider struct {
+	Password string
+}
+
+func (provider *FixedPasswordAuthProvider) DoAuth(connId ConnectionId, pit string, lt string) (channeldpb.AuthResultMessage_AuthResult, error) {
+	if lt == provider.Password {
+		return channeldpb.AuthResultMessage_SUCCESSFUL, nil
+	} else {
+		return channeldpb.AuthResultMessage_INVALID_LT, nil
+	}
+}
+
 var authProvider AuthProvider
 
 // = &AlwaysFailAuthProvider{}

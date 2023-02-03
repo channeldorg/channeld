@@ -1,6 +1,7 @@
 package channeld
 
 import (
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ type Logger struct {
 }
 
 var rootLogger *Logger //*zap.Logger
+var securityLogger *Logger
 
 func RootLogger() *Logger {
 	return rootLogger
@@ -74,8 +76,13 @@ func InitLogs() {
 	if GlobalSettings.LogFile.HasValue {
 		cfg.OutputPaths = append(cfg.OutputPaths, strings.ReplaceAll(GlobalSettings.LogFile.Value, "{time}", time.Now().Format("20060102150405")))
 	}
+
 	zapLogger, _ := cfg.Build()
 	rootLogger = &Logger{zapLogger}
+
+	cfg.OutputPaths = append(cfg.OutputPaths, filepath.Dir(GlobalSettings.LogFile.Value)+"/security.log")
+	zapLogger, _ = cfg.Build()
+	securityLogger = &Logger{zapLogger}
 
 	zap.Hooks(func(e zapcore.Entry) error {
 		if e.Level >= zapcore.WarnLevel {

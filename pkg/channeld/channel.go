@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -42,7 +43,7 @@ type channelMessage struct {
 type ConnectionInChannel interface {
 	Id() ConnectionId
 	GetConnectionType() channeldpb.ConnectionType
-	OnAuthenticated()
+	OnAuthenticated(pit string)
 	HasAuthorityOver(ch *Channel) bool
 	Close()
 	IsClosing() bool
@@ -52,6 +53,7 @@ type ConnectionInChannel interface {
 	sendSubscribed(ctx MessageContext, ch *Channel, connToSub ConnectionInChannel, stubId uint32, subOptions *channeldpb.ChannelSubscriptionOptions)
 	sendUnsubscribed(ctx MessageContext, ch *Channel, connToUnsub *Connection, stubId uint32)
 	Logger() *Logger
+	RemoteAddr() net.Addr
 }
 
 type Channel struct {

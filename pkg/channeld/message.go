@@ -244,6 +244,13 @@ func handleAuth(ctx MessageContext) {
 	}
 	//log.Printf("Auth PIT: %s, LT: %s\n", msg.PlayerIdentifierToken, msg.LoginToken)
 
+	_, banned := pitBlacklist[msg.PlayerIdentifierToken]
+	if banned {
+		securityLogger.Info("refused authentication of banned PIT", zap.String("pit", msg.PlayerIdentifierToken))
+		ctx.Connection.Close()
+		return
+	}
+
 	if authProvider == nil && !GlobalSettings.Development {
 		rootLogger.Panic("no auth provider")
 		return
@@ -251,29 +258,34 @@ func handleAuth(ctx MessageContext) {
 
 	authResult := channeldpb.AuthResultMessage_SUCCESSFUL
 	if ctx.Connection.GetConnectionType() == channeldpb.ConnectionType_SERVER && GlobalSettings.ServerBypassAuth {
-		onAuthComplete(ctx, authResult)
+		onAuthComplete(ctx, authResult, msg.PlayerIdentifierToken)
 	} else if authProvider != nil {
 		go func() {
 			authResult, err := authProvider.DoAuth(ctx.Connection.Id(), msg.PlayerIdentifierToken, msg.LoginToken)
 			if err != nil {
+				Event_AuthFailed.Broadcast(AuthFailedEventData{
+					AuthResult:            authResult,
+					Connection:            ctx.Connection,
+					PlayerIdentifierToken: msg.PlayerIdentifierToken,
+				})
 				ctx.Connection.Logger().Error("failed to do auth", zap.Error(err))
 				ctx.Connection.Close()
 			} else {
-				onAuthComplete(ctx, authResult)
+				onAuthComplete(ctx, authResult, msg.PlayerIdentifierToken)
 			}
 		}()
 	} else {
-		onAuthComplete(ctx, authResult)
+		onAuthComplete(ctx, authResult, msg.PlayerIdentifierToken)
 	}
 }
 
-func onAuthComplete(ctx MessageContext, authResult channeldpb.AuthResultMessage_AuthResult) {
+func onAuthComplete(ctx MessageContext, authResult channeldpb.AuthResultMessage_AuthResult, pit string) {
 	if ctx.Connection.IsClosing() {
 		return
 	}
 
 	if authResult == channeldpb.AuthResultMessage_SUCCESSFUL {
-		ctx.Connection.OnAuthenticated()
+		ctx.Connection.OnAuthenticated(pit)
 	}
 
 	ctx.Msg = &channeldpb.AuthResultMessage{

@@ -2,6 +2,7 @@ package channeld
 
 import (
 	"math"
+	"net"
 	"testing"
 
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
@@ -224,7 +225,7 @@ func (c *testConnection) GetConnectionType() channeldpb.ConnectionType {
 	return channeldpb.ConnectionType_NO_CONNECTION
 }
 
-func (c *testConnection) OnAuthenticated() {
+func (c *testConnection) OnAuthenticated(pit string) {
 
 }
 
@@ -266,6 +267,10 @@ func (c *testConnection) sendUnsubscribed(ctx MessageContext, ch *Channel, connT
 
 func (c *testConnection) Logger() *Logger {
 	return rootLogger
+}
+
+func (c *testConnection) RemoteAddr() net.Addr {
+	return nil
 }
 
 func TestGetChannelId2(t *testing.T) {

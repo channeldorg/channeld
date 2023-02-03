@@ -3,6 +3,7 @@ package channeld
 import (
 	"sync"
 
+	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"channeld.clewcat.com/channeld/pkg/common"
 )
 
@@ -10,6 +11,16 @@ var Event_GlobalChannelPossessed = &Event[*Channel]{}
 var Event_GlobalChannelUnpossessed = &Event[struct{}]{}
 var Event_ChannelCreated = &Event[*Channel]{}
 var Event_ChannelRemoved = &Event[common.ChannelId]{}
+
+type AuthFailedEventData struct {
+	AuthResult            channeldpb.AuthResultMessage_AuthResult
+	Connection            ConnectionInChannel
+	PlayerIdentifierToken string
+}
+
+var Event_AuthFailed = &Event[AuthFailedEventData]{}
+
+var Event_FsmDisallowed = &Event[*Connection]{}
 
 type EventData interface {
 }

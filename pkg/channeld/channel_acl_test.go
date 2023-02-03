@@ -1,6 +1,7 @@
 package channeld
 
 import (
+	"net"
 	"testing"
 
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
@@ -19,7 +20,7 @@ func (c *aclTestConnection) GetConnectionType() channeldpb.ConnectionType {
 	return channeldpb.ConnectionType_NO_CONNECTION
 }
 
-func (c *aclTestConnection) OnAuthenticated() {
+func (c *aclTestConnection) OnAuthenticated(pit string) {
 
 }
 
@@ -58,6 +59,10 @@ func (c *aclTestConnection) sendUnsubscribed(ctx MessageContext, ch *Channel, co
 
 func (c *aclTestConnection) Logger() *Logger {
 	return rootLogger
+}
+
+func (c *aclTestConnection) RemoteAddr() net.Addr {
+	return nil
 }
 
 var idCounter = 0

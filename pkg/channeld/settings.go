@@ -38,6 +38,8 @@ type GlobalSettingsType struct {
 	MaxConnectionIdBits uint8
 
 	ConnectionAuthTimeoutMs int64
+	MaxFailedAuthAttempts   int
+	MaxFsmDisallowed        int
 
 	SpatialChannelIdStart common.ChannelId
 
@@ -69,6 +71,8 @@ var GlobalSettings = GlobalSettingsType{
 	// Mirror uses int32 as the connId
 	MaxConnectionIdBits:     31,
 	ConnectionAuthTimeoutMs: 5000,
+	MaxFailedAuthAttempts:   5,
+	MaxFsmDisallowed:        10,
 	SpatialChannelIdStart:   65536,
 	ChannelSettings: map[channeldpb.ChannelType]ChannelSettingsType{
 		channeldpb.ChannelType_GLOBAL: {
@@ -153,10 +157,13 @@ func (s *GlobalSettingsType) ParseFlag() error {
 	flag.BoolVar(&s.EnableRecordPacket, "erp", false, "enable record message packets send from clients")
 	flag.StringVar(&s.ReplaySessionPersistenceDir, "rspd", "", "the path to write packet recording")
 
+	// Use flag.Uint instead of flag.UintVar to avoid the default value being overwritten by the flag value
 	ct := flag.Uint("ct", 0, "the compression type, 0 = No, 1 = Snappy")
 	scs := flag.Uint("scs", uint(s.SpatialChannelIdStart), "start ChannelId of spatial channels. Default is 65535.")
 	mcb := flag.Uint("mcb", uint(s.MaxConnectionIdBits), "max bits of ConnectionId (e.g. 16 means max ConnectionId = 1<<16 - 1). Up to 32.")
-	cat := flag.Uint("cat", uint(s.ConnectionAuthTimeoutMs), "the duration to allow a connection stay unauthenticated before closing it. Default is 5000.")
+	cat := flag.Uint("cat", uint(s.ConnectionAuthTimeoutMs), "the duration to allow a connection stay unauthenticated before closing it. Default is 5000. (0 = no limit)")
+	mfaa := flag.Int("mfaa", s.MaxFailedAuthAttempts, "the max number of failed authentication attempts before closing the connection. Default is 5. (0 = no limit)")
+	mfd := flag.Int("mfd", s.MaxFsmDisallowed, "the max number of disallowed FSM transitions before closing the connection. Default is 10. (0 = no limit)")
 
 	chs := flag.String("chs", "config/channel_settings_hifi.json", "the path to the channel settings file")
 
@@ -176,6 +183,14 @@ func (s *GlobalSettingsType) ParseFlag() error {
 
 	if cat != nil {
 		s.ConnectionAuthTimeoutMs = int64(*cat)
+	}
+
+	if mfaa != nil {
+		s.MaxFailedAuthAttempts = int(*mfaa)
+	}
+
+	if mfd != nil {
+		s.MaxFsmDisallowed = int(*mfd)
 	}
 
 	chsData, err := ioutil.ReadFile(*chs)
