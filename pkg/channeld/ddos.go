@@ -26,6 +26,7 @@ func InitAntiDDoS() {
 			if GlobalSettings.MaxFailedAuthAttempts > 0 && failedAuthCounters[data.PlayerIdentifierToken] >= GlobalSettings.MaxFailedAuthAttempts {
 				pitBlacklist[data.PlayerIdentifierToken] = time.Now()
 				securityLogger.Info("blacklisted PIT due to too many failed auth attempts", zap.String("pit", data.PlayerIdentifierToken))
+				data.Connection.Close()
 			}
 		} else {
 			// Invalid username token - record the IP
@@ -34,6 +35,7 @@ func InitAntiDDoS() {
 			if GlobalSettings.MaxFailedAuthAttempts > 0 && failedAuthCounters[ip] >= GlobalSettings.MaxFailedAuthAttempts {
 				ipBlacklist[ip] = time.Now()
 				securityLogger.Info("blacklisted IP due to too many failed auth attempts", zap.String("ip", ip))
+				data.Connection.Close()
 			}
 		}
 	})
@@ -51,6 +53,8 @@ func InitAntiDDoS() {
 			c.Close()
 		}
 	})
+
+	go checkUnauthConns()
 }
 
 // Disconnection unauthenticated connections after ConnectionAuthTimeoutMs.
@@ -58,6 +62,9 @@ func checkUnauthConns() {
 	for {
 		unauthenticatedConnections.Range(func(_, v interface{}) bool {
 			conn := v.(*Connection)
+			if conn.IsClosing() {
+				return true
+			}
 			if conn.state == ConnectionState_UNAUTHENTICATED && time.Since(conn.connTime).Milliseconds() >= GlobalSettings.ConnectionAuthTimeoutMs {
 				ipBlacklist[GetIP(conn.RemoteAddr())] = time.Now()
 				conn.Close()

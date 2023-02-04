@@ -263,14 +263,18 @@ func handleAuth(ctx MessageContext) {
 		go func() {
 			authResult, err := authProvider.DoAuth(ctx.Connection.Id(), msg.PlayerIdentifierToken, msg.LoginToken)
 			if err != nil {
-				Event_AuthFailed.Broadcast(AuthFailedEventData{
-					AuthResult:            authResult,
-					Connection:            ctx.Connection,
-					PlayerIdentifierToken: msg.PlayerIdentifierToken,
-				})
 				ctx.Connection.Logger().Error("failed to do auth", zap.Error(err))
 				ctx.Connection.Close()
 			} else {
+
+				if authResult != channeldpb.AuthResultMessage_SUCCESSFUL {
+					Event_AuthFailed.Broadcast(AuthFailedEventData{
+						AuthResult:            authResult,
+						Connection:            ctx.Connection,
+						PlayerIdentifierToken: msg.PlayerIdentifierToken,
+					})
+				}
+
 				onAuthComplete(ctx, authResult, msg.PlayerIdentifierToken)
 			}
 		}()

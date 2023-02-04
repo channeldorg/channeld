@@ -72,8 +72,8 @@ type Connection struct {
 
 var allConnections sync.Map // map[ConnectionId]*Connection
 var nextConnectionId uint32 = 0
-var serverFsm fsm.FiniteStateMachine
-var clientFsm fsm.FiniteStateMachine
+var serverFsm *fsm.FiniteStateMachine
+var clientFsm *fsm.FiniteStateMachine
 
 func InitConnections(serverFsmPath string, clientFsmPath string) {
 	bytes, err := os.ReadFile(serverFsmPath)
@@ -103,8 +103,6 @@ func InitConnections(serverFsmPath string, clientFsmPath string) {
 			zap.String("currentState", clientFsm.CurrentState().Name),
 		)
 	}
-
-	go checkUnauthConns()
 }
 
 func GetConnection(id ConnectionId) *Connection {
@@ -255,16 +253,21 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 		}
 	}
 
-	// IMPORTANT: always make a value copy
-	var fsm fsm.FiniteStateMachine
 	switch t {
 	case channeldpb.ConnectionType_SERVER:
-		fsm = serverFsm
+		if serverFsm != nil {
+			// IMPORTANT: always make a value copy
+			fsm := *serverFsm
+			connection.fsm = &fsm
+		}
 	case channeldpb.ConnectionType_CLIENT:
-		fsm = clientFsm
+		if clientFsm != nil {
+			// IMPORTANT: always make a value copy
+			fsm := *clientFsm
+			connection.fsm = &fsm
+		}
 	}
 
-	connection.fsm = &fsm
 	if connection.fsm == nil {
 		rootLogger.Panic("cannot set the FSM for connection", zap.String("connType", t.String()))
 	}

@@ -65,9 +65,13 @@ type ChannelSettingsType struct {
 }
 
 var GlobalSettings = GlobalSettingsType{
-	LogLevel:        &NullableInt{},
-	LogFile:         &NullableString{},
-	CompressionType: channeldpb.CompressionType_NO_COMPRESSION,
+	LogLevel:              &NullableInt{},
+	LogFile:               &NullableString{},
+	ServerReadBufferSize:  0x0001ffff,
+	ServerWriteBufferSize: 256,
+	ClientReadBufferSize:  0x0001ffff,
+	ClientWriteBufferSize: 512,
+	CompressionType:       channeldpb.CompressionType_NO_COMPRESSION,
 	// Mirror uses int32 as the connId
 	MaxConnectionIdBits:     31,
 	ConnectionAuthTimeoutMs: 5000,
@@ -143,15 +147,15 @@ func (s *GlobalSettingsType) ParseFlag() error {
 
 	flag.StringVar(&s.ServerNetwork, "sn", "tcp", "the network type for the server connections")
 	flag.StringVar(&s.ServerAddress, "sa", ":11288", "the network address for the server connections")
-	flag.IntVar(&s.ServerReadBufferSize, "srb", 0x0001ffff, "the read buffer size for the server connections")
-	flag.IntVar(&s.ServerWriteBufferSize, "swb", 256, "the write buffer size for the server connections")
+	flag.IntVar(&s.ServerReadBufferSize, "srb", s.ServerReadBufferSize, "the read buffer size for the server connections")
+	flag.IntVar(&s.ServerWriteBufferSize, "swb", s.ServerWriteBufferSize, "the write buffer size for the server connections")
 	flag.StringVar(&s.ServerFSM, "sfsm", "config/server_authoratative_fsm.json", "the path to the server FSM config")
 	flag.BoolVar(&s.ServerBypassAuth, "sba", true, "should server bypasses the authentication?")
 
 	flag.StringVar(&s.ClientNetwork, "cn", "tcp", "the network type for the client connections")
 	flag.StringVar(&s.ClientAddress, "ca", ":12108", "the network address for the client connections")
-	flag.IntVar(&s.ClientReadBufferSize, "crb", 0x0001ffff, "the read buffer size for the client connections")
-	flag.IntVar(&s.ClientWriteBufferSize, "cwb", 512, "the write buffer size for the client connections")
+	flag.IntVar(&s.ClientReadBufferSize, "crb", s.ClientReadBufferSize, "the read buffer size for the client connections")
+	flag.IntVar(&s.ClientWriteBufferSize, "cwb", s.ClientWriteBufferSize, "the write buffer size for the client connections")
 	flag.StringVar(&s.ClientFSM, "cfsm", "config/client_non_authoratative_fsm.json", "the path to the client FSM config")
 
 	flag.BoolVar(&s.EnableRecordPacket, "erp", false, "enable record message packets send from clients")

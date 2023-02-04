@@ -13,7 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func Init() {
+func init() {
 	InitLogs()
 	InitAntiDDoS()
 }
@@ -23,7 +23,6 @@ func TestUnauthTimeout(t *testing.T) {
 
 	// go StartListening(channeldpb.ConnectionType_SERVER, "tcp", ":31288")
 	go StartListening(channeldpb.ConnectionType_CLIENT, "tcp", ":32108")
-	go checkUnauthConns()
 	time.Sleep(time.Millisecond * 100)
 
 	conn, err := net.Dial("tcp", "127.0.0.1:32108")
@@ -40,15 +39,16 @@ func TestUnauthTimeout(t *testing.T) {
 	_, err = conn.Read(buff)
 	assert.ErrorIs(t, err, io.EOF, "Connection should already have been closed by now")
 
-	// Should still be able to connect, but will be soon be disconnected
+	// IP blacklisted. Should still be able to connect, but will be soon be disconnected
 	conn, _ = net.Dial("tcp", "127.0.0.1:32108")
 	time.Sleep(time.Millisecond * 100)
 	_, err = conn.Read(buff)
 	assert.ErrorIs(t, err, io.EOF, "Connection should already have been closed by now")
 }
 
-func TestAuthFailure(t *testing.T) {
-	// Force authentication
+func TestWrongPassword(t *testing.T) {
+	InitConnections("../../config/server_conn_fsm_test.json", "../../config/client_non_authoratative_fsm.json")
+	// Turn off dev mode to force authentication
 	GlobalSettings.Development = false
 	GlobalSettings.MaxFailedAuthAttempts = 3
 	SetAuthProvider(&FixedPasswordAuthProvider{"rightpassword"})
@@ -58,34 +58,56 @@ func TestAuthFailure(t *testing.T) {
 	go StartListening(channeldpb.ConnectionType_CLIENT, "tcp", ":32108")
 	time.Sleep(time.Millisecond * 100)
 
-	conn, _ := net.Dial("tcp", "127.0.0.1:32108")
+	conn, err := net.Dial("tcp", "127.0.0.1:32108")
+	assert.NoError(t, err, "Error connecting to server")
+
 	sendMessage(conn, uint32(channeldpb.MessageType_AUTH), &channeldpb.AuthMessage{
 		PlayerIdentifierToken: "user1",
 		LoginToken:            "wrongpassword",
 	})
+	time.Sleep(time.Millisecond * 100)
 	assert.Contains(t, failedAuthCounters, "user1", "Failed auth counter should contain user1")
 	assert.True(t, checkConnOpen(conn), "Connection should not have been closed yet")
 
-	time.Sleep(time.Millisecond * 100)
 	sendMessage(conn, uint32(channeldpb.MessageType_AUTH), &channeldpb.AuthMessage{
 		PlayerIdentifierToken: "user1",
 		LoginToken:            "wrongpassword",
 	})
+	time.Sleep(time.Millisecond * 100)
 	assert.EqualValues(t, 2, failedAuthCounters["user1"], "Failed auth counter should be 2")
 	assert.True(t, checkConnOpen(conn), "Connection should not have been closed yet")
 
-	time.Sleep(time.Millisecond * 100)
 	sendMessage(conn, uint32(channeldpb.MessageType_AUTH), &channeldpb.AuthMessage{
 		PlayerIdentifierToken: "user1",
 		LoginToken:            "rightpassword",
 	})
-	assert.True(t, checkConnOpen(conn), "Connection should not have been closed yet")
-
 	time.Sleep(time.Millisecond * 100)
+	assert.EqualValues(t, 2, failedAuthCounters["user1"], "Failed auth counter should still be 2")
+	// assert.True(t, checkConnOpen(conn), "Connection should not have been closed yet")
+
+	conn.Close()
+	time.Sleep(time.Millisecond * 100)
+	// Re-open connection as the FSM only allows valid AuthMessage once
+	conn, err = net.Dial("tcp", "127.0.0.1:32108")
+	assert.NoError(t, err, "Error connecting to server")
+
 	sendMessage(conn, uint32(channeldpb.MessageType_AUTH), &channeldpb.AuthMessage{
 		PlayerIdentifierToken: "user1",
 		LoginToken:            "wrongpassword",
 	})
+	time.Sleep(time.Millisecond * 100)
+	assert.False(t, checkConnOpen(conn), "Connection should have been closed by now")
+
+	// PIT blacklisted. Should still be able to connect, but can't login anymore
+	conn, _ = net.Dial("tcp", "127.0.0.1:32108")
+	time.Sleep(time.Millisecond * 100)
+	assert.True(t, checkConnOpen(conn), "Connection should have been closed by now")
+	sendMessage(conn, uint32(channeldpb.MessageType_AUTH), &channeldpb.AuthMessage{
+		PlayerIdentifierToken: "user1",
+		LoginToken:            "rightpassword",
+	})
+	time.Sleep(time.Millisecond * 100)
+	// Event the right password won't work anymore
 	assert.False(t, checkConnOpen(conn), "Connection should have been closed by now")
 }
 
@@ -106,7 +128,7 @@ func sendMessage(conn net.Conn, msgType uint32, msg proto.Message) {
 
 func checkConnOpen(conn net.Conn) bool {
 	buff := make([]byte, 1)
-	conn.SetReadDeadline(time.Now().Add(time.Millisecond * 100))
+	conn.SetReadDeadline(time.Now().Add(time.Millisecond * 50))
 	_, err := conn.Read(buff)
-	return errors.Is(err, os.ErrDeadlineExceeded)
+	return err == nil || errors.Is(err, os.ErrDeadlineExceeded)
 }

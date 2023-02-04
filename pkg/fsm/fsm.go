@@ -71,7 +71,7 @@ func parseMsgTypes(s string, f func(msgType uint32)) {
 
 var logger *zap.SugaredLogger
 
-func Load(bytes []byte) (FiniteStateMachine, error) {
+func Load(bytes []byte) (*FiniteStateMachine, error) {
 	if logger == nil {
 		l, _ := zap.NewProduction()
 		defer l.Sync()
@@ -81,7 +81,9 @@ func Load(bytes []byte) (FiniteStateMachine, error) {
 	var fsm FiniteStateMachine
 	err := json.Unmarshal(bytes, &fsm)
 	if err == nil {
-		fsm.currentState = &fsm.States[0]
+		if len(fsm.States) > 0 {
+			fsm.currentState = &fsm.States[0]
+		}
 		fsm.stateNameMap = make(map[string]*State, len(fsm.States))
 		fsm.lock = &sync.RWMutex{}
 
@@ -116,7 +118,7 @@ func Load(bytes []byte) (FiniteStateMachine, error) {
 			err = fsm.ChangeState(*fsm.InitState)
 		}
 	}
-	return fsm, err
+	return &fsm, err
 }
 
 func (fsm *FiniteStateMachine) IsAllowed(msgType uint32) bool {

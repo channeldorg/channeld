@@ -26,7 +26,7 @@ func (provider *LoggingAuthProvider) DoAuth(connId ConnectionId, pit string, lt 
 type AlwaysFailAuthProvider struct{}
 
 func (provider *AlwaysFailAuthProvider) DoAuth(connId ConnectionId, pit string, lt string) (channeldpb.AuthResultMessage_AuthResult, error) {
-	return channeldpb.AuthResultMessage_INVALID_LT, nil
+	return channeldpb.AuthResultMessage_INVALID_PIT, nil
 }
 
 type FixedPasswordAuthProvider struct {
