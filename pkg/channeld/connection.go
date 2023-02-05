@@ -292,7 +292,7 @@ func (c *Connection) Close() {
 		recover()
 	}()
 	if c.IsClosing() {
-		c.Logger().Warn("connection is already closed")
+		c.Logger().Debug("connection is already closed")
 		return
 	}
 
@@ -310,6 +310,7 @@ func (c *Connection) Close() {
 	allConnections.Delete(c.id)
 	unauthenticatedConnections.Delete(c.id)
 
+	c.Logger().Info("closed connection")
 	connectionNum.WithLabelValues(c.connectionType.String()).Dec()
 }
 

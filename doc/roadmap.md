@@ -5,7 +5,7 @@
 - [x] Message broadcasting
 - [x] Authentication
 - [x] Channel ACL
-- [ ] DDoS Protection
+- [x] DDoS Protection
 - [ ] Health check
 - [ ] Front-end load-balancing
 - [x] Spatial-based pub/sub
