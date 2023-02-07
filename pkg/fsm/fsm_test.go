@@ -16,7 +16,7 @@ func loadServerFSM(t *testing.T) FiniteStateMachine {
 	if err != nil {
 		t.Error(err)
 	}
-	return serverFSM
+	return *serverFSM
 }
 
 func TestLoad(t *testing.T) {

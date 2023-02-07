@@ -18,9 +18,11 @@ type SpatialController interface {
 	common.SpatialInfoChangedNotifier
 	// Called in GLOBAL and spatial channels
 	GetChannelId(info common.SpatialInfo) (common.ChannelId, error)
+	// Called in the spatials channel
+	QueryChannelIds(query *channeldpb.SpatialInterestQuery) (map[common.ChannelId]uint, error)
 	// Called in GLOBAL channel
 	GetRegions() ([]*channeldpb.SpatialRegion, error)
-	// Called in any spatial channel
+	// Called in the spatials channel
 	GetAdjacentChannels(spatialChannelId common.ChannelId) ([]common.ChannelId, error)
 	// Create spatial channels for a spatial server.
 	// Called in GLOBAL channel
@@ -85,6 +87,15 @@ type StaticGrid2DSpatialController struct {
 
 	//serverIndex       uint32
 	serverConnections []ConnectionInChannel
+
+	gridSize float64
+}
+
+func (ctl *StaticGrid2DSpatialController) GridSize() float64 {
+	if ctl.gridSize == 0 && ctl.GridWidth > 0 && ctl.GridHeight > 0 {
+		ctl.gridSize = math.Sqrt(ctl.GridWidth*ctl.GridWidth + ctl.GridHeight*ctl.GridHeight)
+	}
+	return ctl.gridSize
 }
 
 func (ctl *StaticGrid2DSpatialController) GetChannelId(info common.SpatialInfo) (common.ChannelId, error) {
@@ -106,6 +117,82 @@ func (ctl *StaticGrid2DSpatialController) GetChannelIdWithOffset(info common.Spa
 	}
 	index := uint32(gridX) + uint32(gridY)*ctl.GridCols
 	return common.ChannelId(index) + GlobalSettings.SpatialChannelIdStart, nil
+}
+
+func (ctl *StaticGrid2DSpatialController) QueryChannelIds(query *channeldpb.SpatialInterestQuery) (map[common.ChannelId]uint, error) {
+	if query == nil {
+		return nil, fmt.Errorf("query is nil")
+	}
+
+	result := make(map[common.ChannelId]uint)
+
+	if query.SpotsAOI != nil {
+		for _, spot := range query.SpotsAOI.Spots {
+			chId, err := ctl.GetChannelId(common.SpatialInfo{X: spot.X, Y: spot.Y, Z: spot.Z})
+			if err != nil {
+				return nil, err
+			}
+			result[chId] = uint(math.Ceil(query.SpotsAOI.Center.Dist2D(spot) / ctl.GridSize()))
+		}
+	}
+
+	if query.BoxAOI != nil {
+		center := &common.SpatialInfo{X: (query.BoxAOI.Min.X + query.BoxAOI.Max.X) * 0.5, Y: 0, Z: (query.BoxAOI.Min.Z + query.BoxAOI.Max.Z) * 0.5}
+		for z := query.BoxAOI.Min.Z; z < query.BoxAOI.Max.Z+ctl.GridHeight; z += ctl.GridHeight {
+			for x := query.BoxAOI.Min.X; x < query.BoxAOI.Max.X+ctl.GridWidth; x += ctl.GridWidth {
+				spot := common.SpatialInfo{X: x, Y: 0, Z: z}
+				chId, err := ctl.GetChannelId(spot)
+				if err != nil {
+					return nil, err
+				}
+				result[chId] = uint(math.Ceil(center.Dist2D(&spot) / ctl.GridSize()))
+			}
+		}
+	}
+
+	if query.SphereAOI != nil {
+		center := &common.SpatialInfo{X: query.SphereAOI.Center.X, Y: 0, Z: query.SphereAOI.Center.Z}
+		for z := center.Z - query.SphereAOI.Radius; z < center.Z+query.SphereAOI.Radius+ctl.GridHeight; z += ctl.GridHeight {
+			for x := center.X - query.SphereAOI.Radius; x < center.X+query.SphereAOI.Radius+ctl.GridWidth; x += ctl.GridWidth {
+				if (x-center.X)*(x-center.X)+(z-center.Z)*(z-center.Z) > query.SphereAOI.Radius*query.SphereAOI.Radius {
+					continue
+				}
+				spot := common.SpatialInfo{X: x, Y: 0, Z: z}
+				chId, err := ctl.GetChannelId(spot)
+				if err != nil {
+					return nil, err
+				}
+				result[chId] = uint(math.Ceil(center.Dist2D(&spot) / ctl.GridSize()))
+			}
+		}
+	}
+
+	if query.ConeAOI != nil {
+		center := &common.SpatialInfo{X: query.ConeAOI.Center.X, Y: 0, Z: query.ConeAOI.Center.Z}
+		coneDir := &common.SpatialInfo{X: query.ConeAOI.Direction.X, Y: 0, Z: query.ConeAOI.Direction.Z}
+		coneDir.Normalize2D()
+		for z := center.Z - query.ConeAOI.Radius; z < center.Z+query.ConeAOI.Radius+ctl.GridHeight; z += ctl.GridHeight {
+			for x := center.X - query.ConeAOI.Radius; x < center.X+query.ConeAOI.Radius+ctl.GridWidth; x += ctl.GridWidth {
+				if (x-center.X)*(x-center.X)+(z-center.Z)*(z-center.Z) > query.ConeAOI.Radius*query.ConeAOI.Radius {
+					continue
+				}
+				spot := common.SpatialInfo{X: x, Y: 0, Z: z}
+				dir := common.SpatialInfo{X: spot.X - center.X, Y: 0, Z: spot.Z - center.Z}
+				dir.Normalize2D()
+				if dir.Dot2D(coneDir) < math.Cos(query.ConeAOI.Angle*0.5) {
+					continue
+				}
+
+				chId, err := ctl.GetChannelId(spot)
+				if err != nil {
+					return nil, err
+				}
+				result[chId] = uint(math.Ceil(center.Dist2D(&spot) / ctl.GridSize()))
+			}
+		}
+	}
+
+	return result, nil
 }
 
 func (ctl *StaticGrid2DSpatialController) GetRegions() ([]*channeldpb.SpatialRegion, error) {

@@ -131,6 +131,9 @@ enum MessageType {
 
     // Used by @SpatialRegionsUpdateMessage
     SPATIAL_REGIONS_UPDATE = 13;
+
+    // Used by @UpdateSpatialInterestMessage
+    UPDATE_SPATIAL_INTEREST = 14;
     
     // Used by @DebugGetSpatialRegionsMessage
     DEBUG_GET_SPATIAL_REGIONS = 99;
@@ -363,6 +366,41 @@ message SpatialRegion {
 // Sent upon the creation of spatial channels (after @CreateSpatialChannelsResultMessage being sent), or any regional change (basiclally caused by the loadbalancer).
 message SpatialRegionsUpdateMessage {
     repeated SpatialRegion regions = 1;
+}
+
+message SpatialInterestQuery {
+
+    message SpotsAOI {
+        SpatialInfo center = 1;
+        repeated SpatialInfo spots = 2;
+    }
+    optional SpotsAOI spotsAOI = 1;
+
+    message BoxAOI {
+        SpatialInfo min = 1;
+        SpatialInfo max = 2;
+    }
+    optional BoxAOI boxAOI = 2;
+
+    message SphereAOI {
+        SpatialInfo center = 1;
+        double radius = 2;
+    }
+    optional SphereAOI sphereAOI = 3;
+
+    message ConeAOI {
+        SpatialInfo center = 1;
+        SpatialInfo direction = 2;
+        double angle = 3;
+        double radius = 4;
+    }
+    optional ConeAOI coneAOI = 4;
+
+}
+
+message UpdateSpatialInterestMessage {
+    uint32 connId = 1;
+    SpatialInterestQuery query = 2;
 }
 
 // ------------------ DEBUG messages start ---------------------//

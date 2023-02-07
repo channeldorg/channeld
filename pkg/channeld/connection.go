@@ -68,6 +68,7 @@ type Connection struct {
 	connTime             time.Time
 	closeHandlers        []func()
 	replaySession        *replaypb.ReplaySession
+	spatialSubscriptions map[common.ChannelId]*channeldpb.ChannelSubscriptionOptions
 }
 
 var allConnections sync.Map // map[ConnectionId]*Connection
@@ -242,9 +243,10 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 			zap.String("connType", t.String()),
 			zap.Uint32("connId", nextConnectionId),
 		)},
-		state:         ConnectionState_UNAUTHENTICATED,
-		connTime:      time.Now(),
-		closeHandlers: make([]func(), 0),
+		state:                ConnectionState_UNAUTHENTICATED,
+		connTime:             time.Now(),
+		closeHandlers:        make([]func(), 0),
+		spatialSubscriptions: make(map[common.ChannelId]*channeldpb.ChannelSubscriptionOptions),
 	}
 
 	if connection.isPacketRecordingEnabled() {
