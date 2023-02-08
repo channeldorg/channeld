@@ -305,16 +305,16 @@ func (x *TestRepChannelData) GetTestNPCStates() map[uint32]*TestNPCState {
 	return nil
 }
 
-type GlobalChannelData struct {
+type TestRepGameState_MulticastNumber_Params struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	GameState *unrealpb.GameStateBase `protobuf:"bytes,1,opt,name=gameState,proto3" json:"gameState,omitempty"`
+	Num *int32 `protobuf:"varint,1,opt,name=num,proto3,oneof" json:"num,omitempty"`
 }
 
-func (x *GlobalChannelData) Reset() {
-	*x = GlobalChannelData{}
+func (x *TestRepGameState_MulticastNumber_Params) Reset() {
+	*x = TestRepGameState_MulticastNumber_Params{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_tps_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -322,13 +322,13 @@ func (x *GlobalChannelData) Reset() {
 	}
 }
 
-func (x *GlobalChannelData) String() string {
+func (x *TestRepGameState_MulticastNumber_Params) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GlobalChannelData) ProtoMessage() {}
+func (*TestRepGameState_MulticastNumber_Params) ProtoMessage() {}
 
-func (x *GlobalChannelData) ProtoReflect() protoreflect.Message {
+func (x *TestRepGameState_MulticastNumber_Params) ProtoReflect() protoreflect.Message {
 	mi := &file_tps_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -340,16 +340,16 @@ func (x *GlobalChannelData) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GlobalChannelData.ProtoReflect.Descriptor instead.
-func (*GlobalChannelData) Descriptor() ([]byte, []int) {
+// Deprecated: Use TestRepGameState_MulticastNumber_Params.ProtoReflect.Descriptor instead.
+func (*TestRepGameState_MulticastNumber_Params) Descriptor() ([]byte, []int) {
 	return file_tps_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *GlobalChannelData) GetGameState() *unrealpb.GameStateBase {
-	if x != nil {
-		return x.GameState
+func (x *TestRepGameState_MulticastNumber_Params) GetNum() int32 {
+	if x != nil && x.Num != nil {
+		return *x.Num
 	}
-	return nil
+	return 0
 }
 
 var File_tps_proto protoreflect.FileDescriptor
@@ -504,16 +504,16 @@ var file_tps_proto_rawDesc = []byte{
 	0x18, 0x01, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x29, 0x0a, 0x05, 0x76,
 	0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x13, 0x2e, 0x74, 0x70, 0x73,
 	0x70, 0x62, 0x2e, 0x54, 0x65, 0x73, 0x74, 0x4e, 0x50, 0x43, 0x53, 0x74, 0x61, 0x74, 0x65, 0x52,
-	0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x22, 0x4a, 0x0a, 0x11, 0x47, 0x6c,
-	0x6f, 0x62, 0x61, 0x6c, 0x43, 0x68, 0x61, 0x6e, 0x6e, 0x65, 0x6c, 0x44, 0x61, 0x74, 0x61, 0x12,
-	0x35, 0x0a, 0x09, 0x67, 0x61, 0x6d, 0x65, 0x53, 0x74, 0x61, 0x74, 0x65, 0x18, 0x01, 0x20, 0x01,
-	0x28, 0x0b, 0x32, 0x17, 0x2e, 0x75, 0x6e, 0x72, 0x65, 0x61, 0x6c, 0x70, 0x62, 0x2e, 0x47, 0x61,
-	0x6d, 0x65, 0x53, 0x74, 0x61, 0x74, 0x65, 0x42, 0x61, 0x73, 0x65, 0x52, 0x09, 0x67, 0x61, 0x6d,
-	0x65, 0x53, 0x74, 0x61, 0x74, 0x65, 0x42, 0x3e, 0x5a, 0x3c, 0x63, 0x68, 0x61, 0x6e, 0x6e, 0x65,
-	0x6c, 0x64, 0x2e, 0x63, 0x6c, 0x65, 0x77, 0x63, 0x61, 0x74, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63,
-	0x68, 0x61, 0x6e, 0x6e, 0x65, 0x6c, 0x64, 0x2f, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x73,
-	0x2f, 0x63, 0x68, 0x61, 0x6e, 0x6e, 0x65, 0x6c, 0x64, 0x2d, 0x75, 0x65, 0x2d, 0x74, 0x70, 0x73,
-	0x2f, 0x74, 0x70, 0x73, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x22, 0x48, 0x0a, 0x27, 0x54, 0x65,
+	0x73, 0x74, 0x52, 0x65, 0x70, 0x47, 0x61, 0x6d, 0x65, 0x53, 0x74, 0x61, 0x74, 0x65, 0x5f, 0x4d,
+	0x75, 0x6c, 0x74, 0x69, 0x63, 0x61, 0x73, 0x74, 0x4e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x5f, 0x50,
+	0x61, 0x72, 0x61, 0x6d, 0x73, 0x12, 0x15, 0x0a, 0x03, 0x6e, 0x75, 0x6d, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x05, 0x48, 0x00, 0x52, 0x03, 0x6e, 0x75, 0x6d, 0x88, 0x01, 0x01, 0x42, 0x06, 0x0a, 0x04,
+	0x5f, 0x6e, 0x75, 0x6d, 0x42, 0x3e, 0x5a, 0x3c, 0x63, 0x68, 0x61, 0x6e, 0x6e, 0x65, 0x6c, 0x64,
+	0x2e, 0x63, 0x6c, 0x65, 0x77, 0x63, 0x61, 0x74, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x68, 0x61,
+	0x6e, 0x6e, 0x65, 0x6c, 0x64, 0x2f, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x73, 0x2f, 0x63,
+	0x68, 0x61, 0x6e, 0x6e, 0x65, 0x6c, 0x64, 0x2d, 0x75, 0x65, 0x2d, 0x74, 0x70, 0x73, 0x2f, 0x74,
+	0x70, 0x73, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -530,11 +530,11 @@ func file_tps_proto_rawDescGZIP() []byte {
 
 var file_tps_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_tps_proto_goTypes = []interface{}{
-	(*TestRepGameState)(nil),               // 0: tpspb.TestRepGameState
-	(*TestRepPlayerControllerState)(nil),   // 1: tpspb.TestRepPlayerControllerState
-	(*TestNPCState)(nil),                   // 2: tpspb.TestNPCState
-	(*TestRepChannelData)(nil),             // 3: tpspb.TestRepChannelData
-	(*GlobalChannelData)(nil),              // 4: tpspb.GlobalChannelData
+	(*TestRepGameState)(nil),                        // 0: tpspb.TestRepGameState
+	(*TestRepPlayerControllerState)(nil),            // 1: tpspb.TestRepPlayerControllerState
+	(*TestNPCState)(nil),                            // 2: tpspb.TestNPCState
+	(*TestRepChannelData)(nil),                      // 3: tpspb.TestRepChannelData
+	(*TestRepGameState_MulticastNumber_Params)(nil), // 4: tpspb.TestRepGameState_MulticastNumber_Params
 	nil,                                    // 5: tpspb.TestRepChannelData.ActorStatesEntry
 	nil,                                    // 6: tpspb.TestRepChannelData.PawnStatesEntry
 	nil,                                    // 7: tpspb.TestRepChannelData.CharacterStatesEntry
@@ -572,22 +572,21 @@ var file_tps_proto_depIdxs = []int32{
 	0,  // 11: tpspb.TestRepChannelData.testGameState:type_name -> tpspb.TestRepGameState
 	13, // 12: tpspb.TestRepChannelData.testRepPlayerControllerStates:type_name -> tpspb.TestRepChannelData.TestRepPlayerControllerStatesEntry
 	14, // 13: tpspb.TestRepChannelData.testNPCStates:type_name -> tpspb.TestRepChannelData.TestNPCStatesEntry
-	17, // 14: tpspb.GlobalChannelData.gameState:type_name -> unrealpb.GameStateBase
-	18, // 15: tpspb.TestRepChannelData.ActorStatesEntry.value:type_name -> unrealpb.ActorState
-	19, // 16: tpspb.TestRepChannelData.PawnStatesEntry.value:type_name -> unrealpb.PawnState
-	20, // 17: tpspb.TestRepChannelData.CharacterStatesEntry.value:type_name -> unrealpb.CharacterState
-	21, // 18: tpspb.TestRepChannelData.PlayerStatesEntry.value:type_name -> unrealpb.PlayerState
-	22, // 19: tpspb.TestRepChannelData.ControllerStatesEntry.value:type_name -> unrealpb.ControllerState
-	23, // 20: tpspb.TestRepChannelData.PlayerControllerStatesEntry.value:type_name -> unrealpb.PlayerControllerState
-	24, // 21: tpspb.TestRepChannelData.ActorComponentStatesEntry.value:type_name -> unrealpb.ActorComponentState
-	25, // 22: tpspb.TestRepChannelData.SceneComponentStatesEntry.value:type_name -> unrealpb.SceneComponentState
-	1,  // 23: tpspb.TestRepChannelData.TestRepPlayerControllerStatesEntry.value:type_name -> tpspb.TestRepPlayerControllerState
-	2,  // 24: tpspb.TestRepChannelData.TestNPCStatesEntry.value:type_name -> tpspb.TestNPCState
-	25, // [25:25] is the sub-list for method output_type
-	25, // [25:25] is the sub-list for method input_type
-	25, // [25:25] is the sub-list for extension type_name
-	25, // [25:25] is the sub-list for extension extendee
-	0,  // [0:25] is the sub-list for field type_name
+	18, // 14: tpspb.TestRepChannelData.ActorStatesEntry.value:type_name -> unrealpb.ActorState
+	19, // 15: tpspb.TestRepChannelData.PawnStatesEntry.value:type_name -> unrealpb.PawnState
+	20, // 16: tpspb.TestRepChannelData.CharacterStatesEntry.value:type_name -> unrealpb.CharacterState
+	21, // 17: tpspb.TestRepChannelData.PlayerStatesEntry.value:type_name -> unrealpb.PlayerState
+	22, // 18: tpspb.TestRepChannelData.ControllerStatesEntry.value:type_name -> unrealpb.ControllerState
+	23, // 19: tpspb.TestRepChannelData.PlayerControllerStatesEntry.value:type_name -> unrealpb.PlayerControllerState
+	24, // 20: tpspb.TestRepChannelData.ActorComponentStatesEntry.value:type_name -> unrealpb.ActorComponentState
+	25, // 21: tpspb.TestRepChannelData.SceneComponentStatesEntry.value:type_name -> unrealpb.SceneComponentState
+	1,  // 22: tpspb.TestRepChannelData.TestRepPlayerControllerStatesEntry.value:type_name -> tpspb.TestRepPlayerControllerState
+	2,  // 23: tpspb.TestRepChannelData.TestNPCStatesEntry.value:type_name -> tpspb.TestNPCState
+	24, // [24:24] is the sub-list for method output_type
+	24, // [24:24] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_tps_proto_init() }
@@ -645,7 +644,7 @@ func file_tps_proto_init() {
 			}
 		}
 		file_tps_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GlobalChannelData); i {
+			switch v := v.(*TestRepGameState_MulticastNumber_Params); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -659,6 +658,7 @@ func file_tps_proto_init() {
 	}
 	file_tps_proto_msgTypes[0].OneofWrappers = []interface{}{}
 	file_tps_proto_msgTypes[2].OneofWrappers = []interface{}{}
+	file_tps_proto_msgTypes[4].OneofWrappers = []interface{}{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

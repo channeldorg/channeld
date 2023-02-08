@@ -22,7 +22,7 @@ func main() {
 	channeld.InitConnections(channeld.GlobalSettings.ServerFSM, channeld.GlobalSettings.ClientFSM)
 	channeld.InitChannels()
 
-	channeld.RegisterChannelDataType(channeldpb.ChannelType_GLOBAL, &tpspb.GlobalChannelData{})
+	channeld.RegisterChannelDataType(channeldpb.ChannelType_GLOBAL, &tpspb.TestRepChannelData{})
 	channeld.RegisterChannelDataType(channeldpb.ChannelType_SUBWORLD, &tpspb.TestRepChannelData{})
 	channeld.RegisterChannelDataType(channeldpb.ChannelType_SPATIAL, &tpspb.TestRepChannelData{})
 
