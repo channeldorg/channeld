@@ -42,30 +42,30 @@ Server          | forward to owner | broadcast (same for ALL_BUT_XXXX) | forward
 // Can be used as the Flags-style enum in C#. See https://groups.google.com/g/protobuf/c/L105Q4NIk0U?pli=1.
 enum BroadcastType {
     // No broadcast. All internal messages should use this type, and other types are ignored.
-    NO_BROADCAST = 0x00;
+    NO_BROADCAST = 0;
 
     // Forward the message to the connection. Can only be used by the backend server.
     // This has the same behavior as sending the message to the PRIVATE channel owned by the target connection with BroadcastType = NO.
-    SINGLE_CONNECTION = 0x01; 
+    SINGLE_CONNECTION = 1; 
 
     // Broadcast the message to all the connections in the channel, the sender included.
-    ALL = 0x02;
+    ALL = 2;
 
     // Broadcast the message to all the connections in the channel, the sender excluded.
-    ALL_BUT_SENDER = 0x04;
+    ALL_BUT_SENDER = 4;
 
     // Broadcast the message to all the connections in the channel, the owner excluded.
-    ALL_BUT_OWNER = 0x06;
+    ALL_BUT_OWNER = 8;
 
     // Broadcast the message to all client connections in the channel.
-    ALL_BUT_CLIENT = 0x08;
+    ALL_BUT_CLIENT = 16;
 
     // Broadcast the message to all server connections in the channel, the owner excluded.
-    ALL_BUT_SERVER = 0x10;
+    ALL_BUT_SERVER = 32;
 
     // Broadcast the message to all the connections in all the adjacent(3x3) spatial channels. Ignored if the target channel is not a spatial channel.
     // To ignore the center spatial channel, use ADJACENT_CHANNELS | ALL_BUT_OWNER; to ignore the sender(spatial server), use ADJACENT_CHANNELS | ALL_BUT_SENDER.
-    ADJACENT_CHANNELS = 0x20;
+    ADJACENT_CHANNELS = 64;
 }
 
 enum ConnectionType {

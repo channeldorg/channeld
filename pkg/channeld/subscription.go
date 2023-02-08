@@ -70,7 +70,7 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.Channel
 	ch.subscribedConnections[c] = cs
 
 	if ch.channelType == channeldpb.ChannelType_SPATIAL {
-		c.spatialSubscriptions[ch.id] = &cs.options
+		c.spatialSubscriptions.Store(ch.id, &cs.options)
 	}
 
 	ch.Logger().Debug("subscribed connection",
@@ -99,7 +99,7 @@ func (c *Connection) UnsubscribeFromChannel(ch *Channel) (*channeldpb.ChannelSub
 	delete(ch.subscribedConnections, c)
 
 	if ch.channelType == channeldpb.ChannelType_SPATIAL {
-		delete(c.spatialSubscriptions, ch.id)
+		c.spatialSubscriptions.Delete(ch.id)
 	}
 
 	ch.Logger().Debug("unsubscribed connection", zap.Uint32("connId", uint32(c.Id())))

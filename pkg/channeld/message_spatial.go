@@ -76,7 +76,15 @@ func handleUpdateSpatialInterest(ctx MessageContext) {
 		}
 	}
 
-	channelsToUnsub := Difference(conn.spatialSubscriptions, channelsToSub)
+	existingsSubs := make(map[common.ChannelId]*channeldpb.ChannelSubscriptionOptions)
+	conn.spatialSubscriptions.Range(func(key, value interface{}) bool {
+		chId := key.(common.ChannelId)
+		subOptions := value.(*channeldpb.ChannelSubscriptionOptions)
+		existingsSubs[chId] = subOptions
+		return true
+	})
+
+	channelsToUnsub := Difference(existingsSubs, channelsToSub)
 
 	for chId := range channelsToUnsub {
 		if ctx.Channel = GetChannel(chId); ctx.Channel == nil {
