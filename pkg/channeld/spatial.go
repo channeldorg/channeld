@@ -130,7 +130,7 @@ func (ctl *StaticGrid2DSpatialController) QueryChannelIds(query *channeldpb.Spat
 		for _, spot := range query.SpotsAOI.Spots {
 			chId, err := ctl.GetChannelId(common.SpatialInfo{X: spot.X, Y: spot.Y, Z: spot.Z})
 			if err != nil {
-				return nil, err
+				continue
 			}
 			result[chId] = uint(math.Ceil(query.SpotsAOI.Center.Dist2D(spot) / ctl.GridSize()))
 		}
@@ -143,7 +143,7 @@ func (ctl *StaticGrid2DSpatialController) QueryChannelIds(query *channeldpb.Spat
 				spot := common.SpatialInfo{X: x, Y: 0, Z: z}
 				chId, err := ctl.GetChannelId(spot)
 				if err != nil {
-					return nil, err
+					continue
 				}
 				result[chId] = uint(math.Ceil(center.Dist2D(&spot) / ctl.GridSize()))
 			}
@@ -160,7 +160,7 @@ func (ctl *StaticGrid2DSpatialController) QueryChannelIds(query *channeldpb.Spat
 				spot := common.SpatialInfo{X: x, Y: 0, Z: z}
 				chId, err := ctl.GetChannelId(spot)
 				if err != nil {
-					return nil, err
+					continue
 				}
 				result[chId] = uint(math.Ceil(center.Dist2D(&spot) / ctl.GridSize()))
 			}
@@ -185,7 +185,7 @@ func (ctl *StaticGrid2DSpatialController) QueryChannelIds(query *channeldpb.Spat
 
 				chId, err := ctl.GetChannelId(spot)
 				if err != nil {
-					return nil, err
+					continue
 				}
 				result[chId] = uint(math.Ceil(center.Dist2D(&spot) / ctl.GridSize()))
 			}

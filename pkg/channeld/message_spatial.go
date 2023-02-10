@@ -49,9 +49,9 @@ func handleUpdateSpatialInterest(ctx MessageContext) {
 		return
 	}
 
-	conn, ok := ctx.Connection.(*Connection)
-	if !ok {
-		ctx.Connection.Logger().Error("ctx.Connection is not a Connection, will not be handled.")
+	clientConn := GetConnection(ConnectionId(msg.ConnId))
+	if clientConn == nil {
+		ctx.Connection.Logger().Error("cannot find client connection to update spatial interest", zap.Uint32("connId", msg.ConnId))
 		return
 	}
 
@@ -77,7 +77,7 @@ func handleUpdateSpatialInterest(ctx MessageContext) {
 	}
 
 	existingsSubs := make(map[common.ChannelId]*channeldpb.ChannelSubscriptionOptions)
-	conn.spatialSubscriptions.Range(func(key, value interface{}) bool {
+	clientConn.spatialSubscriptions.Range(func(key, value interface{}) bool {
 		chId := key.(common.ChannelId)
 		subOptions := value.(*channeldpb.ChannelSubscriptionOptions)
 		existingsSubs[chId] = subOptions
@@ -92,8 +92,9 @@ func handleUpdateSpatialInterest(ctx MessageContext) {
 		}
 		ctx.MsgType = channeldpb.MessageType_UNSUB_FROM_CHANNEL
 		ctx.Msg = &channeldpb.UnsubscribedFromChannelMessage{
-			ConnId: uint32(ctx.Connection.Id()),
+			ConnId: msg.ConnId,
 		}
+		ctx.Connection = clientConn
 		handleUnsubFromChannel(ctx)
 	}
 
@@ -103,9 +104,10 @@ func handleUpdateSpatialInterest(ctx MessageContext) {
 		}
 		ctx.MsgType = channeldpb.MessageType_SUB_TO_CHANNEL
 		ctx.Msg = &channeldpb.SubscribedToChannelMessage{
-			ConnId:     uint32(ctx.Connection.Id()),
+			ConnId:     msg.ConnId,
 			SubOptions: subOptions,
 		}
+		ctx.Connection = clientConn
 		handleSubToChannel(ctx)
 	}
 }
