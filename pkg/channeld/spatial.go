@@ -137,9 +137,20 @@ func (ctl *StaticGrid2DSpatialController) QueryChannelIds(query *channeldpb.Spat
 	}
 
 	if query.BoxAOI != nil {
-		center := &common.SpatialInfo{X: (query.BoxAOI.Min.X + query.BoxAOI.Max.X) * 0.5, Y: 0, Z: (query.BoxAOI.Min.Z + query.BoxAOI.Max.Z) * 0.5}
-		for z := query.BoxAOI.Min.Z; z < query.BoxAOI.Max.Z+ctl.GridHeight; z += ctl.GridHeight {
-			for x := query.BoxAOI.Min.X; x < query.BoxAOI.Max.X+ctl.GridWidth; x += ctl.GridWidth {
+		center := &common.SpatialInfo{X: query.BoxAOI.Center.X, Y: 0, Z: query.BoxAOI.Center.Z}
+
+		stepZ := math.Min(query.BoxAOI.Extent.Z, ctl.GridHeight) * 0.5
+		if stepZ <= 0 {
+			return nil, fmt.Errorf("invalid box extentZ=%f, gridHeight=%f", query.BoxAOI.Extent.Z, ctl.GridHeight)
+		}
+
+		stepX := math.Min(query.BoxAOI.Extent.X, ctl.GridWidth) * 0.5
+		if stepX <= 0 {
+			return nil, fmt.Errorf("invalid box extendX=%f, gridWidth=%f", query.BoxAOI.Extent.X, ctl.GridWidth)
+		}
+
+		for z := center.Z - query.BoxAOI.Extent.Z; z <= center.Z+query.BoxAOI.Extent.Z; z += stepZ {
+			for x := center.X - query.BoxAOI.Extent.X; x <= center.X+query.BoxAOI.Extent.X; x += stepX {
 				spot := common.SpatialInfo{X: x, Y: 0, Z: z}
 				chId, err := ctl.GetChannelId(spot)
 				if err != nil {
@@ -152,8 +163,19 @@ func (ctl *StaticGrid2DSpatialController) QueryChannelIds(query *channeldpb.Spat
 
 	if query.SphereAOI != nil {
 		center := &common.SpatialInfo{X: query.SphereAOI.Center.X, Y: 0, Z: query.SphereAOI.Center.Z}
-		for z := center.Z - query.SphereAOI.Radius; z < center.Z+query.SphereAOI.Radius+ctl.GridHeight; z += ctl.GridHeight {
-			for x := center.X - query.SphereAOI.Radius; x < center.X+query.SphereAOI.Radius+ctl.GridWidth; x += ctl.GridWidth {
+
+		stepZ := math.Min(query.SphereAOI.Radius, ctl.GridHeight) * 0.5
+		if stepZ <= 0 {
+			return nil, fmt.Errorf("invalid radius=%f, gridHeight=%f", query.SphereAOI.Radius, ctl.GridHeight)
+		}
+
+		stepX := math.Min(query.SphereAOI.Radius, ctl.GridWidth) * 0.5
+		if stepX <= 0 {
+			return nil, fmt.Errorf("invalid radius=%f, gridWidth=%f", query.SphereAOI.Radius, ctl.GridWidth)
+		}
+
+		for z := center.Z - query.SphereAOI.Radius; z <= center.Z+query.SphereAOI.Radius; z += stepZ {
+			for x := center.X - query.SphereAOI.Radius; x <= center.X+query.SphereAOI.Radius; x += stepX {
 				if (x-center.X)*(x-center.X)+(z-center.Z)*(z-center.Z) > query.SphereAOI.Radius*query.SphereAOI.Radius {
 					continue
 				}

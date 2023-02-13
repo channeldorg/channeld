@@ -377,8 +377,8 @@ message SpatialInterestQuery {
     optional SpotsAOI spotsAOI = 1;
 
     message BoxAOI {
-        SpatialInfo min = 1;
-        SpatialInfo max = 2;
+        SpatialInfo center = 1;
+        SpatialInfo extent = 2;
     }
     optional BoxAOI boxAOI = 2;
 
