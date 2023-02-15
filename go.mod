@@ -7,7 +7,7 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/indiest/fmutils v0.1.2
 	github.com/pkg/profile v1.6.0
-	github.com/prometheus/client_golang v1.11.0
+	github.com/prometheus/client_golang v1.11.1
 	github.com/stretchr/testify v1.7.0
 	github.com/xtaci/kcp-go v5.4.20+incompatible
 	go.uber.org/zap v1.19.1
