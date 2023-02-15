@@ -1,9 +1,11 @@
 package channeld
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
+	"os"
 
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"channeld.clewcat.com/channeld/pkg/common"
@@ -14,6 +16,8 @@ import (
 )
 
 type SpatialController interface {
+	// Initialize the spatial controller parameters from the json config file.
+	LoadConfig(config []byte) error
 	// Notify() is called in the spatial channels (shared instance)
 	common.SpatialInfoChangedNotifier
 	// Called in GLOBAL and spatial channels
@@ -32,8 +36,34 @@ type SpatialController interface {
 // A channeld instance should have only one SpatialController
 var spatialController SpatialController
 
-func InitSpatialController(controller SpatialController) {
-	spatialController = controller
+func InitSpatialController() {
+	sccData, err := os.ReadFile(GlobalSettings.SpatialControllerConfig)
+
+	if err != nil {
+		rootLogger.Panic("failed to read spatial controller config", zap.Error(err), zap.String("path", GlobalSettings.SpatialControllerConfig))
+	}
+
+	// Unmarshal the spatial controller config to a map[string]string
+	var sccMap map[string]json.RawMessage
+	if err := json.Unmarshal(sccData, &sccMap); err != nil {
+		rootLogger.Panic("failed to unmarshall spatial controller config", zap.Error(err), zap.String("path", GlobalSettings.SpatialControllerConfig))
+	}
+	// Unmarshal the spatial controller type to a string
+	// spatialControllerType := strings.Trim(string(sccMap["SpatialControllerType"]), "\"\\")
+
+	config, exists := sccMap["Config"]
+	if !exists {
+		rootLogger.Panic("'Config' does not exist in json", zap.String("spatialControllerConfig", GlobalSettings.SpatialControllerConfig))
+	}
+	// TODO instance of spatialController should be created from the SpatialControllerConfig.SpatialControllerType
+	// current implementation only supports StaticGrid2DSpatialController
+	ctl := &StaticGrid2DSpatialController{}
+	ctl.LoadConfig(config)
+	spatialController = ctl
+	rootLogger.Verbose("created spatial controller",
+		zap.String("configPath", GlobalSettings.SpatialControllerConfig),
+		// zap.String("spatialControllerType", spatialControllerType),
+	)
 }
 
 func GetSpatialController() SpatialController {
@@ -85,6 +115,26 @@ type StaticGrid2DSpatialController struct {
 
 	//serverIndex       uint32
 	serverConnections []ConnectionInChannel
+}
+
+func (ctl *StaticGrid2DSpatialController) LoadConfig(config []byte) error {
+	err := json.Unmarshal(config, ctl)
+	if err != nil {
+		return err
+	}
+	if ctl.GridWidth <= 0 || ctl.GridHeight <= 0 {
+		return errors.New("GridWidth and GridHeight should be positive")
+	}
+	if ctl.GridCols <= 0 || ctl.GridRows <= 0 {
+		return errors.New("GridCols and GridRows should be positive")
+	}
+	if ctl.ServerCols <= 0 || ctl.ServerRows <= 0 {
+		return errors.New("ServerCols and ServerRows should be positive")
+	}
+	if ctl.ServerInterestBorderSize <= 0 {
+		return errors.New("ServerInterestBorderSize should be positive")
+	}
+	return nil
 }
 
 func (ctl *StaticGrid2DSpatialController) GetChannelId(info common.SpatialInfo) (common.ChannelId, error) {

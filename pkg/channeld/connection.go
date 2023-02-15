@@ -3,7 +3,6 @@ package channeld
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -774,7 +773,7 @@ func (c *Connection) persistReplaySession() {
 	}
 
 	path := filepath.Join(dir, fmt.Sprintf("session_%d_%s.cpr", c.id, time.Now().Local().Format("06-01-02_15-04-03")))
-	err = ioutil.WriteFile(path, data, 0777)
+	err = os.WriteFile(path, data, 0777)
 	if err != nil {
 		c.Logger().Error("failed to write replay session to location", zap.Error(err))
 	}

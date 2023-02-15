@@ -1,0 +1,14 @@
+{
+    "SpatialControllerType": "Static2DSpatialController",
+    "Config": {
+        "WorldOffsetX": -2000,
+        "WorldOffsetZ": -500,
+        "GridWidth": 1000,
+        "GridHeight": 1000,
+        "GridCols": 4,
+        "GridRows": 1,
+        "ServerCols": 2,
+        "ServerRows": 1,
+        "ServerInterestBorderSize": 1
+    }
+}
