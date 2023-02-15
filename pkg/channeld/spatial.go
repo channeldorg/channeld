@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"channeld.clewcat.com/channeld/pkg/common"
@@ -36,14 +37,33 @@ type SpatialController interface {
 var spatialController SpatialController
 
 func InitSpatialController() {
+	sccData, err := os.ReadFile(GlobalSettings.SpatialControllerConfig)
+
+	if err != nil {
+		rootLogger.Panic("failed to read spatial controller config", zap.Error(err), zap.String("path", GlobalSettings.SpatialControllerConfig))
+	}
+
+	// Unmarshal the spatial controller config to a map[string]string
+	var sccMap map[string]json.RawMessage
+	if err := json.Unmarshal(sccData, &sccMap); err != nil {
+		rootLogger.Panic("failed to unmarshall spatial controller config", zap.Error(err), zap.String("path", GlobalSettings.SpatialControllerConfig))
+	}
+	// Unmarshal the spatial controller type to a string
+	// spatialControllerType := strings.Trim(string(sccMap["SpatialControllerType"]), "\"\\")
+
+	config, exists := sccMap["Config"]
+	if !exists {
+		rootLogger.Panic("'Config' does not exist in json", zap.String("spatialControllerConfig", GlobalSettings.SpatialControllerConfig))
+	}
 	// TODO instance of spatialController should be created from the SpatialControllerConfig.SpatialControllerType
 	// current implementation only supports StaticGrid2DSpatialController
-	spatialController = &StaticGrid2DSpatialController{}
+	ctl := &StaticGrid2DSpatialController{}
+	ctl.LoadConfig(config)
+	spatialController = ctl
 	rootLogger.Verbose("created spatial controller",
-		zap.String("configPath", GlobalSettings.SpatialControllerConfig.ConfigPath),
-		zap.String("spatialControllerType", GlobalSettings.SpatialControllerConfig.SpatialControllerType),
+		zap.String("configPath", GlobalSettings.SpatialControllerConfig),
+		// zap.String("spatialControllerType", spatialControllerType),
 	)
-	spatialController.LoadConfig(GlobalSettings.SpatialControllerConfig.Config)
 }
 
 func GetSpatialController() SpatialController {
