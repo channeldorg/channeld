@@ -41,7 +41,8 @@ type GlobalSettingsType struct {
 	MaxFailedAuthAttempts   int
 	MaxFsmDisallowed        int
 
-	SpatialChannelIdStart common.ChannelId
+	SpatialControllerConfig SpatialControllerConfigType
+	SpatialChannelIdStart   common.ChannelId
 
 	ChannelSettings map[channeldpb.ChannelType]ChannelSettingsType
 
@@ -54,6 +55,12 @@ type ACLSettingsType struct {
 	Sub    ChannelAccessLevel
 	Unsub  ChannelAccessLevel
 	Remove ChannelAccessLevel
+}
+
+type SpatialControllerConfigType struct {
+	ConfigPath            string
+	SpatialControllerType string
+	Config                json.RawMessage
 }
 
 type ChannelSettingsType struct {
@@ -164,6 +171,7 @@ func (s *GlobalSettingsType) ParseFlag() error {
 	// Use flag.Uint instead of flag.UintVar to avoid the default value being overwritten by the flag value
 	ct := flag.Uint("ct", 0, "the compression type, 0 = No, 1 = Snappy")
 	scs := flag.Uint("scs", uint(s.SpatialChannelIdStart), "start ChannelId of spatial channels. Default is 65535.")
+	scc := flag.String("scc", "config/spatial_static_2d_2x2.json", "the path to the spatial controller config file")
 	mcb := flag.Uint("mcb", uint(s.MaxConnectionIdBits), "max bits of ConnectionId (e.g. 16 means max ConnectionId = 1<<16 - 1). Up to 32.")
 	cat := flag.Uint("cat", uint(s.ConnectionAuthTimeoutMs), "the duration to allow a connection stay unauthenticated before closing it. Default is 5000. (0 = no limit)")
 	mfaa := flag.Int("mfaa", s.MaxFailedAuthAttempts, "the max number of failed authentication attempts before closing the connection. Default is 5. (0 = no limit)")
@@ -179,6 +187,21 @@ func (s *GlobalSettingsType) ParseFlag() error {
 
 	if scs != nil {
 		s.SpatialChannelIdStart = common.ChannelId(*scs)
+	}
+
+	s.SpatialControllerConfig.ConfigPath = *scc
+	sccData, err := ioutil.ReadFile(*scc)
+	var sccMap map[string]json.RawMessage
+	if err == nil {
+		// Unmarshal the spatial controller config to a map[string]string
+		if err := json.Unmarshal(sccData, &sccMap); err != nil {
+			return fmt.Errorf("failed to unmarshall spatial controller config: %v", err)
+		}
+		// Unmarshal the spatial controller type to a string
+		s.SpatialControllerConfig.SpatialControllerType = strings.Trim(string(sccMap["SpatialControllerType"]), "\"\\")
+		s.SpatialControllerConfig.Config = sccMap["Config"]
+	} else {
+		return fmt.Errorf("failed to read spatial controller config: %v", err)
 	}
 
 	if mcb != nil {
