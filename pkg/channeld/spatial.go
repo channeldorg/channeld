@@ -127,12 +127,17 @@ func (ctl *StaticGrid2DSpatialController) QueryChannelIds(query *channeldpb.Spat
 	result := make(map[common.ChannelId]uint)
 
 	if query.SpotsAOI != nil {
-		for _, spot := range query.SpotsAOI.Spots {
+		for i, spot := range query.SpotsAOI.Spots {
 			chId, err := ctl.GetChannelId(common.SpatialInfo{X: spot.X, Y: spot.Y, Z: spot.Z})
 			if err != nil {
 				continue
 			}
-			result[chId] = uint(math.Ceil(query.SpotsAOI.Center.Dist2D(spot) / ctl.GridSize()))
+			if i < len(query.SpotsAOI.Dists) {
+				result[chId] = uint(query.SpotsAOI.Dists[i])
+			} else {
+				// If distance is not specified, the spot will be considered as always at the nearest distance.
+				result[chId] = 0
+			}
 		}
 	}
 

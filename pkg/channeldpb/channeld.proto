@@ -371,8 +371,9 @@ message SpatialRegionsUpdateMessage {
 message SpatialInterestQuery {
 
     message SpotsAOI {
-        SpatialInfo center = 1;
-        repeated SpatialInfo spots = 2;
+        repeated SpatialInfo spots = 1;
+        // The fixed distance between each spot and the player. If not specified, 0 = nearest will be used.
+        repeated uint32 dists = 2;
     }
     optional SpotsAOI spotsAOI = 1;
 
