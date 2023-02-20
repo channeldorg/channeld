@@ -71,3 +71,14 @@ func HashString(s string) uint32 {
 func Pointer[K any](val K) *K {
 	return &val
 }
+
+// Returns a map of all the keys in thisMap that are not in otherMap
+func Difference[K comparable, V any](thisMap map[K]V, otherMap map[K]V) map[K]V {
+	result := make(map[K]V)
+	for k, v := range thisMap {
+		if _, exists := otherMap[k]; !exists {
+			result[k] = v
+		}
+	}
+	return result
+}

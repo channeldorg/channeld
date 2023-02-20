@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"math"
 
 	"google.golang.org/protobuf/proto"
 )
@@ -32,4 +33,27 @@ type SpatialInfoChangedNotifier interface {
 
 func (s *SpatialInfo) String() string {
 	return fmt.Sprintf("(%.4f, %.4f, %.4f)", s.X, s.Y, s.Z)
+}
+
+func (info1 *SpatialInfo) Dist2D(info2 *SpatialInfo) float64 {
+	return math.Sqrt((info1.X-info2.X)*(info1.X-info2.X) + (info1.Z-info2.Z)*(info1.Z-info2.Z))
+}
+
+func (info1 *SpatialInfo) Dot2D(info2 *SpatialInfo) float64 {
+	return info1.X*info2.X + info1.Z*info2.Z
+}
+
+func (info1 *SpatialInfo) Magnitude2D() float64 {
+	return math.Sqrt(info1.X*info1.X + info1.Z*info1.Z)
+}
+
+func (info *SpatialInfo) Normalize2D() {
+	mag := info.Magnitude2D()
+	info.X /= mag
+	info.Z /= mag
+}
+
+func (info *SpatialInfo) Unit2D() SpatialInfo {
+	mag := info.Magnitude2D()
+	return SpatialInfo{X: info.X / mag, Y: info.Y, Z: info.Z / mag}
 }

@@ -283,6 +283,11 @@ func (ch *Channel) tickMessages(tickStart time.Time) {
 }
 
 func (ch *Channel) tickConnections() {
+	defer func() {
+		ch.connectionsLock.RUnlock()
+	}()
+	ch.connectionsLock.RLock()
+
 	for conn := range ch.subscribedConnections {
 		if conn.IsClosing() {
 			// Unsub the connection from the channel

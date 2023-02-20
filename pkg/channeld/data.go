@@ -124,7 +124,7 @@ func (ch *Channel) tickData(t ChannelTime) {
 
 	focp := ch.fanOutQueue.Front()
 
-	for foci := 0; foci < ch.fanOutQueue.Len(); foci++ {
+	for foci := 0; foci < ch.fanOutQueue.Len() && focp != nil; foci++ {
 		foc := focp.Value.(*fanOutConnection)
 		conn := foc.conn
 		if conn == nil || conn.IsClosing() {

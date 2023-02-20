@@ -22,9 +22,11 @@ type SpatialController interface {
 	common.SpatialInfoChangedNotifier
 	// Called in GLOBAL and spatial channels
 	GetChannelId(info common.SpatialInfo) (common.ChannelId, error)
+	// Called in the spatials channel
+	QueryChannelIds(query *channeldpb.SpatialInterestQuery) (map[common.ChannelId]uint, error)
 	// Called in GLOBAL channel
 	GetRegions() ([]*channeldpb.SpatialRegion, error)
-	// Called in any spatial channel
+	// Called in the spatials channel
 	GetAdjacentChannels(spatialChannelId common.ChannelId) ([]common.ChannelId, error)
 	// Create spatial channels for a spatial server.
 	// Called in GLOBAL channel
@@ -92,10 +94,7 @@ type StaticGrid2DSpatialController struct {
 	// How many grids the world has in Z axis. The height of the world = GridHeight x GridRows.
 	GridRows uint32
 
-	// WorldWidth  float64
-	// WorldHeight float64
-
-	// In the right-handed coordinate system, the difference between the world origin and the top-right corner of the first grid, in the simulation/engine units.
+	// In the left-handed coordinate system, the difference between the world origin and the top-right corner of the first grid, in the simulation/engine units.
 	// This is how we uses the offset value to calculate which grid a (x,z) point is in: gridX = Floor((x - OffsetX) / GridWidth), gridY = Floor((y - OffsetY) / GridHeight)
 	// If the world origin is exactly in the middle of the world, the offset should be (-WorldWidth*0.5, -WorldHeight*0.5).
 	WorldOffsetX float64
@@ -115,6 +114,23 @@ type StaticGrid2DSpatialController struct {
 
 	//serverIndex       uint32
 	serverConnections []ConnectionInChannel
+
+	gridSize float64
+}
+
+func (ctl *StaticGrid2DSpatialController) WorldWidth() float64 {
+	return ctl.GridWidth * float64(ctl.GridCols)
+}
+
+func (ctl *StaticGrid2DSpatialController) WorldHeight() float64 {
+	return ctl.GridHeight * float64(ctl.GridRows)
+}
+
+func (ctl *StaticGrid2DSpatialController) GridSize() float64 {
+	if ctl.gridSize == 0 && ctl.GridWidth > 0 && ctl.GridHeight > 0 {
+		ctl.gridSize = math.Sqrt(ctl.GridWidth*ctl.GridWidth + ctl.GridHeight*ctl.GridHeight)
+	}
+	return ctl.gridSize
 }
 
 func (ctl *StaticGrid2DSpatialController) LoadConfig(config []byte) error {
@@ -156,6 +172,143 @@ func (ctl *StaticGrid2DSpatialController) GetChannelIdWithOffset(info common.Spa
 	}
 	index := uint32(gridX) + uint32(gridY)*ctl.GridCols
 	return common.ChannelId(index) + GlobalSettings.SpatialChannelIdStart, nil
+}
+
+func (ctl *StaticGrid2DSpatialController) QueryChannelIds(query *channeldpb.SpatialInterestQuery) (map[common.ChannelId]uint, error) {
+	if query == nil {
+		return nil, fmt.Errorf("query is nil")
+	}
+
+	result := make(map[common.ChannelId]uint)
+
+	if query.SpotsAOI != nil {
+		for i, spot := range query.SpotsAOI.Spots {
+			chId, err := ctl.GetChannelId(common.SpatialInfo{X: spot.X, Y: spot.Y, Z: spot.Z})
+			if err != nil {
+				continue
+			}
+			if i < len(query.SpotsAOI.Dists) {
+				result[chId] = uint(query.SpotsAOI.Dists[i])
+			} else {
+				// If distance is not specified, the spot will be considered as always at the nearest distance.
+				result[chId] = 0
+			}
+		}
+	}
+
+	if query.BoxAOI != nil {
+		center := &common.SpatialInfo{X: query.BoxAOI.Center.X, Y: 0, Z: query.BoxAOI.Center.Z}
+
+		stepZ := math.Min(query.BoxAOI.Extent.Z, ctl.GridHeight) * 0.5
+		if stepZ <= 0 {
+			return nil, fmt.Errorf("invalid box extentZ=%f, gridHeight=%f", query.BoxAOI.Extent.Z, ctl.GridHeight)
+		}
+
+		stepX := math.Min(query.BoxAOI.Extent.X, ctl.GridWidth) * 0.5
+		if stepX <= 0 {
+			return nil, fmt.Errorf("invalid box extendX=%f, gridWidth=%f", query.BoxAOI.Extent.X, ctl.GridWidth)
+		}
+
+		for z := center.Z - query.BoxAOI.Extent.Z; z <= center.Z+query.BoxAOI.Extent.Z; z += stepZ {
+			for x := center.X - query.BoxAOI.Extent.X; x <= center.X+query.BoxAOI.Extent.X; x += stepX {
+				spot := common.SpatialInfo{X: x, Y: 0, Z: z}
+				chId, err := ctl.GetChannelId(spot)
+				if err != nil {
+					continue
+				}
+				result[chId] = uint(math.Ceil(center.Dist2D(&spot) / ctl.GridSize()))
+			}
+		}
+
+		centerChId, err := ctl.GetChannelId(*center)
+		if err != nil {
+			return nil, err
+		}
+		result[centerChId] = 0
+	}
+
+	if query.SphereAOI != nil {
+		r := query.SphereAOI.Radius
+		center := &common.SpatialInfo{X: query.SphereAOI.Center.X, Y: 0, Z: query.SphereAOI.Center.Z}
+
+		stepZ := math.Min(r, ctl.GridHeight) * 0.5
+		if stepZ <= 0 {
+			return nil, fmt.Errorf("invalid radius=%f, gridHeight=%f", r, ctl.GridHeight)
+		}
+
+		stepX := math.Min(r, ctl.GridWidth) * 0.5
+		if stepX <= 0 {
+			return nil, fmt.Errorf("invalid radius=%f, gridWidth=%f", r, ctl.GridWidth)
+		}
+
+		for z := center.Z - r; z <= center.Z+r; z += stepZ {
+			for x := center.X - r; x <= center.X+r; x += stepX {
+				if (x-center.X)*(x-center.X)+(z-center.Z)*(z-center.Z) > r*r {
+					continue
+				}
+				spot := common.SpatialInfo{X: x, Y: 0, Z: z}
+				chId, err := ctl.GetChannelId(spot)
+				if err != nil {
+					continue
+				}
+				result[chId] = uint(math.Ceil(center.Dist2D(&spot) / ctl.GridSize()))
+			}
+		}
+
+		centerChId, err := ctl.GetChannelId(*center)
+		if err != nil {
+			return nil, err
+		}
+		result[centerChId] = 0
+	}
+
+	if query.ConeAOI != nil {
+		r := query.ConeAOI.Radius
+		center := &common.SpatialInfo{X: query.ConeAOI.Center.X, Y: 0, Z: query.ConeAOI.Center.Z}
+		coneDir := &common.SpatialInfo{X: query.ConeAOI.Direction.X, Y: 0, Z: query.ConeAOI.Direction.Z}
+		coneDir.Normalize2D()
+
+		stepZ := math.Min(r, ctl.GridHeight) * 0.5
+		if stepZ <= 0 {
+			return nil, fmt.Errorf("invalid radius=%f, gridHeight=%f", r, ctl.GridHeight)
+		}
+
+		stepX := math.Min(r, ctl.GridWidth) * 0.5
+		if stepX <= 0 {
+			return nil, fmt.Errorf("invalid radius=%f, gridWidth=%f", r, ctl.GridWidth)
+		}
+
+		for z := math.Max(ctl.WorldOffsetZ, center.Z-r); z <= math.Min(ctl.WorldOffsetZ+ctl.WorldHeight(), center.Z+r); z += stepZ {
+			for x := math.Max(ctl.WorldOffsetX, center.X-r); x <= math.Min(ctl.WorldOffsetX+ctl.WorldWidth(), center.X+r); x += stepX {
+				if (x-center.X)*(x-center.X)+(z-center.Z)*(z-center.Z) > r*r {
+					continue
+				}
+				spot := common.SpatialInfo{X: x, Y: 0, Z: z}
+				dir := common.SpatialInfo{X: spot.X - center.X, Y: 0, Z: spot.Z - center.Z}
+				dir.Normalize2D()
+				dot := dir.Dot2D(coneDir)
+				cos := math.Cos(query.ConeAOI.Angle) // * 0.5)
+				const epsilon = 0.0                  //0.001
+				if dot < cos-epsilon {
+					continue
+				}
+
+				chId, err := ctl.GetChannelId(spot)
+				if err != nil {
+					continue
+				}
+				result[chId] = uint(math.Ceil(center.Dist2D(&spot) / ctl.GridSize()))
+			}
+		}
+
+		centerChId, err := ctl.GetChannelId(*center)
+		if err != nil {
+			return nil, err
+		}
+		result[centerChId] = 0
+	}
+
+	return result, nil
 }
 
 func (ctl *StaticGrid2DSpatialController) GetRegions() ([]*channeldpb.SpatialRegion, error) {

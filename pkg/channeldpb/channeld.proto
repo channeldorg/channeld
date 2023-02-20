@@ -42,30 +42,30 @@ Server          | forward to owner | broadcast (same for ALL_BUT_XXXX) | forward
 // Can be used as the Flags-style enum in C#. See https://groups.google.com/g/protobuf/c/L105Q4NIk0U?pli=1.
 enum BroadcastType {
     // No broadcast. All internal messages should use this type, and other types are ignored.
-    NO_BROADCAST = 0x00;
+    NO_BROADCAST = 0;
 
     // Forward the message to the connection. Can only be used by the backend server.
     // This has the same behavior as sending the message to the PRIVATE channel owned by the target connection with BroadcastType = NO.
-    SINGLE_CONNECTION = 0x01; 
+    SINGLE_CONNECTION = 1; 
 
     // Broadcast the message to all the connections in the channel, the sender included.
-    ALL = 0x02;
+    ALL = 2;
 
     // Broadcast the message to all the connections in the channel, the sender excluded.
-    ALL_BUT_SENDER = 0x04;
+    ALL_BUT_SENDER = 4;
 
     // Broadcast the message to all the connections in the channel, the owner excluded.
-    ALL_BUT_OWNER = 0x06;
+    ALL_BUT_OWNER = 8;
 
     // Broadcast the message to all client connections in the channel.
-    ALL_BUT_CLIENT = 0x08;
+    ALL_BUT_CLIENT = 16;
 
     // Broadcast the message to all server connections in the channel, the owner excluded.
-    ALL_BUT_SERVER = 0x10;
+    ALL_BUT_SERVER = 32;
 
     // Broadcast the message to all the connections in all the adjacent(3x3) spatial channels. Ignored if the target channel is not a spatial channel.
     // To ignore the center spatial channel, use ADJACENT_CHANNELS | ALL_BUT_OWNER; to ignore the sender(spatial server), use ADJACENT_CHANNELS | ALL_BUT_SENDER.
-    ADJACENT_CHANNELS = 0x20;
+    ADJACENT_CHANNELS = 64;
 }
 
 enum ConnectionType {
@@ -131,6 +131,9 @@ enum MessageType {
 
     // Used by @SpatialRegionsUpdateMessage
     SPATIAL_REGIONS_UPDATE = 13;
+
+    // Used by @UpdateSpatialInterestMessage
+    UPDATE_SPATIAL_INTEREST = 14;
     
     // Used by @DebugGetSpatialRegionsMessage
     DEBUG_GET_SPATIAL_REGIONS = 99;
@@ -316,6 +319,7 @@ message DisconnectMessage {
 
 // ----------------- SPATIAL messages start --------------------//
 
+// Left-handed coordinate system with Y-up rule.
 message SpatialInfo {
     double x = 1;
     double y = 2;
@@ -363,6 +367,43 @@ message SpatialRegion {
 // Sent upon the creation of spatial channels (after @CreateSpatialChannelsResultMessage being sent), or any regional change (basiclally caused by the loadbalancer).
 message SpatialRegionsUpdateMessage {
     repeated SpatialRegion regions = 1;
+}
+
+message SpatialInterestQuery {
+
+    message SpotsAOI {
+        repeated SpatialInfo spots = 1;
+        // The fixed distance between each spot and the player. If not specified, 0 = nearest will be used.
+        repeated uint32 dists = 2;
+    }
+    optional SpotsAOI spotsAOI = 1;
+
+    message BoxAOI {
+        SpatialInfo center = 1;
+        SpatialInfo extent = 2;
+    }
+    optional BoxAOI boxAOI = 2;
+
+    message SphereAOI {
+        SpatialInfo center = 1;
+        double radius = 2;
+    }
+    optional SphereAOI sphereAOI = 3;
+
+    message ConeAOI {
+        SpatialInfo center = 1;
+        SpatialInfo direction = 2;
+        // In radians.
+        double angle = 3;
+        double radius = 4;
+    }
+    optional ConeAOI coneAOI = 4;
+
+}
+
+message UpdateSpatialInterestMessage {
+    uint32 connId = 1;
+    SpatialInterestQuery query = 2;
 }
 
 // ------------------ DEBUG messages start ---------------------//

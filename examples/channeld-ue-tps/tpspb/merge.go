@@ -360,28 +360,6 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 		proto.Merge(dst.TestGameState, srcData.TestGameState)
 	}
 
-	for netId, newActorState := range srcData.ActorStates {
-		// Remove the states from the maps
-		if newActorState.Removed {
-			delete(dst.ActorStates, netId)
-			delete(dst.PawnStates, netId)
-			delete(dst.CharacterStates, netId)
-			delete(dst.PlayerStates, netId)
-			delete(dst.ControllerStates, netId)
-			delete(dst.PlayerControllerStates, netId)
-			delete(dst.TestRepPlayerControllerStates, netId)
-			delete(dst.TestNPCStates, netId)
-			continue
-		} else {
-			oldActorState, exists := dst.ActorStates[netId]
-			if exists {
-				proto.Merge(oldActorState, newActorState)
-			} else {
-				dst.ActorStates[netId] = newActorState
-			}
-		}
-	}
-
 	for netId, newPawnState := range srcData.PawnStates {
 		oldPawnState, exists := dst.PawnStates[netId]
 		if exists {
@@ -445,6 +423,16 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 		}
 	}
 
+	for netId, newSceneCompState := range srcData.SceneComponentStates {
+		oldSceneCompState, exists := dst.SceneComponentStates[netId]
+		if exists {
+			proto.Merge(oldSceneCompState, newSceneCompState)
+		} else {
+			dst.SceneComponentStates[netId] = newSceneCompState
+		}
+	}
+
+	// Remove the states at last, in case any new state is added to the dst states in the loop above.
 	for netId, newActorCompState := range srcData.ActorComponentStates {
 		if newActorCompState.Removed {
 			delete(dst.ActorComponentStates, netId)
@@ -459,12 +447,27 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 		}
 	}
 
-	for netId, newSceneCompState := range srcData.SceneComponentStates {
-		oldSceneCompState, exists := dst.SceneComponentStates[netId]
-		if exists {
-			proto.Merge(oldSceneCompState, newSceneCompState)
+	// Remove the states at last, in case any new state is added to the dst states in the loop above.
+	for netId, newActorState := range srcData.ActorStates {
+		// Remove the states from the maps
+		if newActorState.Removed {
+			delete(dst.ActorStates, netId)
+			delete(dst.PawnStates, netId)
+			delete(dst.CharacterStates, netId)
+			delete(dst.PlayerStates, netId)
+			delete(dst.ControllerStates, netId)
+			delete(dst.PlayerControllerStates, netId)
+			delete(dst.TestRepPlayerControllerStates, netId)
+			delete(dst.TestNPCStates, netId)
+			channeld.RootLogger().Debug("removed actor state", zap.Uint32("netId", netId))
+			continue
 		} else {
-			dst.SceneComponentStates[netId] = newSceneCompState
+			oldActorState, exists := dst.ActorStates[netId]
+			if exists {
+				proto.Merge(oldActorState, newActorState)
+			} else {
+				dst.ActorStates[netId] = newActorState
+			}
 		}
 	}
 

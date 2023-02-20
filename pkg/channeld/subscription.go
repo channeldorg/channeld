@@ -68,6 +68,11 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.Channel
 		ch.data.maxFanOutIntervalMs = *cs.options.FanOutIntervalMs
 	}
 	ch.subscribedConnections[c] = cs
+
+	if ch.channelType == channeldpb.ChannelType_SPATIAL {
+		c.spatialSubscriptions.Store(ch.id, &cs.options)
+	}
+
 	ch.Logger().Debug("subscribed connection",
 		zap.Uint32("connId", uint32(c.Id())),
 		zap.String("dataAccess", channeldpb.ChannelDataAccess_name[int32(*cs.options.DataAccess)]),
@@ -87,10 +92,16 @@ func (c *Connection) UnsubscribeFromChannel(ch *Channel) (*channeldpb.ChannelSub
 	cs, exists := ch.subscribedConnections[c]
 	if !exists {
 		return nil, errors.New("subscription does not exist")
-	} else {
-		ch.fanOutQueue.Remove(cs.fanOutElement)
-		delete(ch.subscribedConnections, c)
 	}
+
+	ch.fanOutQueue.Remove(cs.fanOutElement)
+
+	delete(ch.subscribedConnections, c)
+
+	if ch.channelType == channeldpb.ChannelType_SPATIAL {
+		c.spatialSubscriptions.Delete(ch.id)
+	}
+
 	ch.Logger().Debug("unsubscribed connection", zap.Uint32("connId", uint32(c.Id())))
 	return &cs.options, nil
 }

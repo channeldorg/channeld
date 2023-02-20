@@ -51,6 +51,7 @@ var MessageMap = map[channeldpb.MessageType]*messageMapEntry{
 	channeldpb.MessageType_CREATE_SPATIAL_CHANNEL:    {&channeldpb.CreateChannelMessage{}, handleCreateChannel},
 	channeldpb.MessageType_QUERY_SPATIAL_CHANNEL:     {&channeldpb.QuerySpatialChannelMessage{}, handleQuerySpatialChannel},
 	channeldpb.MessageType_DEBUG_GET_SPATIAL_REGIONS: {&channeldpb.DebugGetSpatialRegionsMessage{}, handleGetSpatialRegionsMessage},
+	channeldpb.MessageType_UPDATE_SPATIAL_INTEREST:   {&channeldpb.UpdateSpatialInterestMessage{}, handleUpdateSpatialInterest},
 }
 
 func RegisterMessageHandler(msgType uint32, msg common.Message, handler MessageHandlerFunc) {
@@ -560,7 +561,7 @@ func handleSubToChannel(ctx MessageContext) {
 
 	hasAccess, err := ctx.Channel.CheckACL(ctx.Connection, ChannelAccessType_Sub)
 	if connToSub.Id() != ctx.Connection.Id() && !hasAccess {
-		ctx.Connection.Logger().Error("connection doesn't have access to sub connection to this channel",
+		ctx.Connection.Logger().Warn("connection doesn't have access to sub connection to this channel",
 			zap.Uint32("subConnId", msg.ConnId),
 			zap.String("channelType", ctx.Channel.channelType.String()),
 			zap.Uint32("channelId", uint32(ctx.Channel.id)),
@@ -571,7 +572,7 @@ func handleSubToChannel(ctx MessageContext) {
 
 	cs, exists := ctx.Channel.subscribedConnections[connToSub]
 	if exists {
-		ctx.Connection.Logger().Info("already subscribed to channel, the subscription options will be merged",
+		ctx.Connection.Logger().Debug("already subscribed to channel, the subscription options will be merged",
 			zap.String("channelType", ctx.Channel.channelType.String()),
 			zap.Uint32("channelId", uint32(ctx.Channel.id)),
 		)

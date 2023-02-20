@@ -1,0 +1,10 @@
+go 1.18
+
+use (
+	./examples/channeld-ue-chat
+	./examples/channeld-ue-tps
+	./examples/chat-rooms
+    ./examples/replay
+    ./examples/sim-clients
+    ./examples/unity-mirror-tanks
+)

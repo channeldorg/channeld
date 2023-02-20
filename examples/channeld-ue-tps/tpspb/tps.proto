@@ -34,6 +34,13 @@ message TestRepChannelData {
     map<uint32, TestNPCState> testNPCStates = 12;
 }
 
+/* No need to create a new ChannelData that contains the subset of fields of TestRepChannelData.
+   Otherwise we need to implement a merge() function in channeld and a ReplicationComponent in UE for every new type of ChannelData.
 message GlobalChannelData {
     unrealpb.GameStateBase gameState = 1;
+}
+*/
+
+message TestRepGameState_MulticastNumber_Params {
+    optional int32 num = 1;
 }
