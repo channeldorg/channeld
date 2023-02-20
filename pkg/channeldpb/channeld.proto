@@ -319,6 +319,7 @@ message DisconnectMessage {
 
 // ----------------- SPATIAL messages start --------------------//
 
+// Left-handed coordinate system with Y-up rule.
 message SpatialInfo {
     double x = 1;
     double y = 2;
@@ -392,6 +393,7 @@ message SpatialInterestQuery {
     message ConeAOI {
         SpatialInfo center = 1;
         SpatialInfo direction = 2;
+        // In radians.
         double angle = 3;
         double radius = 4;
     }

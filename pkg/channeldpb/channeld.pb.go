@@ -1620,6 +1620,7 @@ func (x *DisconnectMessage) GetConnId() uint32 {
 	return 0
 }
 
+// Left-handed coordinate system with Y-up rule.
 type SpatialInfo struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -2273,7 +2274,8 @@ type SpatialInterestQuery_SpotsAOI struct {
 	unknownFields protoimpl.UnknownFields
 
 	Spots []*SpatialInfo `protobuf:"bytes,1,rep,name=spots,proto3" json:"spots,omitempty"`
-	Dists []uint32       `protobuf:"varint,2,rep,packed,name=dists,proto3" json:"dists,omitempty"`
+	// The fixed distance between each spot and the player. If not specified, 0 = nearest will be used.
+	Dists []uint32 `protobuf:"varint,2,rep,packed,name=dists,proto3" json:"dists,omitempty"`
 }
 
 func (x *SpatialInterestQuery_SpotsAOI) Reset() {
@@ -2439,8 +2441,9 @@ type SpatialInterestQuery_ConeAOI struct {
 
 	Center    *SpatialInfo `protobuf:"bytes,1,opt,name=center,proto3" json:"center,omitempty"`
 	Direction *SpatialInfo `protobuf:"bytes,2,opt,name=direction,proto3" json:"direction,omitempty"`
-	Angle     float64      `protobuf:"fixed64,3,opt,name=angle,proto3" json:"angle,omitempty"`
-	Radius    float64      `protobuf:"fixed64,4,opt,name=radius,proto3" json:"radius,omitempty"`
+	// In radians.
+	Angle  float64 `protobuf:"fixed64,3,opt,name=angle,proto3" json:"angle,omitempty"`
+	Radius float64 `protobuf:"fixed64,4,opt,name=radius,proto3" json:"radius,omitempty"`
 }
 
 func (x *SpatialInterestQuery_ConeAOI) Reset() {

@@ -18,6 +18,229 @@ func TestUpdateSpatialInterest(t *testing.T) {
 
 }
 
+func TestConeAOI(t *testing.T) {
+	// 1-by-1-grid world
+	ctl1 := &StaticGrid2DSpatialController{
+		WorldOffsetX:             0,
+		WorldOffsetZ:             0,
+		GridWidth:                10,
+		GridHeight:               10,
+		GridCols:                 1,
+		GridRows:                 1,
+		ServerCols:               1,
+		ServerRows:               1,
+		ServerInterestBorderSize: 0,
+	}
+
+	query1 := &channeldpb.SpatialInterestQuery{
+		ConeAOI: &channeldpb.SpatialInterestQuery_ConeAOI{
+			Center: &channeldpb.SpatialInfo{
+				X: 5,
+				Z: 5,
+			},
+			Direction: &channeldpb.SpatialInfo{
+				X: 1,
+				Z: 0,
+			},
+			Radius: 1,
+			Angle:  math.Pi / 4,
+		},
+	}
+
+	result, err := ctl1.QueryChannelIds(query1)
+	assert.NoError(t, err)
+	assert.Contains(t, result, common.ChannelId(65536))
+
+	// 4-by-1-grid world
+	ctl2 := &StaticGrid2DSpatialController{
+		WorldOffsetX:             0,
+		WorldOffsetZ:             0,
+		GridWidth:                10,
+		GridHeight:               10,
+		GridCols:                 4,
+		GridRows:                 1,
+		ServerCols:               1,
+		ServerRows:               1,
+		ServerInterestBorderSize: 0,
+	}
+
+	query2 := &channeldpb.SpatialInterestQuery{
+		ConeAOI: &channeldpb.SpatialInterestQuery_ConeAOI{
+			Center: &channeldpb.SpatialInfo{
+				X: 0,
+				Z: 5,
+			},
+			Direction: &channeldpb.SpatialInfo{
+				X: 1,
+				Z: 0,
+			},
+			Radius: 1,
+			Angle:  math.Pi / 4,
+		},
+	}
+
+	result, err = ctl2.QueryChannelIds(query2)
+	assert.NoError(t, err)
+	assert.Contains(t, result, common.ChannelId(65536))
+
+	query2.ConeAOI.Radius = 25
+	result, err = ctl2.QueryChannelIds(query2)
+	assert.NoError(t, err)
+	assert.Len(t, result, 3)
+
+	query2.ConeAOI.Radius = 100
+	result, err = ctl2.QueryChannelIds(query2)
+	assert.NoError(t, err)
+	assert.Len(t, result, 4)
+
+	query2.ConeAOI.Direction = &channeldpb.SpatialInfo{
+		X: 0,
+		Z: 1,
+	}
+
+	result, err = ctl2.QueryChannelIds(query2)
+	assert.NoError(t, err)
+	assert.Len(t, result, 1)
+
+	/* 3-by-3-grid world
+	-------------------------
+	| 65542 | 65543 | 65544 |
+	-------------------------
+	| 65539 | 65540 | 65541 |
+	-------------------------
+	| 65536 | 65537 | 65538 |
+	-------------------------
+	*/
+	ctl3 := &StaticGrid2DSpatialController{
+		WorldOffsetX:             0,
+		WorldOffsetZ:             0,
+		GridWidth:                10,
+		GridHeight:               10,
+		GridCols:                 3,
+		GridRows:                 3,
+		ServerCols:               1,
+		ServerRows:               1,
+		ServerInterestBorderSize: 0,
+	}
+
+	query3 := &channeldpb.SpatialInterestQuery{
+		ConeAOI: &channeldpb.SpatialInterestQuery_ConeAOI{
+			Center: &channeldpb.SpatialInfo{
+				X: 5,
+				Z: 5,
+			},
+			Direction: &channeldpb.SpatialInfo{
+				X: 1,
+				Z: 0,
+			},
+			Radius: 100,
+			Angle:  0.1,
+		},
+	}
+
+	/*
+		-------------------------
+		|       |       |       |
+		-------------------------
+		|       |       |       |
+		-------------------------
+		| 65536 | 65537 | 65538 |
+		-------------------------
+	*/
+	result, err = ctl3.QueryChannelIds(query3)
+	assert.NoError(t, err)
+	assert.Len(t, result, 3)
+
+	/*
+		-------------------------
+		|       |       | 65544 |
+		-------------------------
+		|       | 65540 | 65541 |
+		-------------------------
+		| 65536 | 65537 | 65538 |
+		-------------------------
+	*/
+	query3.ConeAOI.Angle = math.Pi / 4
+	result, err = ctl3.QueryChannelIds(query3)
+	assert.NoError(t, err)
+	assert.Len(t, result, 6)
+
+	/*
+		-------------------------
+		| 65542 |       |       |
+		-------------------------
+		| 65539 | 65540 |       |
+		-------------------------
+		| 65536 |       |       |
+		-------------------------
+	*/
+	query3.ConeAOI.Center = &channeldpb.SpatialInfo{
+		X: 15,
+		Z: 15,
+	}
+	query3.ConeAOI.Direction = &channeldpb.SpatialInfo{
+		X: -1,
+		Z: 0,
+	}
+	result, err = ctl3.QueryChannelIds(query3)
+	assert.NoError(t, err)
+	assert.Len(t, result, 4)
+
+	/*
+		-------------------------
+		|       |       |       |
+		-------------------------
+		| 65539 |       |       |
+		-------------------------
+		| 65536 | 65537 |       |
+		-------------------------
+	*/
+	query3.ConeAOI.Center = &channeldpb.SpatialInfo{
+		X: 5,
+		Z: 15,
+	}
+	query3.ConeAOI.Direction = &channeldpb.SpatialInfo{
+		X: 0,
+		Z: -1,
+	}
+	result, err = ctl3.QueryChannelIds(query3)
+	assert.NoError(t, err)
+	assert.Len(t, result, 3)
+
+	// 4-by-1-grid world
+	ctl4 := &StaticGrid2DSpatialController{
+		WorldOffsetX:             -2000,
+		WorldOffsetZ:             -500,
+		GridWidth:                1000,
+		GridHeight:               1000,
+		GridCols:                 4,
+		GridRows:                 1,
+		ServerCols:               2,
+		ServerRows:               1,
+		ServerInterestBorderSize: 1,
+	}
+
+	query4 := &channeldpb.SpatialInterestQuery{
+		ConeAOI: &channeldpb.SpatialInterestQuery_ConeAOI{
+			Center: &channeldpb.SpatialInfo{
+				X: 1250,
+				Y: 118,
+			},
+			Direction: &channeldpb.SpatialInfo{
+				X: -0.087,
+				Z: 0.996,
+			},
+			Angle:  0.5236,
+			Radius: 30000,
+		},
+	}
+
+	result, err = ctl4.QueryChannelIds(query4)
+	assert.NoError(t, err)
+	assert.Len(t, result, 1)
+
+}
+
 func TestSphereAOI(t *testing.T) {
 	// 1-by-1-grid world
 	ctl1 := &StaticGrid2DSpatialController{
@@ -29,7 +252,7 @@ func TestSphereAOI(t *testing.T) {
 		GridRows:                 1,
 		ServerCols:               1,
 		ServerRows:               1,
-		ServerInterestBorderSize: 1,
+		ServerInterestBorderSize: 0,
 	}
 
 	query1 := &channeldpb.SpatialInterestQuery{
@@ -80,14 +303,14 @@ func TestSphereAOI(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, result, 4)
 
-	query2.SphereAOI.Center.X = 5
-	query2.SphereAOI.Center.Z = 5
+	query2.SphereAOI.Center.X = 4.9
+	query2.SphereAOI.Center.Z = 4.9
 	result, err = ctl2.QueryChannelIds(query2)
 	assert.NoError(t, err)
 	assert.Len(t, result, 1)
 	assert.Contains(t, result, common.ChannelId(65539))
 
-	query2.SphereAOI.Radius = 5
+	query2.SphereAOI.Radius = 4.9
 	result, err = ctl2.QueryChannelIds(query2)
 	assert.NoError(t, err)
 	// Should only contain 65539
@@ -96,8 +319,8 @@ func TestSphereAOI(t *testing.T) {
 	query2.SphereAOI.Radius = 10
 	result, err = ctl2.QueryChannelIds(query2)
 	assert.NoError(t, err)
-	// Should contain 65539, 65537, 65538
-	assert.Len(t, result, 3)
+	// Should contain 65536, 65537, 65538, 65539
+	assert.Len(t, result, 4)
 
 	// 3-by-3-grid world
 	ctl3 := &StaticGrid2DSpatialController{
@@ -147,7 +370,7 @@ func TestBoxAOI(t *testing.T) {
 		GridRows:                 1,
 		ServerCols:               1,
 		ServerRows:               1,
-		ServerInterestBorderSize: 1,
+		ServerInterestBorderSize: 0,
 	}
 
 	query1 := &channeldpb.SpatialInterestQuery{
@@ -207,15 +430,15 @@ func TestBoxAOI(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, result, 4)
 
-	query2.BoxAOI.Center.X = 5
-	query2.BoxAOI.Center.Z = 5
+	query2.BoxAOI.Center.X = 4.9
+	query2.BoxAOI.Center.Z = 4.9
 	result, err = ctl2.QueryChannelIds(query2)
 	assert.NoError(t, err)
 	assert.Len(t, result, 1)
 	assert.Contains(t, result, common.ChannelId(65539))
 
-	query2.BoxAOI.Extent.X = 5
-	query2.BoxAOI.Extent.Z = 5
+	query2.BoxAOI.Extent.X = 4.9
+	query2.BoxAOI.Extent.Z = 4.9
 	result, err = ctl2.QueryChannelIds(query2)
 	assert.NoError(t, err)
 	// Should only contain 65539

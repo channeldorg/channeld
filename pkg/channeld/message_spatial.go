@@ -57,7 +57,7 @@ func handleUpdateSpatialInterest(ctx MessageContext) {
 
 	spatialChIds, err := spatialController.QueryChannelIds(msg.Query)
 	if err != nil {
-		ctx.Connection.Logger().Error("error getting spatial channel ids", zap.Error(err))
+		ctx.Connection.Logger().Error("error querying spatial channel ids", zap.Error(err))
 		return
 	}
 
