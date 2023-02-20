@@ -44,7 +44,7 @@
         "mode": "debug",
         "cwd": "${workspaceFolder}",
         "program": "examples/unity-mirror-tanks/main.go",
-        "args": ["-cfsm=config/client_authoratative_fsm.json", "-dev", "-loglevel=-1", "-profile=cpu", "-ct=0"]
+        "args": ["-cfsm=config/client_authoratative_fsm.json", "-dev", "-loglevel=-1", "-profile=cpu", "-ct=0", "-scc=${workspaceFolder}/config/spatial_static_tanks_small.json"]
     },
     {
         "name": "Launch TPS server",

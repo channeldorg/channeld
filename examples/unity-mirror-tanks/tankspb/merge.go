@@ -5,7 +5,6 @@ import (
 
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"channeld.clewcat.com/channeld/pkg/common"
-	"google.golang.org/protobuf/proto"
 )
 
 // Implement [channeld.MergeableChannelData]
@@ -54,7 +53,7 @@ func (dst *TankGameChannelData) Merge(src common.ChannelDataMessage, options *ch
 							common.SpatialInfo{
 								X: float64(v.Position.X),
 								Z: float64(v.Position.Z)},
-							func() proto.Message {
+							func(srcChannelId common.ChannelId, dstChannelId common.ChannelId, handoverData chan common.Message) {
 								data := &TankGameChannelData{
 									TransformStates: map[uint32]*channeldpb.TransformState{
 										k: trans, //v,
@@ -66,7 +65,7 @@ func (dst *TankGameChannelData) Merge(src common.ChannelDataMessage, options *ch
 									data.TankStates[k] = tankState
 								}
 
-								return data
+								handoverData <- data
 							},
 						)
 					}

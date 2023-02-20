@@ -22,29 +22,7 @@ func main() {
 
 	channeld.RegisterChannelDataType(channeldpb.ChannelType_SUBWORLD, &tankspb.TankGameChannelData{})
 
-	channeld.InitSpatialController(&channeld.StaticGrid2DSpatialController{
-		// WorldOffsetX: -40,
-		// WorldOffsetZ: -40,
-		// GridWidth:    8,
-		// GridHeight:   8,
-		// GridCols:     10,
-		// GridRows:     10,
-
-		WorldOffsetX: -5,
-		WorldOffsetZ: -5,
-		GridWidth:    5,
-		GridHeight:   5,
-		GridCols:     2,
-		GridRows:     2,
-		ServerCols:   1,
-		ServerRows:   1,
-		// GridWidth:                10,
-		// GridHeight:               10,
-		// GridCols:                 1,
-		// GridRows:                 1,
-		// ServerCols:               1,
-		// ServerRows:               1,
-		ServerInterestBorderSize: 0})
+	channeld.InitSpatialController()
 
 	// Setup Prometheus
 	http.Handle("/metrics", promhttp.Handler())

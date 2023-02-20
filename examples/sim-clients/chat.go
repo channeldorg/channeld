@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"channeld.clewcat.com/channeld/examples/chat-rooms/chatpb"
+	"channeld.clewcat.com/channeld/pkg/channeld"
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"channeld.clewcat.com/channeld/pkg/client"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -82,9 +84,9 @@ var ChatClientActions = []*clientAction{
 				ChannelType: channeldpb.ChannelType_SUBWORLD,
 				Metadata:    fmt.Sprintf("Room%d", data.rnd.Uint32()),
 				SubOptions: &channeldpb.ChannelSubscriptionOptions{
-					DataAccess:       channeldpb.ChannelDataAccess_WRITE_ACCESS,
+					DataAccess:       channeld.Pointer(channeldpb.ChannelDataAccess_WRITE_ACCESS),
 					DataFieldMasks:   make([]string, 0),
-					FanOutIntervalMs: 100,
+					FanOutIntervalMs: proto.Uint32(100),
 				},
 			}, func(_ *client.ChanneldClient, channelId uint32, m client.Message) {
 				//log.Printf("Client(%d) created channel %d, data clientId: %d", client.Id, channelId, data.clientId)
@@ -133,8 +135,8 @@ var ChatClientActions = []*clientAction{
 				client.Send(channelIdToSub, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_SUB_TO_CHANNEL), &channeldpb.SubscribedToChannelMessage{
 					ConnId: client.Id,
 					SubOptions: &channeldpb.ChannelSubscriptionOptions{
-						DataAccess:       channeldpb.ChannelDataAccess_WRITE_ACCESS,
-						FanOutIntervalMs: 200,
+						DataAccess:       channeld.Pointer(channeldpb.ChannelDataAccess_WRITE_ACCESS),
+						FanOutIntervalMs: proto.Uint32(200),
 						DataFieldMasks:   []string{},
 					},
 				}, nil)

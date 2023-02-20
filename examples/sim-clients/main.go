@@ -7,8 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"channeld.clewcat.com/channeld/pkg/channeld"
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"channeld.clewcat.com/channeld/pkg/client"
+	"google.golang.org/protobuf/proto"
 )
 
 var ServerAddr string = "ws://localhost:12108" //"49.234.9.192:12108" //"ws://49.234.9.192:12108"
@@ -88,8 +90,8 @@ func runClient(clientActions []*clientAction, initFunc func(client *client.Chann
 				c.Send(0, channeldpb.BroadcastType_NO_BROADCAST, uint32(channeldpb.MessageType_SUB_TO_CHANNEL), &channeldpb.SubscribedToChannelMessage{
 					ConnId: resultMsg.ConnId,
 					SubOptions: &channeldpb.ChannelSubscriptionOptions{
-						DataAccess:       channeldpb.ChannelDataAccess_WRITE_ACCESS,
-						FanOutIntervalMs: 100,
+						DataAccess:       channeld.Pointer(channeldpb.ChannelDataAccess_WRITE_ACCESS),
+						FanOutIntervalMs: proto.Uint32(100),
 						DataFieldMasks:   []string{},
 					},
 				}, nil)
