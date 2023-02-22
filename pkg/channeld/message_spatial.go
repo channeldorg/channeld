@@ -95,7 +95,10 @@ func handleUpdateSpatialInterest(ctx MessageContext) {
 			ConnId: msg.ConnId,
 		}
 		ctx.Connection = clientConn
+		/* Make sure the unsub message is handled in the channel's goroutine
 		handleUnsubFromChannel(ctx)
+		*/
+		ctx.Channel.PutMessageContext(ctx, handleUnsubFromChannel)
 	}
 
 	for chId, subOptions := range channelsToSub {
@@ -108,6 +111,9 @@ func handleUpdateSpatialInterest(ctx MessageContext) {
 			SubOptions: subOptions,
 		}
 		ctx.Connection = clientConn
+		/* Make sure the sub message is handled in the channel's goroutine
 		handleSubToChannel(ctx)
+		*/
+		ctx.Channel.PutMessageContext(ctx, handleSubToChannel)
 	}
 }

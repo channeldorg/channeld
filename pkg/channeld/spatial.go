@@ -62,7 +62,7 @@ func InitSpatialController() {
 	ctl := &StaticGrid2DSpatialController{}
 	ctl.LoadConfig(config)
 	spatialController = ctl
-	rootLogger.Verbose("created spatial controller",
+	rootLogger.Info("created spatial controller",
 		zap.String("configPath", GlobalSettings.SpatialControllerConfig),
 		// zap.String("spatialControllerType", spatialControllerType),
 	)
