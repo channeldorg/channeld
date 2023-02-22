@@ -39,23 +39,29 @@ type SpatialController interface {
 var spatialController SpatialController
 
 func InitSpatialController() {
-	sccData, err := os.ReadFile(GlobalSettings.SpatialControllerConfig)
+	if !GlobalSettings.SpatialControllerConfig.HasValue {
+		rootLogger.Info("spatial controller config is not set, spatial controller will not be created")
+		return
+	}
+
+	cfgPath := GlobalSettings.SpatialControllerConfig.Value
+	sccData, err := os.ReadFile(cfgPath)
 
 	if err != nil {
-		rootLogger.Panic("failed to read spatial controller config", zap.Error(err), zap.String("path", GlobalSettings.SpatialControllerConfig))
+		rootLogger.Panic("failed to read spatial controller config", zap.Error(err), zap.String("cfgPath", cfgPath))
 	}
 
 	// Unmarshal the spatial controller config to a map[string]string
 	var sccMap map[string]json.RawMessage
 	if err := json.Unmarshal(sccData, &sccMap); err != nil {
-		rootLogger.Panic("failed to unmarshall spatial controller config", zap.Error(err), zap.String("path", GlobalSettings.SpatialControllerConfig))
+		rootLogger.Panic("failed to unmarshall spatial controller config", zap.Error(err), zap.String("cfgPath", cfgPath))
 	}
 	// Unmarshal the spatial controller type to a string
 	// spatialControllerType := strings.Trim(string(sccMap["SpatialControllerType"]), "\"\\")
 
 	config, exists := sccMap["Config"]
 	if !exists {
-		rootLogger.Panic("'Config' does not exist in json", zap.String("spatialControllerConfig", GlobalSettings.SpatialControllerConfig))
+		rootLogger.Panic("'Config' does not exist in json", zap.String("cfgPath", cfgPath))
 	}
 	// TODO instance of spatialController should be created from the SpatialControllerConfig.SpatialControllerType
 	// current implementation only supports StaticGrid2DSpatialController
@@ -63,7 +69,7 @@ func InitSpatialController() {
 	ctl.LoadConfig(config)
 	spatialController = ctl
 	rootLogger.Info("created spatial controller",
-		zap.String("configPath", GlobalSettings.SpatialControllerConfig),
+		zap.String("cfgPath", cfgPath),
 		// zap.String("spatialControllerType", spatialControllerType),
 	)
 }
