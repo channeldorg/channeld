@@ -12,14 +12,12 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func init() {
+func TestUnauthTimeout(t *testing.T) {
 	InitLogs()
 	InitAntiDDoS()
-	InitChannels()
+	// InitChannels()
 	InitConnections("../../config/server_conn_fsm_test.json", "../../config/client_non_authoratative_fsm.json")
-}
 
-func TestUnauthTimeout(t *testing.T) {
 	GlobalSettings.ConnectionAuthTimeoutMs = 1000
 
 	// go StartListening(channeldpb.ConnectionType_SERVER, "tcp", ":31288")
@@ -41,6 +39,11 @@ func TestUnauthTimeout(t *testing.T) {
 }
 
 func TestInvalidUsername(t *testing.T) {
+	InitLogs()
+	InitAntiDDoS()
+	InitChannels()
+	InitConnections("../../config/server_conn_fsm_test.json", "../../config/client_non_authoratative_fsm.json")
+
 	// Turn off dev mode to force authentication
 	GlobalSettings.Development = false
 	GlobalSettings.MaxFailedAuthAttempts = 2
@@ -79,6 +82,11 @@ func TestInvalidUsername(t *testing.T) {
 }
 
 func TestWrongPassword(t *testing.T) {
+	InitLogs()
+	InitAntiDDoS()
+	InitChannels()
+	InitConnections("../../config/server_conn_fsm_test.json", "../../config/client_non_authoratative_fsm.json")
+
 	// Turn off dev mode to force authentication
 	GlobalSettings.Development = false
 	GlobalSettings.MaxFailedAuthAttempts = 3

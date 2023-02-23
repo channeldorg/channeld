@@ -70,8 +70,10 @@ var GlobalSettings = GlobalSettingsType{
 	LogFile:               &NullableString{},
 	ServerReadBufferSize:  0x0001ffff,
 	ServerWriteBufferSize: 256,
+	ServerFSM:             "config/server_authoratative_fsm.json",
 	ClientReadBufferSize:  0x0001ffff,
 	ClientWriteBufferSize: 512,
+	ClientFSM:             "config/client_non_authoratative_fsm.json",
 	CompressionType:       channeldpb.CompressionType_NO_COMPRESSION,
 	// Mirror uses int32 as the connId
 	MaxConnectionIdBits:     31,
@@ -150,14 +152,14 @@ func (s *GlobalSettingsType) ParseFlag() error {
 	flag.StringVar(&s.ServerAddress, "sa", ":11288", "the network address for the server connections")
 	flag.IntVar(&s.ServerReadBufferSize, "srb", s.ServerReadBufferSize, "the read buffer size for the server connections")
 	flag.IntVar(&s.ServerWriteBufferSize, "swb", s.ServerWriteBufferSize, "the write buffer size for the server connections")
-	flag.StringVar(&s.ServerFSM, "sfsm", "config/server_authoratative_fsm.json", "the path to the server FSM config")
+	flag.StringVar(&s.ServerFSM, "sfsm", s.ServerFSM, "the path to the server FSM config")
 	flag.BoolVar(&s.ServerBypassAuth, "sba", true, "should server bypasses the authentication?")
 
 	flag.StringVar(&s.ClientNetwork, "cn", "tcp", "the network type for the client connections")
 	flag.StringVar(&s.ClientAddress, "ca", ":12108", "the network address for the client connections")
 	flag.IntVar(&s.ClientReadBufferSize, "crb", s.ClientReadBufferSize, "the read buffer size for the client connections")
 	flag.IntVar(&s.ClientWriteBufferSize, "cwb", s.ClientWriteBufferSize, "the write buffer size for the client connections")
-	flag.StringVar(&s.ClientFSM, "cfsm", "config/client_non_authoratative_fsm.json", "the path to the client FSM config")
+	flag.StringVar(&s.ClientFSM, "cfsm", s.ClientFSM, "the path to the client FSM config")
 
 	flag.BoolVar(&s.EnableRecordPacket, "erp", false, "enable record message packets send from clients")
 	flag.StringVar(&s.ReplaySessionPersistenceDir, "rspd", "", "the path to write packet recording")

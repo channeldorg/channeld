@@ -8,6 +8,7 @@ import (
 	"channeld.clewcat.com/channeld/pkg/channeld"
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"channeld.clewcat.com/channeld/pkg/common"
+	"channeld.clewcat.com/channeld/pkg/unreal"
 	"channeld.clewcat.com/channeld/pkg/unrealpb"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -28,14 +29,14 @@ func main() {
 
 	channeld.InitSpatialController()
 
-	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_SPAWN), &channeldpb.ServerForwardMessage{}, tpspb.HandleUnrealSpawnObject)
-	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_HANDOVER_CONTEXT), &unrealpb.GetHandoverContextResultMessage{}, tpspb.HandleHandoverContextResult)
-	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_GET_UNREAL_OBJECT_REF), &unrealpb.GetUnrealObjectRefMessage{}, tpspb.HandleGetUnrealObjectRef)
+	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_SPAWN), &channeldpb.ServerForwardMessage{}, handleUnrealSpawnObject)
+	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_HANDOVER_CONTEXT), &unrealpb.GetHandoverContextResultMessage{}, handleHandoverContextResult)
+	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_GET_UNREAL_OBJECT_REF), &unrealpb.GetUnrealObjectRefMessage{}, handleGetUnrealObjectRef)
 
 	channeld.Event_GlobalChannelUnpossessed.Listen(func(struct{}) {
 		// Global server exits. Clear up all the cache.
-		tpspb.AllSpawnedObj = make(map[uint32]*unrealpb.UnrealObjectRef)
-		tpspb.HandoverDataProviders = make(map[uint64]chan common.Message)
+		allSpawnedObj = make(map[uint32]*unrealpb.UnrealObjectRef)
+		unreal.HandoverDataProviders = make(map[uint64]chan common.Message)
 	})
 
 	// Setup Prometheus

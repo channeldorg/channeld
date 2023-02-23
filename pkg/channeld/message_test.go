@@ -14,6 +14,8 @@ import (
 func TestHandleListChannels(t *testing.T) {
 	InitLogs()
 	InitChannels()
+	InitConnections("../../config/server_conn_fsm_test.json", "../../config/client_non_authoratative_fsm.json")
+
 	c := addTestConnection(channeldpb.ConnectionType_SERVER)
 	ch0 := globalChannel
 	ch1, _ := CreateChannel(channeldpb.ChannelType_PRIVATE, c)
@@ -164,7 +166,7 @@ func BenchmarkRawMessagePack(b *testing.B) {
 func TestMessageCopy(t *testing.T) {
 	msg := MessageMap[channeldpb.MessageType_CREATE_CHANNEL].msg
 	msgCopy := proto.Clone(msg).(*channeldpb.CreateChannelMessage)
-	assert.NotEqual(t, MessageMap[channeldpb.MessageType_CREATE_CHANNEL].msg, msgCopy)
+	assert.False(t, msg == msgCopy)
 
 	createChannelMsg := &channeldpb.CreateChannelMessage{}
 	assert.IsType(t, msg, createChannelMsg)

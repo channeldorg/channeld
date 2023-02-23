@@ -72,6 +72,7 @@ func testChannelDataMessageProcessor(msg common.Message) (common.Message, error)
 func TestFanOutChannelData(t *testing.T) {
 	InitLogs()
 	InitChannels()
+	InitConnections("../../config/server_conn_fsm_test.json", "../../config/client_non_authoratative_fsm.json")
 
 	c0 := addTestConnectionWithProcessor(channeldpb.ConnectionType_SERVER, testChannelDataMessageProcessor)
 	c1 := addTestConnectionWithProcessor(channeldpb.ConnectionType_CLIENT, testChannelDataMessageProcessor)
@@ -279,10 +280,10 @@ func TestDataMergeOptions(t *testing.T) {
 
 func TestReflectChannelData(t *testing.T) {
 	RegisterChannelDataType(channeldpb.ChannelType_TEST, &testpb.TestChannelDataMessage{})
-	globalData, err := ReflectChannelData(channeldpb.ChannelType_TEST, nil)
+	globalDataMsg, err := ReflectChannelDataMessage(channeldpb.ChannelType_TEST, nil)
 	assert.NoError(t, err)
-	assert.NotNil(t, globalData)
-	assert.IsType(t, &testpb.TestChannelDataMessage{}, globalData.msg)
+	assert.NotNil(t, globalDataMsg)
+	assert.IsType(t, &testpb.TestChannelDataMessage{}, globalDataMsg)
 }
 
 func TestDataFieldMasks(t *testing.T) {

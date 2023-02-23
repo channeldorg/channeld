@@ -22,6 +22,12 @@ type ChannelData struct {
 	maxFanOutIntervalMs uint32
 }
 
+// Indicate that the channel data message should be initialized with default values.
+type ChannelDataInitializer interface {
+	common.Message
+	Init() error
+}
+
 type RemovableMapField interface {
 	GetRemoved() bool
 }
@@ -51,7 +57,7 @@ func RegisterChannelDataType(channelType channeldpb.ChannelType, msgTemplate pro
 	channelDataTypeRegistery[channelType] = msgTemplate
 }
 
-func ReflectChannelData(channelType channeldpb.ChannelType, mergeOptions *channeldpb.ChannelDataMergeOptions) (*ChannelData, error) {
+func ReflectChannelDataMessage(channelType channeldpb.ChannelType, mergeOptions *channeldpb.ChannelDataMergeOptions) (common.ChannelDataMessage, error) {
 	/*
 		channelTypeName := channelType.String()
 		dataTypeName := fmt.Sprintf("channeld.%sChannelDataMessage",
@@ -66,11 +72,7 @@ func ReflectChannelData(channelType channeldpb.ChannelType, mergeOptions *channe
 		return nil, fmt.Errorf("failed to create data for channel type %s", channelType.String())
 	}
 
-	return &ChannelData{
-		msg:             dataType.ProtoReflect().New().Interface(),
-		mergeOptions:    mergeOptions,
-		updateMsgBuffer: list.New(),
-	}, nil
+	return dataType.ProtoReflect().New().Interface(), nil
 }
 
 func (ch *Channel) InitData(dataMsg common.ChannelDataMessage, mergeOptions *channeldpb.ChannelDataMergeOptions) {
@@ -78,6 +80,23 @@ func (ch *Channel) InitData(dataMsg common.ChannelDataMessage, mergeOptions *cha
 		msg:             dataMsg,
 		updateMsgBuffer: list.New(),
 		mergeOptions:    mergeOptions,
+	}
+
+	if dataMsg == nil {
+		var err error
+		ch.data.msg, err = ReflectChannelDataMessage(ch.channelType, mergeOptions)
+		if err != nil {
+			ch.logger.Error("failed to create channel data message", zap.Error(err))
+			return
+		}
+	}
+
+	initializer, ok := ch.data.msg.(ChannelDataInitializer)
+	if ok {
+		if err := initializer.Init(); err != nil {
+			ch.logger.Error("failed to initialize channel data message", zap.Error(err))
+			return
+		}
 	}
 }
 

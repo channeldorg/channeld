@@ -98,7 +98,11 @@ var globalChannel *Channel
 func InitChannels() {
 	nextChannelId = 0
 	nextSpatialChannelId = GlobalSettings.SpatialChannelIdStart
-	globalChannel, _ = CreateChannel(channeldpb.ChannelType_GLOBAL, nil)
+	var err error
+	globalChannel, err = CreateChannel(channeldpb.ChannelType_GLOBAL, nil)
+	if err != nil {
+		rootLogger.Panic("Failed to create global channel", zap.Error(err))
+	}
 }
 
 func GetChannel(id common.ChannelId) *Channel {
