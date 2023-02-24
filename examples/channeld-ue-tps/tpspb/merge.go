@@ -106,7 +106,7 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 	}
 
 	if spatialNotifier != nil {
-		// src = the upcoming update, dst = existing channel data
+		// src = the incoming update, dst = existing channel data
 		for netId, newActorState := range srcData.ActorStates {
 			oldActorState, exists := dst.ActorStates[netId]
 			if exists {

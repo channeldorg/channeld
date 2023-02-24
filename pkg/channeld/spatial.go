@@ -564,6 +564,11 @@ func (ctl *StaticGrid2DSpatialController) subToAdjacentChannels(serverIndex uint
 
 var dataMarshalOptions = protojson.MarshalOptions{Multiline: false}
 
+type HandoverDataWithPayload interface {
+	// Clear the payload of the handover data so it won't be send to the connection that don't have the interest
+	ClearPayload()
+}
+
 // Runs in the source spatial channel (shared instance)
 func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, newInfo common.SpatialInfo, handoverDataProvider func(common.ChannelId, common.ChannelId, chan common.Message)) {
 	srcChannelId, err := ctl.GetChannelId(oldInfo)
@@ -636,6 +641,19 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 			ContextConnId: uint32(srcChannel.latestDataUpdateConnId),
 		}
 
+		handoverMsgNoPayload := &channeldpb.ChannelDataHandoverMessage{
+			SrcChannelId:  uint32(srcChannelId),
+			DstChannelId:  uint32(dstChannelId),
+			Data:          anyData,
+			ContextConnId: uint32(srcChannel.latestDataUpdateConnId),
+		}
+		if dataWithoutPayload, ok := handoverData.(HandoverDataWithPayload); ok {
+			dataWithoutPayload.ClearPayload()
+			if anyDataWithoutPayload, err := anypb.New(dataWithoutPayload.(common.Message)); err == nil {
+				handoverMsgNoPayload.Data = anyDataWithoutPayload
+			}
+		}
+
 		// Use GetAllConnections() to avoid race condition
 		srcChannelConns := srcChannel.GetAllConnections()
 		dstChanenlConns := dstChannel.GetAllConnections()
@@ -643,9 +661,19 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 		for conn := range srcChannelConns {
 			// Avoid duplicate sending
 			if _, exists := dstChanenlConns[conn]; !exists {
+				msgToSend := handoverMsg
+
+				if c, ok := conn.(*Connection); ok {
+					_, hasInterestInDstChannel := c.spatialSubscriptions.Load(dstChannelId)
+					if !hasInterestInDstChannel {
+						// This connection has not interest in the dstChannel, no need to send the handover data payload
+						msgToSend = handoverMsgNoPayload
+					}
+				}
+
 				conn.Send(MessageContext{
 					MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
-					Msg:       handoverMsg,
+					Msg:       msgToSend,
 					Broadcast: 0,
 					StubId:    0,
 					ChannelId: uint32(srcChannelId),
