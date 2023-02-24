@@ -171,6 +171,7 @@ message ActorComponentState {
 }
 
 message SceneComponentState {
+    bool removed = 1;
     optional bool bAbsoluteLocation = 2;
     optional bool bAbsoluteRotation = 3;
     optional bool bAbsoluteScale = 4;

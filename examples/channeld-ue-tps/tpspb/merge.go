@@ -249,15 +249,18 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 	}
 
 	for netId, newSceneCompState := range srcData.SceneComponentStates {
-		oldSceneCompState, exists := dst.SceneComponentStates[netId]
-		if exists {
-			proto.Merge(oldSceneCompState, newSceneCompState)
+		if newSceneCompState.Removed {
+			delete(dst.SceneComponentStates, netId)
 		} else {
-			dst.SceneComponentStates[netId] = newSceneCompState
+			oldSceneCompState, exists := dst.SceneComponentStates[netId]
+			if exists {
+				proto.Merge(oldSceneCompState, newSceneCompState)
+			} else {
+				dst.SceneComponentStates[netId] = newSceneCompState
+			}
 		}
 	}
 
-	// Remove the states at last, in case any new state is added to the dst states in the loop above.
 	for netId, newActorCompState := range srcData.ActorComponentStates {
 		if newActorCompState.Removed {
 			delete(dst.ActorComponentStates, netId)
@@ -271,9 +274,8 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 		}
 	}
 
-	// Remove the states at last, in case any new state is added to the dst states in the loop above.
+	// Remove the actor and the corresponding states at last, in case any 'parent' state (e.g. CharacterState) is added to the dst above.
 	for netId, newActorState := range srcData.ActorStates {
-		// Remove the states from the maps
 		if newActorState.Removed {
 			delete(dst.ActorStates, netId)
 			delete(dst.PawnStates, netId)
