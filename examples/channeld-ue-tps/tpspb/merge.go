@@ -112,71 +112,20 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 			if exists {
 				if newActorState.ReplicatedMovement != nil && newActorState.ReplicatedMovement.Location != nil &&
 					oldActorState.ReplicatedMovement != nil && oldActorState.ReplicatedMovement.Location != nil {
-					newLoc := newActorState.ReplicatedMovement.Location
-					oldLoc := oldActorState.ReplicatedMovement.Location
+					unreal.CheckSpatialInfoChange(netId, newActorState.ReplicatedMovement.Location, oldActorState.ReplicatedMovement.Location, spatialNotifier)
+				}
+			}
+		}
 
-					var newX, newY float32
-					if newLoc.X != nil {
-						newX = *newLoc.X
-					} else {
-						// Use GetX/Y() to avoid violation memory access!
-						newX = oldLoc.GetX()
-					}
-					if newLoc.Y != nil {
-						newY = *newLoc.Y
-					} else {
-						newY = oldLoc.GetY()
-					}
-					if newX != oldLoc.GetX() || newY != oldLoc.GetY() {
-						spatialNotifier.Notify(
-							// Swap the Y and Z as UE uses the Z-Up rule but channeld uses the Y-up rule.
-							common.SpatialInfo{
-								X: float64(oldLoc.GetX()),
-								Z: float64(oldLoc.GetY())},
-							common.SpatialInfo{
-								X: float64(newX),
-								Z: float64(newY)},
-							func(srcChannelId common.ChannelId, dstChannelId common.ChannelId, handoverData chan common.Message) {
-								/* No matter if it's cross-server, always ask for the handover context.
-								// Handover happens within the spatial server - no need to ask for the handover context.
-								if channeld.GetChannel(srcChannelId).IsSameOwner(channeld.GetChannel(dstChannelId)) {
-									defer allSpawnedObjLock.RLocker().Unlock()
-									allSpawnedObjLock.RLock()
-									handoverData <- &unrealpb.HandoverData{
-										Context: []*unrealpb.HandoverContext{
-											{
-												Obj:          allSpawnedObj[netId],
-												ClientConnId: oldActorState.OwningConnId,
-											},
-										},
-									}
-								} else*/{
-									unreal.AddHandoverDataProvider(netId, uint32(srcChannelId), handoverData)
-									channeld.GetChannel(srcChannelId).SendToOwner(uint32(unrealpb.MessageType_HANDOVER_CONTEXT), &unrealpb.GetHandoverContextMessage{
-										NetId:        netId,
-										SrcChannelId: uint32(srcChannelId),
-										DstChannelId: uint32(dstChannelId),
-									})
-									channeld.RootLogger().Info("getting handover context from src server",
-										zap.Uint32("srcChannelId", uint32(srcChannelId)),
-										zap.Float32("oldX", oldLoc.GetX()), zap.Float32("oldY", oldLoc.GetY()),
-										zap.Float32("newX", newX), zap.Float32("newY", newY),
-									)
-								}
-							},
-						)
-					}
+		for netId, newSceneCompState := range srcData.SceneComponentStates {
+			oldSceneCompState, exists := dst.SceneComponentStates[netId]
+			if exists {
+				if newSceneCompState.RelativeLocation != nil && oldSceneCompState.RelativeLocation != nil {
+					unreal.CheckSpatialInfoChange(netId, newSceneCompState.RelativeLocation, oldSceneCompState.RelativeLocation, spatialNotifier)
 				}
 			}
 		}
 	}
-
-	/* The states should be initialized in Channel.InitData() -> TestRepChannelData.Init().
-	// The maps can be nil after InitData().
-	initStates(dst)
-	*/
-
-	// channeld.ReflectMerge(dst, src, options)
 
 	if srcData.GameState != nil {
 		proto.Merge(dst.GameState, srcData.GameState)
@@ -190,6 +139,9 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 		if exists {
 			proto.Merge(oldPawnState, newPawnState)
 		} else {
+			if dst.PawnStates == nil {
+				dst.PawnStates = make(map[uint32]*unrealpb.PawnState)
+			}
 			dst.PawnStates[netId] = newPawnState
 		}
 	}
@@ -199,6 +151,9 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 		if exists {
 			proto.Merge(oldCharacterState, newCharacterState)
 		} else {
+			if dst.CharacterStates == nil {
+				dst.CharacterStates = make(map[uint32]*unrealpb.CharacterState)
+			}
 			dst.CharacterStates[netId] = newCharacterState
 		}
 	}
@@ -208,6 +163,9 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 		if exists {
 			proto.Merge(oldPlayerState, newPlayerState)
 		} else {
+			if dst.PlayerStates == nil {
+				dst.PlayerStates = make(map[uint32]*unrealpb.PlayerState)
+			}
 			dst.PlayerStates[netId] = newPlayerState
 		}
 	}
@@ -217,6 +175,9 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 		if exists {
 			proto.Merge(oldControllerState, newControllerState)
 		} else {
+			if dst.ControllerStates == nil {
+				dst.ControllerStates = make(map[uint32]*unrealpb.ControllerState)
+			}
 			dst.ControllerStates[netId] = newControllerState
 		}
 	}
@@ -226,6 +187,9 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 		if exists {
 			proto.Merge(oldPlayerControllerState, newPlayerControllerState)
 		} else {
+			if dst.PlayerControllerStates == nil {
+				dst.PlayerControllerStates = make(map[uint32]*unrealpb.PlayerControllerState)
+			}
 			dst.PlayerControllerStates[netId] = newPlayerControllerState
 		}
 	}
@@ -235,6 +199,9 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 		if exists {
 			proto.Merge(oldTestRepPlayerControllerState, newTestRepPlayerControllerState)
 		} else {
+			if dst.TestRepPlayerControllerStates == nil {
+				dst.TestRepPlayerControllerStates = make(map[uint32]*TestRepPlayerControllerState)
+			}
 			dst.TestRepPlayerControllerStates[netId] = newTestRepPlayerControllerState
 		}
 	}
@@ -244,6 +211,9 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 		if exists {
 			proto.Merge(oldTestNPCState, newTestNPCState)
 		} else {
+			if dst.TestNPCStates == nil {
+				dst.TestNPCStates = make(map[uint32]*TestNPCState)
+			}
 			dst.TestNPCStates[netId] = newTestNPCState
 		}
 	}
@@ -256,6 +226,9 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 			if exists {
 				proto.Merge(oldSceneCompState, newSceneCompState)
 			} else {
+				if dst.SceneComponentStates == nil {
+					dst.SceneComponentStates = make(map[uint32]*unrealpb.SceneComponentState)
+				}
 				dst.SceneComponentStates[netId] = newSceneCompState
 			}
 		}
@@ -269,6 +242,9 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 			if exists {
 				proto.Merge(oldActorCompState, newActorCompState)
 			} else {
+				if dst.ActorComponentStates == nil {
+					dst.ActorComponentStates = make(map[uint32]*unrealpb.ActorComponentState)
+				}
 				dst.ActorComponentStates[netId] = newActorCompState
 			}
 		}
@@ -292,6 +268,9 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 			if exists {
 				proto.Merge(oldActorState, newActorState)
 			} else {
+				if dst.ActorStates == nil {
+					dst.ActorStates = make(map[uint32]*unrealpb.ActorState)
+				}
 				dst.ActorStates[netId] = newActorState
 			}
 		}

@@ -1,4 +1,4 @@
-package main
+package unreal
 
 import (
 	"sync"
@@ -6,7 +6,6 @@ import (
 	"channeld.clewcat.com/channeld/pkg/channeld"
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"channeld.clewcat.com/channeld/pkg/common"
-	"channeld.clewcat.com/channeld/pkg/unreal"
 	"channeld.clewcat.com/channeld/pkg/unrealpb"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -17,6 +16,20 @@ import (
 // Only in this way we can send the UnrealObjectRef as the handover data.
 var allSpawnedObj map[uint32]*unrealpb.UnrealObjectRef = make(map[uint32]*unrealpb.UnrealObjectRef)
 var allSpawnedObjLock sync.RWMutex
+
+func InitMessageHandlers() {
+	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_SPAWN), &channeldpb.ServerForwardMessage{}, handleUnrealSpawnObject)
+	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_HANDOVER_CONTEXT), &unrealpb.GetHandoverContextResultMessage{}, handleHandoverContextResult)
+	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_GET_UNREAL_OBJECT_REF), &unrealpb.GetUnrealObjectRefMessage{}, handleGetUnrealObjectRef)
+
+	channeld.Event_GlobalChannelUnpossessed.Listen(func(struct{}) {
+		// Global server exits. Clear up all the cache.
+		allSpawnedObjLock.Lock()
+		defer allSpawnedObjLock.Unlock()
+		allSpawnedObj = make(map[uint32]*unrealpb.UnrealObjectRef)
+		resetHandoverDataProviders()
+	})
+}
 
 func handleGetUnrealObjectRef(ctx channeld.MessageContext) {
 	msg, ok := ctx.Msg.(*unrealpb.GetUnrealObjectRefMessage)
@@ -121,13 +134,13 @@ func handleHandoverContextResult(ctx channeld.MessageContext) {
 		return
 	}
 
-	provider, exists := unreal.GetHandoverDataProvider(msg.NetId, msg.SrcChannelId)
+	provider, exists := getHandoverDataProvider(msg.NetId, msg.SrcChannelId)
 	if !exists {
 		ctx.Connection.Logger().Error("could not find the handover data provider", zap.Uint32("netId", msg.NetId))
 		return
 	}
 
-	defer unreal.RemoveHandoverDataProvider(msg.NetId, msg.SrcChannelId)
+	defer removeHandoverDataProvider(msg.NetId, msg.SrcChannelId)
 
 	// No context - no handover will happen
 	if len(msg.Context) == 0 {
@@ -145,7 +158,7 @@ func handleHandoverContextResult(ctx channeld.MessageContext) {
 
 	handoverChannelData := fullChannelData.ProtoReflect().New().Interface()
 
-	collector, ok := handoverChannelData.(unreal.ChannelDataCollector)
+	collector, ok := handoverChannelData.(ChannelDataCollector)
 	if ok {
 		for _, handoverCtx := range msg.Context {
 			if handoverCtx.Obj == nil || handoverCtx.Obj.NetGUID == nil || *handoverCtx.Obj.NetGUID == 0 {

@@ -8,7 +8,6 @@ import (
 	"channeld.clewcat.com/channeld/pkg/channeld"
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"channeld.clewcat.com/channeld/pkg/unreal"
-	"channeld.clewcat.com/channeld/pkg/unrealpb"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -28,15 +27,7 @@ func main() {
 
 	channeld.InitSpatialController()
 
-	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_SPAWN), &channeldpb.ServerForwardMessage{}, handleUnrealSpawnObject)
-	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_HANDOVER_CONTEXT), &unrealpb.GetHandoverContextResultMessage{}, handleHandoverContextResult)
-	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_GET_UNREAL_OBJECT_REF), &unrealpb.GetUnrealObjectRefMessage{}, handleGetUnrealObjectRef)
-
-	channeld.Event_GlobalChannelUnpossessed.Listen(func(struct{}) {
-		// Global server exits. Clear up all the cache.
-		allSpawnedObj = make(map[uint32]*unrealpb.UnrealObjectRef)
-		unreal.ResetHandoverDataProviders()
-	})
+	unreal.InitMessageHandlers()
 
 	// Setup Prometheus
 	http.Handle("/metrics", promhttp.Handler())
