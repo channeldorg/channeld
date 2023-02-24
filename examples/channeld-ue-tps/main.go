@@ -7,7 +7,6 @@ import (
 	"channeld.clewcat.com/channeld/examples/channeld-ue-tps/tpspb"
 	"channeld.clewcat.com/channeld/pkg/channeld"
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
-	"channeld.clewcat.com/channeld/pkg/common"
 	"channeld.clewcat.com/channeld/pkg/unreal"
 	"channeld.clewcat.com/channeld/pkg/unrealpb"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -36,7 +35,7 @@ func main() {
 	channeld.Event_GlobalChannelUnpossessed.Listen(func(struct{}) {
 		// Global server exits. Clear up all the cache.
 		allSpawnedObj = make(map[uint32]*unrealpb.UnrealObjectRef)
-		unreal.HandoverDataProviders = make(map[uint64]chan common.Message)
+		unreal.ResetHandoverDataProviders()
 	})
 
 	// Setup Prometheus

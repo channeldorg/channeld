@@ -121,14 +121,13 @@ func handleHandoverContextResult(ctx channeld.MessageContext) {
 		return
 	}
 
-	stubId := unreal.GetHandoverStub(msg.NetId, msg.SrcChannelId)
-	provider, exists := unreal.HandoverDataProviders[stubId]
+	provider, exists := unreal.GetHandoverDataProvider(msg.NetId, msg.SrcChannelId)
 	if !exists {
 		ctx.Connection.Logger().Error("could not find the handover data provider", zap.Uint32("netId", msg.NetId))
 		return
 	}
 
-	defer delete(unreal.HandoverDataProviders, stubId)
+	defer unreal.RemoveHandoverDataProvider(msg.NetId, msg.SrcChannelId)
 
 	// No context - no handover will happen
 	if len(msg.Context) == 0 {
@@ -138,6 +137,7 @@ func handleHandoverContextResult(ctx channeld.MessageContext) {
 
 	if ctx.Channel.GetDataMessage() == nil {
 		ctx.Channel.Logger().Error("channel data message is nil")
+		provider <- nil
 		return
 	}
 
@@ -199,6 +199,7 @@ func handleHandoverContextResult(ctx channeld.MessageContext) {
 		anyData, err := anypb.New(handoverChannelData)
 		if err != nil {
 			ctx.Connection.Logger().Error("failed to marshal handover data", zap.Error(err), zap.Uint32("netId", msg.NetId))
+			provider <- nil
 			return
 		}
 		handoverData.ChannelData = anyData

@@ -151,7 +151,7 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 										},
 									}
 								} else*/{
-									unreal.HandoverDataProviders[unreal.GetHandoverStub(netId, uint32(srcChannelId))] = handoverData
+									unreal.AddHandoverDataProvider(netId, uint32(srcChannelId), handoverData)
 									channeld.GetChannel(srcChannelId).SendToOwner(uint32(unrealpb.MessageType_HANDOVER_CONTEXT), &unrealpb.GetHandoverContextMessage{
 										NetId:        netId,
 										SrcChannelId: uint32(srcChannelId),
@@ -261,7 +261,6 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 	for netId, newActorCompState := range srcData.ActorComponentStates {
 		if newActorCompState.Removed {
 			delete(dst.ActorComponentStates, netId)
-			delete(dst.SceneComponentStates, netId)
 		} else {
 			oldActorCompState, exists := dst.ActorComponentStates[netId]
 			if exists {
