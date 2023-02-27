@@ -105,6 +105,70 @@ func (MessageType) EnumDescriptor() ([]byte, []int) {
 	return file_unreal_common_proto_rawDescGZIP(), []int{0}
 }
 
+type UnrealObjectType int32
+
+const (
+	UnrealObjectType_UOT_Unknown          UnrealObjectType = 0
+	UnrealObjectType_UOT_GameState        UnrealObjectType = 1
+	UnrealObjectType_UOT_Actor            UnrealObjectType = 2
+	UnrealObjectType_UOT_Pawn             UnrealObjectType = 3
+	UnrealObjectType_UOT_Character        UnrealObjectType = 4
+	UnrealObjectType_UOT_PlayerState      UnrealObjectType = 5
+	UnrealObjectType_UOT_Controller       UnrealObjectType = 6
+	UnrealObjectType_UOT_PlayerController UnrealObjectType = 7
+)
+
+// Enum value maps for UnrealObjectType.
+var (
+	UnrealObjectType_name = map[int32]string{
+		0: "UOT_Unknown",
+		1: "UOT_GameState",
+		2: "UOT_Actor",
+		3: "UOT_Pawn",
+		4: "UOT_Character",
+		5: "UOT_PlayerState",
+		6: "UOT_Controller",
+		7: "UOT_PlayerController",
+	}
+	UnrealObjectType_value = map[string]int32{
+		"UOT_Unknown":          0,
+		"UOT_GameState":        1,
+		"UOT_Actor":            2,
+		"UOT_Pawn":             3,
+		"UOT_Character":        4,
+		"UOT_PlayerState":      5,
+		"UOT_Controller":       6,
+		"UOT_PlayerController": 7,
+	}
+)
+
+func (x UnrealObjectType) Enum() *UnrealObjectType {
+	p := new(UnrealObjectType)
+	*p = x
+	return p
+}
+
+func (x UnrealObjectType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (UnrealObjectType) Descriptor() protoreflect.EnumDescriptor {
+	return file_unreal_common_proto_enumTypes[1].Descriptor()
+}
+
+func (UnrealObjectType) Type() protoreflect.EnumType {
+	return &file_unreal_common_proto_enumTypes[1]
+}
+
+func (x UnrealObjectType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use UnrealObjectType.Descriptor instead.
+func (UnrealObjectType) EnumDescriptor() ([]byte, []int) {
+	return file_unreal_common_proto_rawDescGZIP(), []int{1}
+}
+
 // Maps to UE's FVector AND FRotator struct.
 // For FRotator, x = pitch, y = yaw, z = roll
 type FVector struct {
@@ -178,7 +242,7 @@ type UnrealObjectRef struct {
 	NetGUID      *uint32                             `protobuf:"varint,1,opt,name=netGUID,proto3,oneof" json:"netGUID,omitempty"`
 	Context      []*UnrealObjectRef_GuidCachedObject `protobuf:"bytes,2,rep,name=context,proto3" json:"context,omitempty"`
 	NetGUIDBunch []byte                              `protobuf:"bytes,3,opt,name=netGUIDBunch,proto3,oneof" json:"netGUIDBunch,omitempty"`
-	BunchBitsNum *uint32                             `protobuf:"varint,4,opt,name=bunchBitsNum,proto3,oneof" json:"bunchBitsNum,omitempty"`
+	BunchBitsNum *uint32                             `protobuf:"varint,4,opt,name=bunchBitsNum,proto3,oneof" json:"bunchBitsNum,omitempty"` // optional uint32 objType = 5;
 }
 
 func (x *UnrealObjectRef) Reset() {
@@ -742,13 +806,14 @@ func (x *GetHandoverContextResultMessage) GetContext() []*HandoverContext {
 }
 
 // Wrapped in ChannelDataHandoverMessage.data
+// Implements [channeld.HandoverDataPayload]
 type HandoverData struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
 	Context []*HandoverContext `protobuf:"bytes,1,rep,name=context,proto3" json:"context,omitempty"`
-	// The channel data message for the destination server only.
+	// The channel data message that will be handed over to the destination channel.
 	ChannelData *anypb.Any `protobuf:"bytes,2,opt,name=channelData,proto3,oneof" json:"channelData,omitempty"`
 }
 
@@ -4287,10 +4352,21 @@ var file_unreal_common_proto_rawDesc = []byte{
 	0x0a, 0x15, 0x53, 0x45, 0x52, 0x56, 0x45, 0x52, 0x5f, 0x50, 0x4c, 0x41, 0x59, 0x45, 0x52, 0x5f,
 	0x53, 0x50, 0x41, 0x57, 0x4e, 0x45, 0x44, 0x10, 0xc9, 0x01, 0x12, 0x18, 0x0a, 0x13, 0x53, 0x45,
 	0x52, 0x56, 0x45, 0x52, 0x5f, 0x50, 0x4c, 0x41, 0x59, 0x45, 0x52, 0x5f, 0x4c, 0x45, 0x41, 0x56,
-	0x45, 0x10, 0xca, 0x01, 0x42, 0x2c, 0x5a, 0x2a, 0x63, 0x68, 0x61, 0x6e, 0x6e, 0x65, 0x6c, 0x64,
-	0x2e, 0x63, 0x6c, 0x65, 0x77, 0x63, 0x61, 0x74, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x68, 0x61,
-	0x6e, 0x6e, 0x65, 0x6c, 0x64, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x75, 0x6e, 0x72, 0x65, 0x61, 0x6c,
-	0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x45, 0x10, 0xca, 0x01, 0x2a, 0xa9, 0x01, 0x0a, 0x10, 0x55, 0x6e, 0x72, 0x65, 0x61, 0x6c, 0x4f,
+	0x62, 0x6a, 0x65, 0x63, 0x74, 0x54, 0x79, 0x70, 0x65, 0x12, 0x0f, 0x0a, 0x0b, 0x55, 0x4f, 0x54,
+	0x5f, 0x55, 0x6e, 0x6b, 0x6e, 0x6f, 0x77, 0x6e, 0x10, 0x00, 0x12, 0x11, 0x0a, 0x0d, 0x55, 0x4f,
+	0x54, 0x5f, 0x47, 0x61, 0x6d, 0x65, 0x53, 0x74, 0x61, 0x74, 0x65, 0x10, 0x01, 0x12, 0x0d, 0x0a,
+	0x09, 0x55, 0x4f, 0x54, 0x5f, 0x41, 0x63, 0x74, 0x6f, 0x72, 0x10, 0x02, 0x12, 0x0c, 0x0a, 0x08,
+	0x55, 0x4f, 0x54, 0x5f, 0x50, 0x61, 0x77, 0x6e, 0x10, 0x03, 0x12, 0x11, 0x0a, 0x0d, 0x55, 0x4f,
+	0x54, 0x5f, 0x43, 0x68, 0x61, 0x72, 0x61, 0x63, 0x74, 0x65, 0x72, 0x10, 0x04, 0x12, 0x13, 0x0a,
+	0x0f, 0x55, 0x4f, 0x54, 0x5f, 0x50, 0x6c, 0x61, 0x79, 0x65, 0x72, 0x53, 0x74, 0x61, 0x74, 0x65,
+	0x10, 0x05, 0x12, 0x12, 0x0a, 0x0e, 0x55, 0x4f, 0x54, 0x5f, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x6f,
+	0x6c, 0x6c, 0x65, 0x72, 0x10, 0x06, 0x12, 0x18, 0x0a, 0x14, 0x55, 0x4f, 0x54, 0x5f, 0x50, 0x6c,
+	0x61, 0x79, 0x65, 0x72, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c, 0x6c, 0x65, 0x72, 0x10, 0x07,
+	0x42, 0x2c, 0x5a, 0x2a, 0x63, 0x68, 0x61, 0x6e, 0x6e, 0x65, 0x6c, 0x64, 0x2e, 0x63, 0x6c, 0x65,
+	0x77, 0x63, 0x61, 0x74, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x68, 0x61, 0x6e, 0x6e, 0x65, 0x6c,
+	0x64, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x75, 0x6e, 0x72, 0x65, 0x61, 0x6c, 0x70, 0x62, 0x62, 0x06,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -4305,131 +4381,132 @@ func file_unreal_common_proto_rawDescGZIP() []byte {
 	return file_unreal_common_proto_rawDescData
 }
 
-var file_unreal_common_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_unreal_common_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_unreal_common_proto_msgTypes = make([]protoimpl.MessageInfo, 47)
 var file_unreal_common_proto_goTypes = []interface{}{
 	(MessageType)(0),                                              // 0: unrealpb.MessageType
-	(*FVector)(nil),                                               // 1: unrealpb.FVector
-	(*UnrealObjectRef)(nil),                                       // 2: unrealpb.UnrealObjectRef
-	(*ActorComponentRef)(nil),                                     // 3: unrealpb.ActorComponentRef
-	(*RemoteFunctionMessage)(nil),                                 // 4: unrealpb.RemoteFunctionMessage
-	(*SpawnObjectMessage)(nil),                                    // 5: unrealpb.SpawnObjectMessage
-	(*ServerSpawnedPlayerMessage)(nil),                            // 6: unrealpb.ServerSpawnedPlayerMessage
-	(*DestroyObjectMessage)(nil),                                  // 7: unrealpb.DestroyObjectMessage
-	(*HandoverContext)(nil),                                       // 8: unrealpb.HandoverContext
-	(*GetHandoverContextMessage)(nil),                             // 9: unrealpb.GetHandoverContextMessage
-	(*GetHandoverContextResultMessage)(nil),                       // 10: unrealpb.GetHandoverContextResultMessage
-	(*HandoverData)(nil),                                          // 11: unrealpb.HandoverData
-	(*GetUnrealObjectRefMessage)(nil),                             // 12: unrealpb.GetUnrealObjectRefMessage
-	(*GetUnrealObjectRefResultMessage)(nil),                       // 13: unrealpb.GetUnrealObjectRefResultMessage
-	(*FRepMovement)(nil),                                          // 14: unrealpb.FRepMovement
-	(*FRepAttachment)(nil),                                        // 15: unrealpb.FRepAttachment
-	(*ActorState)(nil),                                            // 16: unrealpb.ActorState
-	(*ActorComponentState)(nil),                                   // 17: unrealpb.ActorComponentState
-	(*SceneComponentState)(nil),                                   // 18: unrealpb.SceneComponentState
-	(*FBasedMovementInfo)(nil),                                    // 19: unrealpb.FBasedMovementInfo
-	(*FRootMotionSource)(nil),                                     // 20: unrealpb.FRootMotionSource
-	(*FRootMotionSourceGroup)(nil),                                // 21: unrealpb.FRootMotionSourceGroup
-	(*FRepRootMotionMontage)(nil),                                 // 22: unrealpb.FRepRootMotionMontage
-	(*CharacterState)(nil),                                        // 23: unrealpb.CharacterState
-	(*Character_ServerMovePacked_Params)(nil),                     // 24: unrealpb.Character_ServerMovePacked_Params
-	(*Character_ClientMoveResponsePacked_Params)(nil),             // 25: unrealpb.Character_ClientMoveResponsePacked_Params
-	(*PlayerState)(nil),                                           // 26: unrealpb.PlayerState
-	(*ControllerState)(nil),                                       // 27: unrealpb.ControllerState
-	(*Controller_ClientSetLocation_Params)(nil),                   // 28: unrealpb.Controller_ClientSetLocation_Params
-	(*Controller_ClientSetRotation_Params)(nil),                   // 29: unrealpb.Controller_ClientSetRotation_Params
-	(*PlayerControllerState)(nil),                                 // 30: unrealpb.PlayerControllerState
-	(*PlayerController_ServerUpdateCamera_Params)(nil),            // 31: unrealpb.PlayerController_ServerUpdateCamera_Params
-	(*PlayerController_ClientSetHUD_Params)(nil),                  // 32: unrealpb.PlayerController_ClientSetHUD_Params
-	(*PlayerController_ClientSetViewTarget_Params)(nil),           // 33: unrealpb.PlayerController_ClientSetViewTarget_Params
-	(*PlayerController_ClientEnableNetworkVoice_Params)(nil),      // 34: unrealpb.PlayerController_ClientEnableNetworkVoice_Params
-	(*PlayerController_ClientCapBandwidth_Params)(nil),            // 35: unrealpb.PlayerController_ClientCapBandwidth_Params
-	(*PlayerController_ClientRestart_Params)(nil),                 // 36: unrealpb.PlayerController_ClientRestart_Params
-	(*PlayerController_ClientSetCameraMode_Params)(nil),           // 37: unrealpb.PlayerController_ClientSetCameraMode_Params
-	(*PlayerController_ClientRetryClientRestart_Params)(nil),      // 38: unrealpb.PlayerController_ClientRetryClientRestart_Params
-	(*PlayerController_ServerSetSpectatorLocation_Params)(nil),    // 39: unrealpb.PlayerController_ServerSetSpectatorLocation_Params
-	(*PlayerController_ServerAcknowledgePossession_Params)(nil),   // 40: unrealpb.PlayerController_ServerAcknowledgePossession_Params
-	(*PlayerController_ClientGotoState_Params)(nil),               // 41: unrealpb.PlayerController_ClientGotoState_Params
-	(*PlayerController_ClientReceiveLocalizedMessage_Params)(nil), // 42: unrealpb.PlayerController_ClientReceiveLocalizedMessage_Params
-	(*GameStateBase)(nil),                                         // 43: unrealpb.GameStateBase
-	(*PawnState)(nil),                                             // 44: unrealpb.PawnState
-	(*FClientAdjustment)(nil),                                     // 45: unrealpb.FClientAdjustment
-	(*UnrealObjectRef_GuidCachedObject)(nil),                      // 46: unrealpb.UnrealObjectRef.GuidCachedObject
-	(*FRootMotionSource_FRootMotionFinishVelocitySettings)(nil),   // 47: unrealpb.FRootMotionSource.FRootMotionFinishVelocitySettings
-	(*anypb.Any)(nil),                                             // 48: google.protobuf.Any
+	(UnrealObjectType)(0),                                         // 1: unrealpb.UnrealObjectType
+	(*FVector)(nil),                                               // 2: unrealpb.FVector
+	(*UnrealObjectRef)(nil),                                       // 3: unrealpb.UnrealObjectRef
+	(*ActorComponentRef)(nil),                                     // 4: unrealpb.ActorComponentRef
+	(*RemoteFunctionMessage)(nil),                                 // 5: unrealpb.RemoteFunctionMessage
+	(*SpawnObjectMessage)(nil),                                    // 6: unrealpb.SpawnObjectMessage
+	(*ServerSpawnedPlayerMessage)(nil),                            // 7: unrealpb.ServerSpawnedPlayerMessage
+	(*DestroyObjectMessage)(nil),                                  // 8: unrealpb.DestroyObjectMessage
+	(*HandoverContext)(nil),                                       // 9: unrealpb.HandoverContext
+	(*GetHandoverContextMessage)(nil),                             // 10: unrealpb.GetHandoverContextMessage
+	(*GetHandoverContextResultMessage)(nil),                       // 11: unrealpb.GetHandoverContextResultMessage
+	(*HandoverData)(nil),                                          // 12: unrealpb.HandoverData
+	(*GetUnrealObjectRefMessage)(nil),                             // 13: unrealpb.GetUnrealObjectRefMessage
+	(*GetUnrealObjectRefResultMessage)(nil),                       // 14: unrealpb.GetUnrealObjectRefResultMessage
+	(*FRepMovement)(nil),                                          // 15: unrealpb.FRepMovement
+	(*FRepAttachment)(nil),                                        // 16: unrealpb.FRepAttachment
+	(*ActorState)(nil),                                            // 17: unrealpb.ActorState
+	(*ActorComponentState)(nil),                                   // 18: unrealpb.ActorComponentState
+	(*SceneComponentState)(nil),                                   // 19: unrealpb.SceneComponentState
+	(*FBasedMovementInfo)(nil),                                    // 20: unrealpb.FBasedMovementInfo
+	(*FRootMotionSource)(nil),                                     // 21: unrealpb.FRootMotionSource
+	(*FRootMotionSourceGroup)(nil),                                // 22: unrealpb.FRootMotionSourceGroup
+	(*FRepRootMotionMontage)(nil),                                 // 23: unrealpb.FRepRootMotionMontage
+	(*CharacterState)(nil),                                        // 24: unrealpb.CharacterState
+	(*Character_ServerMovePacked_Params)(nil),                     // 25: unrealpb.Character_ServerMovePacked_Params
+	(*Character_ClientMoveResponsePacked_Params)(nil),             // 26: unrealpb.Character_ClientMoveResponsePacked_Params
+	(*PlayerState)(nil),                                           // 27: unrealpb.PlayerState
+	(*ControllerState)(nil),                                       // 28: unrealpb.ControllerState
+	(*Controller_ClientSetLocation_Params)(nil),                   // 29: unrealpb.Controller_ClientSetLocation_Params
+	(*Controller_ClientSetRotation_Params)(nil),                   // 30: unrealpb.Controller_ClientSetRotation_Params
+	(*PlayerControllerState)(nil),                                 // 31: unrealpb.PlayerControllerState
+	(*PlayerController_ServerUpdateCamera_Params)(nil),            // 32: unrealpb.PlayerController_ServerUpdateCamera_Params
+	(*PlayerController_ClientSetHUD_Params)(nil),                  // 33: unrealpb.PlayerController_ClientSetHUD_Params
+	(*PlayerController_ClientSetViewTarget_Params)(nil),           // 34: unrealpb.PlayerController_ClientSetViewTarget_Params
+	(*PlayerController_ClientEnableNetworkVoice_Params)(nil),      // 35: unrealpb.PlayerController_ClientEnableNetworkVoice_Params
+	(*PlayerController_ClientCapBandwidth_Params)(nil),            // 36: unrealpb.PlayerController_ClientCapBandwidth_Params
+	(*PlayerController_ClientRestart_Params)(nil),                 // 37: unrealpb.PlayerController_ClientRestart_Params
+	(*PlayerController_ClientSetCameraMode_Params)(nil),           // 38: unrealpb.PlayerController_ClientSetCameraMode_Params
+	(*PlayerController_ClientRetryClientRestart_Params)(nil),      // 39: unrealpb.PlayerController_ClientRetryClientRestart_Params
+	(*PlayerController_ServerSetSpectatorLocation_Params)(nil),    // 40: unrealpb.PlayerController_ServerSetSpectatorLocation_Params
+	(*PlayerController_ServerAcknowledgePossession_Params)(nil),   // 41: unrealpb.PlayerController_ServerAcknowledgePossession_Params
+	(*PlayerController_ClientGotoState_Params)(nil),               // 42: unrealpb.PlayerController_ClientGotoState_Params
+	(*PlayerController_ClientReceiveLocalizedMessage_Params)(nil), // 43: unrealpb.PlayerController_ClientReceiveLocalizedMessage_Params
+	(*GameStateBase)(nil),                                         // 44: unrealpb.GameStateBase
+	(*PawnState)(nil),                                             // 45: unrealpb.PawnState
+	(*FClientAdjustment)(nil),                                     // 46: unrealpb.FClientAdjustment
+	(*UnrealObjectRef_GuidCachedObject)(nil),                      // 47: unrealpb.UnrealObjectRef.GuidCachedObject
+	(*FRootMotionSource_FRootMotionFinishVelocitySettings)(nil),   // 48: unrealpb.FRootMotionSource.FRootMotionFinishVelocitySettings
+	(*anypb.Any)(nil),                                             // 49: google.protobuf.Any
 }
 var file_unreal_common_proto_depIdxs = []int32{
-	46, // 0: unrealpb.UnrealObjectRef.context:type_name -> unrealpb.UnrealObjectRef.GuidCachedObject
-	2,  // 1: unrealpb.ActorComponentRef.owner:type_name -> unrealpb.UnrealObjectRef
-	2,  // 2: unrealpb.RemoteFunctionMessage.targetObj:type_name -> unrealpb.UnrealObjectRef
-	2,  // 3: unrealpb.SpawnObjectMessage.obj:type_name -> unrealpb.UnrealObjectRef
-	1,  // 4: unrealpb.SpawnObjectMessage.location:type_name -> unrealpb.FVector
-	1,  // 5: unrealpb.ServerSpawnedPlayerMessage.startPos:type_name -> unrealpb.FVector
-	2,  // 6: unrealpb.HandoverContext.obj:type_name -> unrealpb.UnrealObjectRef
-	8,  // 7: unrealpb.GetHandoverContextResultMessage.context:type_name -> unrealpb.HandoverContext
-	8,  // 8: unrealpb.HandoverData.context:type_name -> unrealpb.HandoverContext
-	48, // 9: unrealpb.HandoverData.channelData:type_name -> google.protobuf.Any
-	2,  // 10: unrealpb.GetUnrealObjectRefResultMessage.objRef:type_name -> unrealpb.UnrealObjectRef
-	1,  // 11: unrealpb.FRepMovement.linearVelocity:type_name -> unrealpb.FVector
-	1,  // 12: unrealpb.FRepMovement.angularVelocity:type_name -> unrealpb.FVector
-	1,  // 13: unrealpb.FRepMovement.location:type_name -> unrealpb.FVector
-	1,  // 14: unrealpb.FRepMovement.rotation:type_name -> unrealpb.FVector
-	2,  // 15: unrealpb.FRepAttachment.attachParent:type_name -> unrealpb.UnrealObjectRef
-	1,  // 16: unrealpb.FRepAttachment.locationOffset:type_name -> unrealpb.FVector
-	1,  // 17: unrealpb.FRepAttachment.relativeScale:type_name -> unrealpb.FVector
-	1,  // 18: unrealpb.FRepAttachment.rotationOffset:type_name -> unrealpb.FVector
-	3,  // 19: unrealpb.FRepAttachment.attachComponent:type_name -> unrealpb.ActorComponentRef
-	2,  // 20: unrealpb.ActorState.owner:type_name -> unrealpb.UnrealObjectRef
-	2,  // 21: unrealpb.ActorState.instigator:type_name -> unrealpb.UnrealObjectRef
-	14, // 22: unrealpb.ActorState.replicatedMovement:type_name -> unrealpb.FRepMovement
-	15, // 23: unrealpb.ActorState.attachmentReplication:type_name -> unrealpb.FRepAttachment
-	3,  // 24: unrealpb.SceneComponentState.attachParent:type_name -> unrealpb.ActorComponentRef
-	3,  // 25: unrealpb.SceneComponentState.attachChildren:type_name -> unrealpb.ActorComponentRef
-	1,  // 26: unrealpb.SceneComponentState.relativeLocation:type_name -> unrealpb.FVector
-	1,  // 27: unrealpb.SceneComponentState.relativeRotation:type_name -> unrealpb.FVector
-	1,  // 28: unrealpb.SceneComponentState.relativeScale:type_name -> unrealpb.FVector
-	3,  // 29: unrealpb.FBasedMovementInfo.movementBase:type_name -> unrealpb.ActorComponentRef
-	1,  // 30: unrealpb.FBasedMovementInfo.location:type_name -> unrealpb.FVector
-	1,  // 31: unrealpb.FBasedMovementInfo.rotation:type_name -> unrealpb.FVector
-	47, // 32: unrealpb.FRootMotionSource.finishVelocityParams:type_name -> unrealpb.FRootMotionSource.FRootMotionFinishVelocitySettings
-	20, // 33: unrealpb.FRootMotionSourceGroup.rootMotionSources:type_name -> unrealpb.FRootMotionSource
-	20, // 34: unrealpb.FRootMotionSourceGroup.pendingAddRootMotionSources:type_name -> unrealpb.FRootMotionSource
-	1,  // 35: unrealpb.FRootMotionSourceGroup.lastPreAdditiveVelocity:type_name -> unrealpb.FVector
-	2,  // 36: unrealpb.FRepRootMotionMontage.animMontage:type_name -> unrealpb.UnrealObjectRef
-	1,  // 37: unrealpb.FRepRootMotionMontage.location:type_name -> unrealpb.FVector
-	1,  // 38: unrealpb.FRepRootMotionMontage.rotation:type_name -> unrealpb.FVector
-	3,  // 39: unrealpb.FRepRootMotionMontage.movementBase:type_name -> unrealpb.ActorComponentRef
-	21, // 40: unrealpb.FRepRootMotionMontage.authoritativeRootMotion:type_name -> unrealpb.FRootMotionSourceGroup
-	1,  // 41: unrealpb.FRepRootMotionMontage.acceleration:type_name -> unrealpb.FVector
-	1,  // 42: unrealpb.FRepRootMotionMontage.linearVelocity:type_name -> unrealpb.FVector
-	22, // 43: unrealpb.CharacterState.rootMotion:type_name -> unrealpb.FRepRootMotionMontage
-	19, // 44: unrealpb.CharacterState.basedMovement:type_name -> unrealpb.FBasedMovementInfo
-	2,  // 45: unrealpb.ControllerState.playerState:type_name -> unrealpb.UnrealObjectRef
-	2,  // 46: unrealpb.ControllerState.pawn:type_name -> unrealpb.UnrealObjectRef
-	1,  // 47: unrealpb.Controller_ClientSetLocation_Params.newLocation:type_name -> unrealpb.FVector
-	1,  // 48: unrealpb.Controller_ClientSetLocation_Params.newRotation:type_name -> unrealpb.FVector
-	1,  // 49: unrealpb.Controller_ClientSetRotation_Params.newRotation:type_name -> unrealpb.FVector
-	1,  // 50: unrealpb.PlayerControllerState.targetViewRotation:type_name -> unrealpb.FVector
-	1,  // 51: unrealpb.PlayerControllerState.spawnLocation:type_name -> unrealpb.FVector
-	1,  // 52: unrealpb.PlayerController_ServerUpdateCamera_Params.camLoc:type_name -> unrealpb.FVector
-	2,  // 53: unrealpb.PlayerController_ClientSetViewTarget_Params.actor:type_name -> unrealpb.UnrealObjectRef
-	2,  // 54: unrealpb.PlayerController_ClientRestart_Params.pawn:type_name -> unrealpb.UnrealObjectRef
-	2,  // 55: unrealpb.PlayerController_ClientRetryClientRestart_Params.pawn:type_name -> unrealpb.UnrealObjectRef
-	1,  // 56: unrealpb.PlayerController_ServerSetSpectatorLocation_Params.newLoc:type_name -> unrealpb.FVector
-	1,  // 57: unrealpb.PlayerController_ServerSetSpectatorLocation_Params.newRot:type_name -> unrealpb.FVector
-	2,  // 58: unrealpb.PlayerController_ServerAcknowledgePossession_Params.pawn:type_name -> unrealpb.UnrealObjectRef
-	2,  // 59: unrealpb.PlayerController_ClientReceiveLocalizedMessage_Params.relatedPlayerState_1:type_name -> unrealpb.UnrealObjectRef
-	2,  // 60: unrealpb.PlayerController_ClientReceiveLocalizedMessage_Params.relatedPlayerState_2:type_name -> unrealpb.UnrealObjectRef
-	2,  // 61: unrealpb.PlayerController_ClientReceiveLocalizedMessage_Params.optionalObject:type_name -> unrealpb.UnrealObjectRef
-	2,  // 62: unrealpb.PawnState.playerState:type_name -> unrealpb.UnrealObjectRef
-	2,  // 63: unrealpb.PawnState.controller:type_name -> unrealpb.UnrealObjectRef
-	1,  // 64: unrealpb.FClientAdjustment.newLoc:type_name -> unrealpb.FVector
-	1,  // 65: unrealpb.FClientAdjustment.newVel:type_name -> unrealpb.FVector
-	1,  // 66: unrealpb.FClientAdjustment.newRot:type_name -> unrealpb.FVector
-	2,  // 67: unrealpb.FClientAdjustment.newBase:type_name -> unrealpb.UnrealObjectRef
-	21, // 68: unrealpb.FClientAdjustment.rootMotionSourceCorrection:type_name -> unrealpb.FRootMotionSourceGroup
-	1,  // 69: unrealpb.FClientAdjustment.rootMotionRotation:type_name -> unrealpb.FVector
-	1,  // 70: unrealpb.FRootMotionSource.FRootMotionFinishVelocitySettings.setVelocity:type_name -> unrealpb.FVector
+	47, // 0: unrealpb.UnrealObjectRef.context:type_name -> unrealpb.UnrealObjectRef.GuidCachedObject
+	3,  // 1: unrealpb.ActorComponentRef.owner:type_name -> unrealpb.UnrealObjectRef
+	3,  // 2: unrealpb.RemoteFunctionMessage.targetObj:type_name -> unrealpb.UnrealObjectRef
+	3,  // 3: unrealpb.SpawnObjectMessage.obj:type_name -> unrealpb.UnrealObjectRef
+	2,  // 4: unrealpb.SpawnObjectMessage.location:type_name -> unrealpb.FVector
+	2,  // 5: unrealpb.ServerSpawnedPlayerMessage.startPos:type_name -> unrealpb.FVector
+	3,  // 6: unrealpb.HandoverContext.obj:type_name -> unrealpb.UnrealObjectRef
+	9,  // 7: unrealpb.GetHandoverContextResultMessage.context:type_name -> unrealpb.HandoverContext
+	9,  // 8: unrealpb.HandoverData.context:type_name -> unrealpb.HandoverContext
+	49, // 9: unrealpb.HandoverData.channelData:type_name -> google.protobuf.Any
+	3,  // 10: unrealpb.GetUnrealObjectRefResultMessage.objRef:type_name -> unrealpb.UnrealObjectRef
+	2,  // 11: unrealpb.FRepMovement.linearVelocity:type_name -> unrealpb.FVector
+	2,  // 12: unrealpb.FRepMovement.angularVelocity:type_name -> unrealpb.FVector
+	2,  // 13: unrealpb.FRepMovement.location:type_name -> unrealpb.FVector
+	2,  // 14: unrealpb.FRepMovement.rotation:type_name -> unrealpb.FVector
+	3,  // 15: unrealpb.FRepAttachment.attachParent:type_name -> unrealpb.UnrealObjectRef
+	2,  // 16: unrealpb.FRepAttachment.locationOffset:type_name -> unrealpb.FVector
+	2,  // 17: unrealpb.FRepAttachment.relativeScale:type_name -> unrealpb.FVector
+	2,  // 18: unrealpb.FRepAttachment.rotationOffset:type_name -> unrealpb.FVector
+	4,  // 19: unrealpb.FRepAttachment.attachComponent:type_name -> unrealpb.ActorComponentRef
+	3,  // 20: unrealpb.ActorState.owner:type_name -> unrealpb.UnrealObjectRef
+	3,  // 21: unrealpb.ActorState.instigator:type_name -> unrealpb.UnrealObjectRef
+	15, // 22: unrealpb.ActorState.replicatedMovement:type_name -> unrealpb.FRepMovement
+	16, // 23: unrealpb.ActorState.attachmentReplication:type_name -> unrealpb.FRepAttachment
+	4,  // 24: unrealpb.SceneComponentState.attachParent:type_name -> unrealpb.ActorComponentRef
+	4,  // 25: unrealpb.SceneComponentState.attachChildren:type_name -> unrealpb.ActorComponentRef
+	2,  // 26: unrealpb.SceneComponentState.relativeLocation:type_name -> unrealpb.FVector
+	2,  // 27: unrealpb.SceneComponentState.relativeRotation:type_name -> unrealpb.FVector
+	2,  // 28: unrealpb.SceneComponentState.relativeScale:type_name -> unrealpb.FVector
+	4,  // 29: unrealpb.FBasedMovementInfo.movementBase:type_name -> unrealpb.ActorComponentRef
+	2,  // 30: unrealpb.FBasedMovementInfo.location:type_name -> unrealpb.FVector
+	2,  // 31: unrealpb.FBasedMovementInfo.rotation:type_name -> unrealpb.FVector
+	48, // 32: unrealpb.FRootMotionSource.finishVelocityParams:type_name -> unrealpb.FRootMotionSource.FRootMotionFinishVelocitySettings
+	21, // 33: unrealpb.FRootMotionSourceGroup.rootMotionSources:type_name -> unrealpb.FRootMotionSource
+	21, // 34: unrealpb.FRootMotionSourceGroup.pendingAddRootMotionSources:type_name -> unrealpb.FRootMotionSource
+	2,  // 35: unrealpb.FRootMotionSourceGroup.lastPreAdditiveVelocity:type_name -> unrealpb.FVector
+	3,  // 36: unrealpb.FRepRootMotionMontage.animMontage:type_name -> unrealpb.UnrealObjectRef
+	2,  // 37: unrealpb.FRepRootMotionMontage.location:type_name -> unrealpb.FVector
+	2,  // 38: unrealpb.FRepRootMotionMontage.rotation:type_name -> unrealpb.FVector
+	4,  // 39: unrealpb.FRepRootMotionMontage.movementBase:type_name -> unrealpb.ActorComponentRef
+	22, // 40: unrealpb.FRepRootMotionMontage.authoritativeRootMotion:type_name -> unrealpb.FRootMotionSourceGroup
+	2,  // 41: unrealpb.FRepRootMotionMontage.acceleration:type_name -> unrealpb.FVector
+	2,  // 42: unrealpb.FRepRootMotionMontage.linearVelocity:type_name -> unrealpb.FVector
+	23, // 43: unrealpb.CharacterState.rootMotion:type_name -> unrealpb.FRepRootMotionMontage
+	20, // 44: unrealpb.CharacterState.basedMovement:type_name -> unrealpb.FBasedMovementInfo
+	3,  // 45: unrealpb.ControllerState.playerState:type_name -> unrealpb.UnrealObjectRef
+	3,  // 46: unrealpb.ControllerState.pawn:type_name -> unrealpb.UnrealObjectRef
+	2,  // 47: unrealpb.Controller_ClientSetLocation_Params.newLocation:type_name -> unrealpb.FVector
+	2,  // 48: unrealpb.Controller_ClientSetLocation_Params.newRotation:type_name -> unrealpb.FVector
+	2,  // 49: unrealpb.Controller_ClientSetRotation_Params.newRotation:type_name -> unrealpb.FVector
+	2,  // 50: unrealpb.PlayerControllerState.targetViewRotation:type_name -> unrealpb.FVector
+	2,  // 51: unrealpb.PlayerControllerState.spawnLocation:type_name -> unrealpb.FVector
+	2,  // 52: unrealpb.PlayerController_ServerUpdateCamera_Params.camLoc:type_name -> unrealpb.FVector
+	3,  // 53: unrealpb.PlayerController_ClientSetViewTarget_Params.actor:type_name -> unrealpb.UnrealObjectRef
+	3,  // 54: unrealpb.PlayerController_ClientRestart_Params.pawn:type_name -> unrealpb.UnrealObjectRef
+	3,  // 55: unrealpb.PlayerController_ClientRetryClientRestart_Params.pawn:type_name -> unrealpb.UnrealObjectRef
+	2,  // 56: unrealpb.PlayerController_ServerSetSpectatorLocation_Params.newLoc:type_name -> unrealpb.FVector
+	2,  // 57: unrealpb.PlayerController_ServerSetSpectatorLocation_Params.newRot:type_name -> unrealpb.FVector
+	3,  // 58: unrealpb.PlayerController_ServerAcknowledgePossession_Params.pawn:type_name -> unrealpb.UnrealObjectRef
+	3,  // 59: unrealpb.PlayerController_ClientReceiveLocalizedMessage_Params.relatedPlayerState_1:type_name -> unrealpb.UnrealObjectRef
+	3,  // 60: unrealpb.PlayerController_ClientReceiveLocalizedMessage_Params.relatedPlayerState_2:type_name -> unrealpb.UnrealObjectRef
+	3,  // 61: unrealpb.PlayerController_ClientReceiveLocalizedMessage_Params.optionalObject:type_name -> unrealpb.UnrealObjectRef
+	3,  // 62: unrealpb.PawnState.playerState:type_name -> unrealpb.UnrealObjectRef
+	3,  // 63: unrealpb.PawnState.controller:type_name -> unrealpb.UnrealObjectRef
+	2,  // 64: unrealpb.FClientAdjustment.newLoc:type_name -> unrealpb.FVector
+	2,  // 65: unrealpb.FClientAdjustment.newVel:type_name -> unrealpb.FVector
+	2,  // 66: unrealpb.FClientAdjustment.newRot:type_name -> unrealpb.FVector
+	3,  // 67: unrealpb.FClientAdjustment.newBase:type_name -> unrealpb.UnrealObjectRef
+	22, // 68: unrealpb.FClientAdjustment.rootMotionSourceCorrection:type_name -> unrealpb.FRootMotionSourceGroup
+	2,  // 69: unrealpb.FClientAdjustment.rootMotionRotation:type_name -> unrealpb.FVector
+	2,  // 70: unrealpb.FRootMotionSource.FRootMotionFinishVelocitySettings.setVelocity:type_name -> unrealpb.FVector
 	71, // [71:71] is the sub-list for method output_type
 	71, // [71:71] is the sub-list for method input_type
 	71, // [71:71] is the sub-list for extension type_name
@@ -5037,7 +5114,7 @@ func file_unreal_common_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_unreal_common_proto_rawDesc,
-			NumEnums:      1,
+			NumEnums:      2,
 			NumMessages:   47,
 			NumExtensions: 0,
 			NumServices:   0,

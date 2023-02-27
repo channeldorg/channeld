@@ -42,6 +42,18 @@ enum MessageType {
     SERVER_PLAYER_LEAVE = 202;
 }
 
+enum UnrealObjectType
+{
+    UOT_Unknown = 0;
+    UOT_GameState = 1;
+    UOT_Actor = 2;
+    UOT_Pawn = 3;
+    UOT_Character = 4;
+    UOT_PlayerState = 5;
+    UOT_Controller = 6;
+    UOT_PlayerController = 7;
+}
+
 // Maps to UE's FVector AND FRotator struct.
 // For FRotator, x = pitch, y = yaw, z = roll
 message FVector {
@@ -60,6 +72,7 @@ message UnrealObjectRef {
     repeated GuidCachedObject context = 2;
     optional bytes netGUIDBunch = 3;
     optional uint32 bunchBitsNum = 4;
+    // optional uint32 objType = 5;
 }
 
 message ActorComponentRef {
