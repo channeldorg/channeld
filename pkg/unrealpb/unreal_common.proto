@@ -15,11 +15,11 @@ enum MessageType {
 	// Used by ChanneldGameInstanceSubsystem to broadcast the ProtoMessageObject from server side. The message is packed as google::protobuf::any to support anonymous types.
     ANY = 101;
 
- 	// Used by ReplicationDriver to send/receive UE's native RPC.
+ 	// Used by ChanneldNetDriver to send/receive UE's native RPC.
     // See @RemoteFunctionMessage
     RPC = 102;
 
-    // Used by UE server to spawn objects on the client. 
+    // Used by UE servers to spawn objects on the client. 
     // See @SpawnObjectMessage
     SPAWN = 103;
     

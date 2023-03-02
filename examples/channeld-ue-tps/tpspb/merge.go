@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+/*
 // Implement [channeld.ChannelDataInitializer]
 func (data *TestRepChannelData) Init() error {
 	if data.GameState == nil {
@@ -53,6 +54,7 @@ func (data *TestRepChannelData) Init() error {
 
 	return nil
 }
+*/
 
 // Implement [channeld.ChannelDataInitializer]
 func (to *TestRepChannelData) CollectStates(netId uint32, src common.Message) error {
@@ -61,37 +63,68 @@ func (to *TestRepChannelData) CollectStates(netId uint32, src common.Message) er
 		return errors.New("src is not a TestRepChannelData")
 	}
 
-	to.Init()
+	// to.Init()
 	actorState, exists := from.ActorStates[netId]
 	if exists {
+		if to.ActorStates == nil {
+			to.ActorStates = make(map[uint32]*unrealpb.ActorState)
+		}
 		to.ActorStates[netId] = actorState
 	}
+
 	pawnState, exists := from.PawnStates[netId]
 	if exists {
+		if to.PawnStates == nil {
+			to.PawnStates = make(map[uint32]*unrealpb.PawnState)
+		}
 		to.PawnStates[netId] = pawnState
 	}
+
 	characterState, exists := from.CharacterStates[netId]
 	if exists {
+		if to.CharacterStates == nil {
+			to.CharacterStates = make(map[uint32]*unrealpb.CharacterState)
+		}
 		to.CharacterStates[netId] = characterState
 	}
+
 	playerState, exists := from.PlayerStates[netId]
 	if exists {
+		if to.PlayerStates == nil {
+			to.PlayerStates = make(map[uint32]*unrealpb.PlayerState)
+		}
 		to.PlayerStates[netId] = playerState
 	}
+
 	controllerState, exists := from.ControllerStates[netId]
 	if exists {
+		if to.ControllerStates == nil {
+			to.ControllerStates = make(map[uint32]*unrealpb.ControllerState)
+		}
 		to.ControllerStates[netId] = controllerState
 	}
+
 	playerControllerStates, exists := from.PlayerControllerStates[netId]
 	if exists {
+		if to.PlayerControllerStates == nil {
+			to.PlayerControllerStates = make(map[uint32]*unrealpb.PlayerControllerState)
+		}
 		to.PlayerControllerStates[netId] = playerControllerStates
 	}
+
 	testRepPlayerControllerStates, exists := from.TestRepPlayerControllerStates[netId]
 	if exists {
+		if to.TestRepPlayerControllerStates == nil {
+			to.TestRepPlayerControllerStates = make(map[uint32]*TestRepPlayerControllerState)
+		}
 		to.TestRepPlayerControllerStates[netId] = testRepPlayerControllerStates
 	}
+
 	testNPCStates, exists := from.TestNPCStates[netId]
 	if exists {
+		if to.TestNPCStates == nil {
+			to.TestNPCStates = make(map[uint32]*TestNPCState)
+		}
 		to.TestNPCStates[netId] = testNPCStates
 	}
 
@@ -128,9 +161,16 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 	}
 
 	if srcData.GameState != nil {
+		if dst.GameState == nil {
+			dst.GameState = &unrealpb.GameStateBase{}
+		}
 		proto.Merge(dst.GameState, srcData.GameState)
 	}
+
 	if srcData.TestGameState != nil {
+		if dst.TestGameState == nil {
+			dst.TestGameState = &TestRepGameState{}
+		}
 		proto.Merge(dst.TestGameState, srcData.TestGameState)
 	}
 
