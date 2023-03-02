@@ -56,7 +56,7 @@ func (data *TestRepChannelData) Init() error {
 }
 */
 
-// Implement [channeld.ChannelDataInitializer]
+// Implement [channeld.ChannelDataCollector]
 func (to *TestRepChannelData) CollectStates(netId uint32, src common.Message) error {
 	from, ok := src.(*TestRepChannelData)
 	if !ok {

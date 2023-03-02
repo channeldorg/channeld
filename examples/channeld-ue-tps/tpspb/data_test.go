@@ -23,7 +23,7 @@ var dstData2 = &TestRepChannelData{}
 func init() {
 	channeld.InitLogs()
 
-	srcData.Init()
+	// srcData.Init()
 
 	protojson.Unmarshal(srcDataJson, srcData)
 	protojson.Unmarshal(dstDataJson1, dstData1)
