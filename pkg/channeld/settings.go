@@ -63,6 +63,8 @@ type ChannelSettingsType struct {
 	DefaultFanOutDelayMs           int32
 	RemoveChannelAfterOwnerRemoved bool
 	ACLSettings                    ACLSettingsType
+	// Optinal. The full name of the Protobuf message type for the channel data (including the package name)
+	DataMsgFullName string
 }
 
 var GlobalSettings = GlobalSettingsType{

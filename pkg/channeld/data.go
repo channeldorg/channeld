@@ -54,7 +54,27 @@ var channelDataTypeRegistery = make(map[channeldpb.ChannelType]proto.Message)
 // This is needed when channeld doesn't know the package of the message is in,
 // as well as creating a ChannelData using ReflectChannelData()
 func RegisterChannelDataType(channelType channeldpb.ChannelType, msgTemplate proto.Message) {
-	channelDataTypeRegistery[channelType] = msgTemplate
+	msg, exists := channelDataTypeRegistery[channelType]
+
+	if exists {
+		if rootLogger != nil {
+			rootLogger.Warn("channel data type already exists, won't be registered",
+				zap.String("channelType", channelType.String()),
+				zap.String("curMsgName", string(msg.ProtoReflect().Descriptor().FullName())),
+				zap.String("newMsgName", string(msgTemplate.ProtoReflect().Descriptor().FullName())),
+			)
+		}
+	} else {
+		channelDataTypeRegistery[channelType] = msgTemplate
+
+		if rootLogger != nil {
+			rootLogger.Info("registered channel data type",
+				zap.String("channelType", channelType.String()),
+				zap.String("msgFullName", string(msgTemplate.ProtoReflect().Descriptor().FullName())),
+			)
+		}
+	}
+
 }
 
 func ReflectChannelDataMessage(channelType channeldpb.ChannelType, mergeOptions *channeldpb.ChannelDataMergeOptions) (common.ChannelDataMessage, error) {

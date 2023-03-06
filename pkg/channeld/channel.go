@@ -13,6 +13,8 @@ import (
 	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"channeld.clewcat.com/channeld/pkg/common"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
 type ChannelState uint8
@@ -102,6 +104,24 @@ func InitChannels() {
 	globalChannel, err = CreateChannel(channeldpb.ChannelType_GLOBAL, nil)
 	if err != nil {
 		rootLogger.Panic("Failed to create global channel", zap.Error(err))
+	}
+
+	for chType, settings := range GlobalSettings.ChannelSettings {
+		if settings.DataMsgFullName == "" {
+			continue
+		}
+
+		msgType, err := protoregistry.GlobalTypes.FindMessageByName(protoreflect.FullName(settings.DataMsgFullName))
+		if err != nil {
+			rootLogger.Error("failed to find message type for channel data",
+				zap.String("channelType", chType.String()),
+				zap.String("msgFullName", settings.DataMsgFullName),
+				zap.Error(err),
+			)
+			continue
+		}
+
+		RegisterChannelDataType(chType, msgType.New().Interface())
 	}
 }
 

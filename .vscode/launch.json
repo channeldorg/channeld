@@ -35,7 +35,7 @@
         "request": "launch",
         "mode": "debug",
         "program": "examples/chat-rooms/main.go",
-        "args": ["-dev", "-loglevel=0", "-profile=cpu", "-ct=1", "-chs=${workspaceFolder}/config/channel_settings_hifi.json"]
+        "args": ["-dev", "-loglevel=0", "-profile=cpu", "-ct=1", "-chs=${workspaceFolder}/config/channel_settings_lofi.json"]
     },
     {
         "name": "Launch Tank Example",
@@ -53,6 +53,7 @@
         "mode": "debug",
         "cwd": "${workspaceFolder}",
         "program": "examples/channeld-ue-tps",
+        "buildFlags": "-pkgdir=./tpspb",
         "args": ["-cfsm=config/client_authoratative_fsm.json", "-dev", "-loglevel=-1", "-ct=0", "-mcb=13", "-scc=${workspaceFolder}/config/spatial_static_2x2.json"]
     },
     {

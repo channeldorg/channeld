@@ -1,0 +1,50 @@
+{
+    "1": {
+        "TickIntervalMs": 20,
+        "DefaultFanOutIntervalMs": 20,
+        "DefaultFanOutDelayMs": 0,
+        "RemoveChannelAfterOwnerRemoved": false,
+        "ACLSettings": {
+            "Sub": 3,
+            "Unsub": 3,
+            "Remove": 0
+        },
+        "DataMsgFullName": "channeldgenpb.DefaultChannelData"
+    },
+    "2": {
+        "TickIntervalMs": 20,
+        "DefaultFanOutIntervalMs": 20,
+        "DefaultFanOutDelayMs": 0,
+        "RemoveChannelAfterOwnerRemoved": true,
+        "ACLSettings": {
+            "Sub": 2,
+            "Unsub": 2,
+            "Remove": 2
+        },
+        "DataMsgFullName": "channeldgenpb.DefaultChannelData"
+    },
+    "3": {
+        "TickIntervalMs": 20,
+        "DefaultFanOutIntervalMs": 20,
+        "DefaultFanOutDelayMs": 0,
+        "RemoveChannelAfterOwnerRemoved": true,
+        "ACLSettings": {
+            "Sub": 3,
+            "Unsub": 3,
+            "Remove": 2
+        },
+        "DataMsgFullName": "channeldgenpb.DefaultChannelData"
+    },
+    "4": {
+        "TickIntervalMs": 20,
+        "DefaultFanOutIntervalMs": 20,
+        "DefaultFanOutDelayMs": 0,
+        "RemoveChannelAfterOwnerRemoved": true,
+        "ACLSettings": {
+            "Sub": 3,
+            "Unsub": 3,
+            "Remove": 2
+        },
+        "DataMsgFullName": "channeldgenpb.DefaultChannelData"
+    }
+}
