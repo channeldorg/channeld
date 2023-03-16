@@ -89,7 +89,7 @@ func ReflectChannelDataMessage(channelType channeldpb.ChannelType, mergeOptions 
 	*/
 	dataType, exists := channelDataTypeRegistery[channelType]
 	if !exists {
-		return nil, fmt.Errorf("failed to create data for channel type %s", channelType.String())
+		return nil, fmt.Errorf("no channel data type registered for channel type %s", channelType.String())
 	}
 
 	return dataType.ProtoReflect().New().Interface(), nil
@@ -106,7 +106,7 @@ func (ch *Channel) InitData(dataMsg common.ChannelDataMessage, mergeOptions *cha
 		var err error
 		ch.data.msg, err = ReflectChannelDataMessage(ch.channelType, mergeOptions)
 		if err != nil {
-			ch.logger.Error("failed to create channel data message", zap.Error(err))
+			ch.logger.Info("unable to create default channel data message; will use the first received message to set", zap.String("chType", ch.channelType.String()), zap.Error(err))
 			return
 		}
 	}
@@ -138,6 +138,10 @@ func (ch *Channel) SetDataUpdateConnId(connId ConnectionId) {
 func (d *ChannelData) OnUpdate(updateMsg common.ChannelDataMessage, t ChannelTime, senderConnId ConnectionId, spatialNotifier common.SpatialInfoChangedNotifier) {
 	if d.msg == nil {
 		d.msg = updateMsg
+		rootLogger.Info("initialized channel data with update message",
+			zap.Uint32("senderConnId", uint32(senderConnId)),
+			zap.String("msgName", string(updateMsg.ProtoReflect().Descriptor().FullName())),
+		)
 	} else {
 		mergeWithOptions(d.msg, updateMsg, d.mergeOptions, spatialNotifier)
 	}
