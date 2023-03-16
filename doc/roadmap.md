@@ -7,9 +7,9 @@
 - [x] Channel ACL
 - [x] DDoS Protection
 - [ ] Health check
-- [ ] Front-end load-balancing
 - [x] Spatial-based pub/sub
 - [ ] Spatial-based load-balancing
+- [ ] Distributed channels
 
 # Modules
 - [x] Stub(RPC) support
@@ -34,12 +34,12 @@
 # SDKs
 - [ ] Javascript SDK
 - [x] Unity C# SDK
-- [ ] Unreal C++ SDK
+- [x] Unreal C++ SDK
 
 # Tools
 - [x] Simulated client (Go)
-- [ ] Replication code generators
-- [ ] Web inspector
+- [x] Replication code generators
+- [ ] Channel monitor
 
 # Example projects
 - [x] Web chat rooms
@@ -55,15 +55,15 @@
         - [x] Observers and Interest Management
         - [ ] SyncVar and RPC code generation
     - [x] Multi-server support
-- [ ] Unreal seamless world travelling
+- [x] Unreal seamless world travelling
     - [x] Implement the C++ client library
     - [x] Blueprint support
     - [x] Integrate with Unreal's networking stack
     - [x] Integrate with Unreal's Replication system
-    - [ ] Replication codegen
+    - [x] Replication codegen
     - [x] Multi-server support
-    - [ ] Client interest management
-    - [ ] Editor toolbar extension
+    - [x] Client interest management
+    - [x] Editor toolbar extension
     - [ ] KCP support
     - [ ] Data traffic compression
 - [ ] Dynamic region load-balancing

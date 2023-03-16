@@ -1,45 +1,68 @@
 # Overview
-channeld is an open source, light-weight and efficient **messaging gateway** server designed for **distributed game servers** (typically MMO) 
-and other backend applications that require real-time, subscription-based user interaction with high concurrency (e.g. instance messenger server).
+channeld is an efficient gateway service designed for massive online systems with high fidelity interactions, such as multiplayer games and 3D virtual events. It can be seamlessly integrated with the mainstream game engines (e.g. Unity, Unreal Engine) to develop dedicated servers, together to distributionally simulate the parallel game sessions or seamless open worlds.
 
-![architecture](doc/architecture.png)
+channeld是为大型多人交互系统（如MMO，虚拟演唱会）设计的高性能网关服务，可无缝接入UE、Unity等引擎进行专用服务器的开发，用于分布式地模拟多房间及无缝大世界等应用。
+
+<img alt="architecture" height="360" src="doc/architecture.png"/>
+
 See the concepts in the [design doc](doc/design.md).
 
-## Applications:
+## Applications 应用场景
 There are three major types of application benifit from channeld's architecture design:
-### Relay Servers:
-![](doc/relay.png)
+
+channeld的架构设计可应用于以下三种场景：
+### 1.Relay Servers 中继服务器
+
+<img height="300" src="doc/relay.png"/>
 
 channeld can be used as the relay server to forward/broadcast messages between game clients.
 
-### Dedicated Server Gateway:
-![](doc/dedicated.png)
+channeld可用于中继服务器，用于转发/广播游戏客户端之间的消息。
+
+### 2.Dedicated Server Gateway 专用服务器网关
+
+<img height="360" src="doc/dedicated.png"/>
 
 channeld can be used as the gateway server to route messages to different dedicated servers.
 
-### Seamless Distributed Server:
-![](doc/seamless.png)
+channeld可用于专用服务器网关，用于将消息路由到不同的专用服务器。
+
+### 3.Seamless Distributed Server Gateway 无缝分布式服务器网关
+
+<img height="400" src="doc/seamless.png"/>
 
 The ultimate purpose of channeld is to enable distributed composition of dedicated servers, together to form a seamless large virtual world.
+
+channeld的最终目标是实现专用服务器的分布式组合，从而形成无缝的大型虚拟世界。
 
 ## Key features:
 * Protobuf-based binary protocol over TCP, KCP or WebSocket
 * FSM-based message filtering
 * Fanout-based data pub/sub of any type defined with Protobuf
-* Area of interest management based on channel and data pub/sub
+* Interest management based on channel and data pub/sub
+* Integration with the mainstream game engines ([Unity](https://github.com/metaworking/channeld-unity-mirror), [Unreal Engine](https://github.com/metaworking/channeld-ue-plugin))
 * [WIP] Backend servers load-balancing with auto-scaling
-* [WIP] Integration with the mainstream game engines ([Unity](https://github.com/indiest/channeld-unity-mirror), Unreal Engine)
 
-## Performance
-channeld is aimmed to support 10Ks connections and 100Ks mps(messages per second) on a single node (uplink + downlink), and 10Ms mps in a distributed system.
+关键特性：
+* 基于Protobuf的二进制协议，支持TCP、KCP、WebSocket
+* 基于有限状态机的消息过滤
+* 基于扇出的数据发布/订阅，支持任意Protobuf定义的数据类型
+* 基于频道和数据发布/订阅的兴趣管理
+* 接入主流游戏引擎（[Unity](https://github.com/metaworking/channeld-unity-mirror), [Unreal Engine](https://github.com/metaworking/channeld-ue-plugin))
 
-## Roadmap
-Currently, the completeness of the project is 40%.
+## Performance 性能
+channeld is aimed to support 10K connections and 100K mps(messages per second) on a single node (uplink + downlink), and 10M+ mps in a distributed system.
 
+channeld的目标是在单个节点（上行+下行）上支持10K连接和100K mps（每秒消息数），以及在分布式系统中支持10M+ mps。
+
+## Roadmap 路线图
 There is a [dedicated roadmap documentation](doc/roadmap.md).
 
 Keep in mind that the requirements of the real-life projects will decide the priority of the development.
 
+路线图详见[这里](doc/roadmap.md)。
+
+请注意，实际项目的需求将决定开发的优先级。
 # Getting Started
 ## 1. Clone the source code
 ## 2. Docker
@@ -63,8 +86,8 @@ Use the input box at the bottom to send messages, to the GLOBAL channel by defau
 
 ## 4. The Unity tank demo
 Follow these steps if the docker image has not been built for the tanks service yet:
-1. Check out the [unity-mirror-channeld](https://github.com/indiest/channeld-unity-mirror) repo
-2. Create the Unity project following the [instruction](https://github.com/indiest/channeld-unity-mirror#how-to-run-the-tank-demo)
+1. Check out the [unity-mirror-channeld](https://github.com/metaworking/channeld-unity-mirror) repo
+2. Create the Unity project following the [instruction](https://github.com/metaworking/channeld-unity-mirror#how-to-run-the-tank-demo)
 3. Either build the Linux player from Unity Editor (Build -> Linux Server), or via the command: `Unity -batchmode -nographics -projectPath <PATH_TO_YOUR_UNITY_PROJECT> -executeMethod BuildScript.BuildLinuxServer -logFile build.log -quit`. The path to the Unity Editor needs to added to the PATH environment argument in order to run the command.
 4. Build the docker image: `docker build -t channeld/tanks .`
 
@@ -72,4 +95,4 @@ Running the Unity tanks demo with Docker is similar to running the chat rooms de
 
 `docker-compose up tanks`
 
-Then you can the play the game in Unity Editor. See the [full instruction here](https://github.com/indiest/channeld-unity-mirror#how-to-run-the-tank-demo).
+Then you can the play the game in Unity Editor. See the [full instruction here](https://github.com/metaworking/channeld-unity-mirror#how-to-run-the-tank-demo).
