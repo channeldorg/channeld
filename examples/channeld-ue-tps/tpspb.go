@@ -1,9 +1,9 @@
 package main
 
 import (
-	"channeld.clewcat.com/channeld/examples/channeld-ue-tps/tpspb"
-	"channeld.clewcat.com/channeld/pkg/channeld"
-	"channeld.clewcat.com/channeld/pkg/channeldpb"
+	"github.com/metaworking/channeld/examples/channeld-ue-tps/tpspb"
+	"github.com/metaworking/channeld/pkg/channeld"
+	"github.com/metaworking/channeld/pkg/channeldpb"
 )
 
 func InitTpsChannelDataTypes() {

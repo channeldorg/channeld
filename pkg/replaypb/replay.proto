@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package replaypb;
 
-import "channeld.proto";
+import "pkg/channeldpb/channeld.proto";
 
-option go_package = "channeld.clewcat.com/channeld/pkg/replaypb";
+option go_package = "github.com/metaworking/channeld/pkg/replaypb";
 
 message ReplayPacket {
     int64 offsetTime = 1;

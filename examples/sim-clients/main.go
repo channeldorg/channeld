@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"channeld.clewcat.com/channeld/pkg/channeld"
-	"channeld.clewcat.com/channeld/pkg/channeldpb"
-	"channeld.clewcat.com/channeld/pkg/client"
+	"github.com/metaworking/channeld/pkg/channeld"
+	"github.com/metaworking/channeld/pkg/channeldpb"
+	"github.com/metaworking/channeld/pkg/client"
 	"google.golang.org/protobuf/proto"
 )
 

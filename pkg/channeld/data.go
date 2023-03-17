@@ -4,9 +4,9 @@ import (
 	"container/list"
 	"fmt"
 
-	"channeld.clewcat.com/channeld/pkg/channeldpb"
-	"channeld.clewcat.com/channeld/pkg/common"
 	"github.com/indiest/fmutils"
+	"github.com/metaworking/channeld/pkg/channeldpb"
+	"github.com/metaworking/channeld/pkg/common"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 

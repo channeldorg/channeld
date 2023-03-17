@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"channeld.clewcat.com/channeld/internal/testpb"
 	"github.com/gorilla/websocket"
+	"github.com/metaworking/channeld/internal/testpb"
 	"google.golang.org/protobuf/proto"
 
 	nws "nhooyr.io/websocket"

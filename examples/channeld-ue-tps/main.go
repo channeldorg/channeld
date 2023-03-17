@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"channeld.clewcat.com/channeld/pkg/channeld"
-	"channeld.clewcat.com/channeld/pkg/channeldpb"
-	"channeld.clewcat.com/channeld/pkg/unreal"
+	"github.com/metaworking/channeld/pkg/channeld"
+	"github.com/metaworking/channeld/pkg/channeldpb"
+	"github.com/metaworking/channeld/pkg/unreal"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 

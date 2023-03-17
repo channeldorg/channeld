@@ -4,7 +4,7 @@ import (
 	"container/list"
 	"errors"
 
-	"channeld.clewcat.com/channeld/pkg/channeldpb"
+	"github.com/metaworking/channeld/pkg/channeldpb"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )

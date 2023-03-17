@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"channeld.clewcat.com/channeld/examples/unity-mirror-tanks/tankspb"
-	"channeld.clewcat.com/channeld/pkg/channeldpb"
-	"channeld.clewcat.com/channeld/pkg/client"
+	"github.com/metaworking/channeld/examples/unity-mirror-tanks/tankspb"
+	"github.com/metaworking/channeld/pkg/channeldpb"
+	"github.com/metaworking/channeld/pkg/client"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )

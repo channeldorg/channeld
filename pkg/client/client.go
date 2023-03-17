@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"channeld.clewcat.com/channeld/pkg/channeld"
-	"channeld.clewcat.com/channeld/pkg/channeldpb"
 	"github.com/golang/snappy"
 	"github.com/gorilla/websocket"
+	"github.com/metaworking/channeld/pkg/channeld"
+	"github.com/metaworking/channeld/pkg/channeldpb"
 	"google.golang.org/protobuf/proto"
 )
 

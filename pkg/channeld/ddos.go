@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"channeld.clewcat.com/channeld/pkg/channeldpb"
+	"github.com/metaworking/channeld/pkg/channeldpb"
 	"go.uber.org/zap"
 )
 

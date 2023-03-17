@@ -3,9 +3,9 @@ package unreal
 import (
 	"sync"
 
-	"channeld.clewcat.com/channeld/pkg/channeld"
-	"channeld.clewcat.com/channeld/pkg/common"
-	"channeld.clewcat.com/channeld/pkg/unrealpb"
+	"github.com/metaworking/channeld/pkg/channeld"
+	"github.com/metaworking/channeld/pkg/common"
+	"github.com/metaworking/channeld/pkg/unrealpb"
 	"go.uber.org/zap"
 )
 

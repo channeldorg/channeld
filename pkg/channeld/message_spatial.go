@@ -1,8 +1,8 @@
 package channeld
 
 import (
-	"channeld.clewcat.com/channeld/pkg/channeldpb"
-	"channeld.clewcat.com/channeld/pkg/common"
+	"github.com/metaworking/channeld/pkg/channeldpb"
+	"github.com/metaworking/channeld/pkg/common"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )

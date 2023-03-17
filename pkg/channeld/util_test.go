@@ -7,7 +7,7 @@ import (
 	"testing"
 	"unsafe"
 
-	"channeld.clewcat.com/channeld/pkg/common"
+	"github.com/metaworking/channeld/pkg/common"
 	"github.com/stretchr/testify/assert"
 )
 

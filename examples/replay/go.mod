@@ -1,9 +1,9 @@
-module channeld.clewcat.com/channeld/examples/replay
+module github.com/metaworking/channeld/examples/replay
 
 go 1.18
 
 require (
-	channeld.clewcat.com/channeld v0.0.0-00010101000000-000000000000
+	github.com/metaworking/channeld v0.0.0-00010101000000-000000000000
 	google.golang.org/protobuf v1.28.1
 )
 
@@ -35,4 +35,4 @@ require (
 	golang.org/x/sys v0.5.0 // indirect
 )
 
-replace channeld.clewcat.com/channeld => ../..
+replace github.com/metaworking/channeld => ../..

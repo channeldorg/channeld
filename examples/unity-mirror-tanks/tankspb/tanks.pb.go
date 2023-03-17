@@ -7,7 +7,7 @@
 package tankspb
 
 import (
-	channeldpb "channeld.clewcat.com/channeld/pkg/channeldpb"
+	channeldpb "github.com/metaworking/channeld/pkg/channeldpb"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"

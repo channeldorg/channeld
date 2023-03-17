@@ -1,9 +1,9 @@
-module channeld.clewcat.com/channeld/examples/chat-rooms
+module github.com/metaworking/channeld/examples/chat-rooms
 
 go 1.18
 
 require (
-	channeld.clewcat.com/channeld v0.0.0-00010101000000-000000000000
+	github.com/metaworking/channeld v0.0.0-00010101000000-000000000000
 	github.com/prometheus/client_golang v1.11.1
 	github.com/stretchr/testify v1.8.1
 	google.golang.org/protobuf v1.28.1
@@ -39,4 +39,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace channeld.clewcat.com/channeld => ../..
+replace github.com/metaworking/channeld => ../..

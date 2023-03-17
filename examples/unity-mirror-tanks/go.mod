@@ -1,9 +1,9 @@
-module channeld.clewcat.com/channeld/examples/unity-mirror-tanks
+module github.com/metaworking/channeld/examples/unity-mirror-tanks
 
 go 1.17
 
 require (
-	channeld.clewcat.com/channeld v0.0.0-00010101000000-000000000000
+	github.com/metaworking/channeld v0.0.0-00010101000000-000000000000
 	github.com/prometheus/client_golang v1.11.1
 	google.golang.org/protobuf v1.27.1
 )
@@ -35,4 +35,4 @@ require (
 	golang.org/x/sys v0.0.0-20210603081109-ebe580a85c40 // indirect
 )
 
-replace channeld.clewcat.com/channeld => ../..
+replace github.com/metaworking/channeld => ../..

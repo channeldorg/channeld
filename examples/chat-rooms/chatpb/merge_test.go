@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"channeld.clewcat.com/channeld/pkg/channeld"
-	"channeld.clewcat.com/channeld/pkg/channeldpb"
+	"github.com/metaworking/channeld/pkg/channeld"
+	"github.com/metaworking/channeld/pkg/channeldpb"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
 )

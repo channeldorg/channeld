@@ -4,7 +4,7 @@ package channeldpb;
 
 import "google/protobuf/any.proto";
 
-option go_package = "channeld.clewcat.com/channeld/pkg/channeldpb";
+option go_package = "github.com/metaworking/channeld/pkg/channeldpb";
 
 // The data packet that is sent between the endpoints. A packet can have multiple messages in the payload in one trip to improve the efficiency.
 message Packet {

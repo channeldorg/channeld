@@ -3,8 +3,8 @@ package testpb
 import (
 	"errors"
 
-	"channeld.clewcat.com/channeld/pkg/channeldpb"
-	"channeld.clewcat.com/channeld/pkg/common"
+	"github.com/metaworking/channeld/pkg/channeldpb"
+	"github.com/metaworking/channeld/pkg/common"
 	"google.golang.org/protobuf/proto"
 )
 
