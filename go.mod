@@ -1,4 +1,4 @@
-module channeld.clewcat.com/channeld
+module github.com/metaworking/channeld
 
 go 1.18
 
