@@ -127,6 +127,7 @@ func handleUnrealSpawnObject(ctx channeld.MessageContext) {
 	)
 }
 
+// Runs in the source spatial channel
 func handleHandoverContextResult(ctx channeld.MessageContext) {
 	msg, ok := ctx.Msg.(*unrealpb.GetHandoverContextResultMessage)
 	if !ok {
@@ -148,13 +149,13 @@ func handleHandoverContextResult(ctx channeld.MessageContext) {
 		return
 	}
 
-	if ctx.Channel.GetDataMessage() == nil {
+	fullChannelData := ctx.Channel.GetDataMessage()
+
+	if fullChannelData == nil {
 		ctx.Channel.Logger().Error("channel data message is nil")
 		provider <- nil
 		return
 	}
-
-	fullChannelData := ctx.Channel.GetDataMessage()
 
 	handoverChannelData := fullChannelData.ProtoReflect().New().Interface()
 
@@ -176,10 +177,18 @@ func handleHandoverContextResult(ctx channeld.MessageContext) {
 					ctx.Connection.Logger().Warn("handover obj is not fully exported yet", zap.Uint32("netId", msg.NetId))
 				}
 			}
+			// Should be goroutine-safe, as the handler is running in the source channel that owns fullChannelData.
 			collector.CollectStates(*handoverCtx.Obj.NetGUID, fullChannelData)
 		}
 	} else {
 		ctx.Connection.Logger().Warn("channel data message is not a ChannelDataCollector, the states of the context objects will not be included in the handover data", zap.Uint32("netId", msg.NetId))
+	}
+
+	anyData, err := anypb.New(handoverChannelData)
+	if err != nil {
+		ctx.Connection.Logger().Error("failed to marshal handover data", zap.Error(err), zap.Uint32("netId", msg.NetId))
+		provider <- nil
+		return
 	}
 
 	// Don't forget to merge the handover channel data to the dst channel, otherwise it may miss some states.
@@ -187,8 +196,10 @@ func handleHandoverContextResult(ctx channeld.MessageContext) {
 	if dstChannel != nil {
 		dstChannelDataMsg := dstChannel.GetDataMessage()
 		if dstChannelDataMsg == nil {
+			// Set the data directly
 			dstChannel.Data().OnUpdate(handoverChannelData, dstChannel.GetTime(), 0, nil)
 		} else {
+			/* Calling Merge() causes concurrent map read and map write as the handler is running in the source channel.
 			mergeable, ok := dstChannelDataMsg.(channeld.MergeableChannelData)
 			if ok {
 				// Should we let the dst channel fan out the update?
@@ -197,6 +208,11 @@ func handleHandoverContextResult(ctx channeld.MessageContext) {
 			} else {
 				proto.Merge(dstChannelDataMsg, handoverChannelData)
 			}
+			*/
+			updateMsg := &channeldpb.ChannelDataUpdateMessage{
+				Data: anyData,
+			}
+			dstChannel.PutMessageInternal(channeldpb.MessageType_CHANNEL_DATA_UPDATE, updateMsg)
 		}
 	}
 
@@ -209,12 +225,6 @@ func handleHandoverContextResult(ctx channeld.MessageContext) {
 	// Only provide channel data for cross-server handover
 	*/
 	if srcChannel != nil && dstChannel != nil /*&& !srcChannel.IsSameOwner(dstChannel)*/ {
-		anyData, err := anypb.New(handoverChannelData)
-		if err != nil {
-			ctx.Connection.Logger().Error("failed to marshal handover data", zap.Error(err), zap.Uint32("netId", msg.NetId))
-			provider <- nil
-			return
-		}
 		handoverData.ChannelData = anyData
 	}
 

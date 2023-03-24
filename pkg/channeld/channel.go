@@ -257,6 +257,32 @@ func (ch *Channel) PutMessageContext(ctx MessageContext, handler MessageHandlerF
 	ch.inMsgQueue <- channelMessage{ctx: ctx, handler: handler}
 }
 
+// Put the message into the channel's message queue. This method is used internally to make sure the message is handled in the channel's goroutine, to avoid race condition.
+//
+// For the MessageContext, the Connection is set as the channel's ownerConnection, and the ChannelId is set as the channel's id.
+func (ch *Channel) PutMessageInternal(msgType channeldpb.MessageType, msg common.Message) {
+	if ch.IsRemoving() {
+		return
+	}
+
+	entry, exists := MessageMap[msgType]
+	if !exists {
+		ch.logger.Error("can't find message handler", zap.String("msgType", msgType.String()))
+		return
+	}
+
+	ch.inMsgQueue <- channelMessage{ctx: MessageContext{
+		MsgType:     msgType,
+		Msg:         msg,
+		Connection:  ch.ownerConnection,
+		Channel:     ch,
+		Broadcast:   0,
+		StubId:      0,
+		ChannelId:   uint32(ch.id),
+		arrivalTime: ch.GetTime(),
+	}, handler: entry.handler}
+}
+
 func (ch *Channel) GetTime() ChannelTime {
 	return ChannelTime(time.Since(ch.startTime))
 }
