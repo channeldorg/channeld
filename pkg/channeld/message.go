@@ -511,8 +511,7 @@ func handleListChannel(ctx MessageContext) {
 	}
 
 	result := make([]*channeldpb.ListChannelResultMessage_ChannelInfo, 0)
-	allChannels.Range(func(_, v interface{}) bool {
-		channel := v.(*Channel)
+	allChannels.Range(func(_ common.ChannelId, channel *Channel) bool {
 		if msg.TypeFilter != channeldpb.ChannelType_UNKNOWN && msg.TypeFilter != channel.channelType {
 			return true
 		}

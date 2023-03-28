@@ -526,6 +526,8 @@ func TestGetAdjacentChannels(t *testing.T) {
 }
 
 func TestCreateSpatialChannels3(t *testing.T) {
+	InitChannels()
+
 	// 2-by-2-grid world, 1:1 grid:server; servers don't have border
 	ctl := &StaticGrid2DSpatialController{
 		WorldOffsetX:             0,
@@ -568,6 +570,8 @@ func TestCreateSpatialChannels3(t *testing.T) {
 }
 
 func TestCreateSpatialChannels2(t *testing.T) {
+	InitChannels()
+
 	// 1-by-1-grid world consists of 1-by-1-grid server
 	ctl := &StaticGrid2DSpatialController{
 		WorldOffsetX:             0,
@@ -607,6 +611,8 @@ func TestCreateSpatialChannels2(t *testing.T) {
 }
 
 func TestCreateSpatialChannels1(t *testing.T) {
+	InitChannels()
+
 	// 4-by-3-grid world consists of 2-by-1-grid servers - there are 2x3=6 servers.
 	ctl := &StaticGrid2DSpatialController{
 		WorldOffsetX:             -40,

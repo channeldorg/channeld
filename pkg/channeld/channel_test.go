@@ -43,7 +43,7 @@ func TestConcurrentAccessChannels(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		for i := 0; i < 100; i++ {
-			allChannels.Range(func(k interface{}, v interface{}) bool {
+			allChannels.Range(func(k common.ChannelId, v *Channel) bool {
 				return true
 			})
 			time.Sleep(1 * time.Millisecond)

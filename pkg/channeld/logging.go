@@ -64,6 +64,10 @@ func (logger *Logger) Trace(msg string, fields ...zap.Field) {
 }
 
 func InitLogs() {
+	if rootLogger != nil {
+		return
+	}
+
 	var cfg zap.Config
 	if GlobalSettings.Development {
 		cfg = zap.NewDevelopmentConfig()

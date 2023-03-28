@@ -456,6 +456,10 @@ func (ctl *StaticGrid2DSpatialController) CreateChannels(ctx MessageContext) ([]
 }
 
 func (ctl *StaticGrid2DSpatialController) subToAdjacentChannels(serverIndex uint32, serverGridCols uint32, serverGridRows uint32, subOptions *channeldpb.ChannelSubscriptionOptions) error {
+	if ctl.ServerInterestBorderSize == 0 {
+		return nil
+	}
+
 	serverConn := ctl.serverConnections[serverIndex]
 	serverX := serverIndex % ctl.ServerCols
 	serverY := serverIndex / ctl.ServerCols
@@ -469,7 +473,7 @@ func (ctl *StaticGrid2DSpatialController) subToAdjacentChannels(serverIndex uint
 	}
 	serverChannel := GetChannel(serverChannelId)
 	if serverChannel == nil {
-		return fmt.Errorf("failed to subscribe to adjacent channels for  %d as it doesn't exist", serverChannelId)
+		return fmt.Errorf("failed to subscribe to adjacent channels for %d as it doesn't exist", serverChannelId)
 	}
 
 	// Right border

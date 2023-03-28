@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
+	"hash/maphash"
 	"math"
 	"net"
 	"sync"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/metaworking/channeld/pkg/channeldpb"
 	"github.com/metaworking/channeld/pkg/common"
+	"github.com/puzpuzpuz/xsync/v2"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
@@ -94,10 +96,18 @@ var nextSpatialChannelId common.ChannelId
 var nonSpatialchannelFull bool = false
 var spatialChannelFull bool = false
 
-var allChannels sync.Map //map[ChannelId]*Channel
+var allChannels *xsync.MapOf[common.ChannelId, *Channel]
 var globalChannel *Channel
 
 func InitChannels() {
+	if allChannels != nil {
+		return
+	}
+
+	allChannels = xsync.NewTypedMapOf[common.ChannelId, *Channel](func(s maphash.Seed, chId common.ChannelId) uint64 {
+		return uint64(chId)
+	})
+
 	nextChannelId = 0
 	nextSpatialChannelId = GlobalSettings.SpatialChannelIdStart
 	var err error
@@ -128,7 +138,7 @@ func InitChannels() {
 func GetChannel(id common.ChannelId) *Channel {
 	ch, ok := allChannels.Load(id)
 	if ok {
-		return ch.(*Channel)
+		return ch
 	} else {
 		return nil
 	}
@@ -189,7 +199,7 @@ func CreateChannel(t channeldpb.ChannelType, owner ConnectionInChannel) (*Channe
 		if nonSpatialchannelFull {
 			return nil, ErrNonSpatialChannelFull
 		}
-		channelId, ok = GetNextIdSync(&allChannels, nextChannelId, 1, GlobalSettings.SpatialChannelIdStart-1)
+		channelId, ok = GetNextIdTyped[common.ChannelId, *Channel](allChannels, nextChannelId, 1, GlobalSettings.SpatialChannelIdStart-1)
 		if ok {
 			nextChannelId = channelId
 		} else {
@@ -200,7 +210,7 @@ func CreateChannel(t channeldpb.ChannelType, owner ConnectionInChannel) (*Channe
 		if spatialChannelFull {
 			return nil, ErrSpatialChannelFull
 		}
-		channelId, ok = GetNextIdSync(&allChannels, nextSpatialChannelId, GlobalSettings.SpatialChannelIdStart, math.MaxUint32)
+		channelId, ok = GetNextIdTyped[common.ChannelId, *Channel](allChannels, nextSpatialChannelId, GlobalSettings.SpatialChannelIdStart, math.MaxUint32)
 		if ok {
 			nextSpatialChannelId = channelId
 		} else {

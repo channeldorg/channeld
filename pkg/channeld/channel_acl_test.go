@@ -104,6 +104,7 @@ func setChannelACLSettings(chTypes []channeldpb.ChannelType, acl ChannelAccessLe
 
 func TestCheckACL(t *testing.T) {
 	InitLogs()
+	InitChannels()
 
 	accessTypes := []ChannelAccessType{ChannelAccessType_Sub, ChannelAccessType_Unsub, ChannelAccessType_Remove}
 

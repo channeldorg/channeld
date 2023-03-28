@@ -60,6 +60,28 @@ func GetNextIdSync(m *sync.Map, start common.ChannelId, min common.ChannelId, ma
 	return 0, false
 }
 
+type UintId interface {
+	common.ChannelId | ConnectionId | uint32
+}
+type MapRead[K comparable, V any] interface {
+	Load(key K) (value V, ok bool)
+}
+
+func GetNextIdTyped[K UintId, V any](m MapRead[K, V], start K, min K, max K) (K, bool) {
+	for i := min; i <= max; i++ {
+		if _, exists := m.Load(start); !exists {
+			return start, true
+		}
+		if start < max {
+			start++
+		} else {
+			start = min
+		}
+	}
+
+	return 0, false
+}
+
 func HashString(s string) uint32 {
 	hash := uint32(17)
 	for c := range s {
