@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/maphash"
+	"math"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -90,10 +91,12 @@ const (
 
 var nextChannelId common.ChannelId
 var nextSpatialChannelId common.ChannelId
+var nextEntityChannelId common.ChannelId
 
 // Cache the status so we don't have to check all the index in the sync map, until a channel is removed.
-var nonSpatialchannelFull bool = false
+var nonSpatialChannelFull bool = false
 var spatialChannelFull bool = false
+var entityChannelFull bool = false
 
 var allChannels *xsync.MapOf[common.ChannelId, *Channel]
 var globalChannel *Channel
@@ -109,6 +112,7 @@ func InitChannels() {
 
 	nextChannelId = 0
 	nextSpatialChannelId = GlobalSettings.SpatialChannelIdStart
+	nextEntityChannelId = GlobalSettings.EntityChannelIdStart
 	var err error
 	globalChannel, err = CreateChannel(channeldpb.ChannelType_GLOBAL, nil)
 	if err != nil {
@@ -145,6 +149,7 @@ func GetChannel(id common.ChannelId) *Channel {
 
 var ErrNonSpatialChannelFull = errors.New("non-spatial channels are full")
 var ErrSpatialChannelFull = errors.New("spatial channels are full")
+var ErrEntityChannelFull = errors.New("entity channels are full")
 
 func createChannelWithId(channelId common.ChannelId, t channeldpb.ChannelType, owner ConnectionInChannel) *Channel {
 	ch := &Channel{
@@ -195,18 +200,7 @@ func CreateChannel(t channeldpb.ChannelType, owner ConnectionInChannel) (*Channe
 
 	var channelId common.ChannelId
 	var ok bool
-	if t != channeldpb.ChannelType_SPATIAL {
-		if nonSpatialchannelFull {
-			return nil, ErrNonSpatialChannelFull
-		}
-		channelId, ok = GetNextIdTyped[common.ChannelId, *Channel](allChannels, nextChannelId, 1, GlobalSettings.SpatialChannelIdStart-1)
-		if ok {
-			nextChannelId = channelId
-		} else {
-			nonSpatialchannelFull = true
-			return nil, ErrNonSpatialChannelFull
-		}
-	} else {
+	if t == channeldpb.ChannelType_SPATIAL {
 		if spatialChannelFull {
 			return nil, ErrSpatialChannelFull
 		}
@@ -216,6 +210,28 @@ func CreateChannel(t channeldpb.ChannelType, owner ConnectionInChannel) (*Channe
 		} else {
 			spatialChannelFull = true
 			return nil, ErrSpatialChannelFull
+		}
+	} else if t == channeldpb.ChannelType_ENTITY {
+		if entityChannelFull {
+			return nil, ErrEntityChannelFull
+		}
+		channelId, ok = GetNextIdTyped[common.ChannelId, *Channel](allChannels, nextEntityChannelId, GlobalSettings.EntityChannelIdStart, math.MaxUint32)
+		if ok {
+			nextEntityChannelId = channelId
+		} else {
+			entityChannelFull = true
+			return nil, ErrEntityChannelFull
+		}
+	} else {
+		if nonSpatialChannelFull {
+			return nil, ErrNonSpatialChannelFull
+		}
+		channelId, ok = GetNextIdTyped[common.ChannelId, *Channel](allChannels, nextChannelId, 1, GlobalSettings.SpatialChannelIdStart-1)
+		if ok {
+			nextChannelId = channelId
+		} else {
+			nonSpatialChannelFull = true
+			return nil, ErrNonSpatialChannelFull
 		}
 	}
 
@@ -230,8 +246,11 @@ func RemoveChannel(ch *Channel) {
 	if ch.channelType == channeldpb.ChannelType_SPATIAL {
 		spatialChannelFull = false
 		nextSpatialChannelId = ch.id
+	} else if ch.channelType == channeldpb.ChannelType_ENTITY {
+		entityChannelFull = false
+		nextEntityChannelId = ch.id
 	} else {
-		nonSpatialchannelFull = false
+		nonSpatialChannelFull = false
 		nextChannelId = ch.id
 	}
 

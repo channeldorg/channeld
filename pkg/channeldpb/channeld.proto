@@ -85,6 +85,9 @@ enum ChannelType {
     // Spatial channels are spatailly connected. Using this type of channel to implement a seamless open world which consists of servers, and each server simulates a part of the world. 
     // Only server connections can create the spatial channel.
     SPATIAL = 4;
+
+    ENTITY = 5;
+    
     // The following are for tests.
     TEST = 100;
     TEST1 = 101;
