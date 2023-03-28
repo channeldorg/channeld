@@ -2,6 +2,7 @@ package channeld
 
 import (
 	"fmt"
+	"hash/maphash"
 	"io"
 	"net"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"github.com/metaworking/channeld/pkg/common"
 	"github.com/metaworking/channeld/pkg/fsm"
 	"github.com/metaworking/channeld/pkg/replaypb"
+	"github.com/puzpuzpuz/xsync/v2"
 	"github.com/xtaci/kcp-go"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -70,12 +72,20 @@ type Connection struct {
 	spatialSubscriptions sync.Map //map[common.ChannelId]*channeldpb.ChannelSubscriptionOptions
 }
 
-var allConnections sync.Map // map[ConnectionId]*Connection
+var allConnections *xsync.MapOf[ConnectionId, *Connection]
 var nextConnectionId uint32 = 0
 var serverFsm *fsm.FiniteStateMachine
 var clientFsm *fsm.FiniteStateMachine
 
 func InitConnections(serverFsmPath string, clientFsmPath string) {
+	if allConnections != nil {
+		return
+	}
+
+	allConnections = xsync.NewTypedMapOf[ConnectionId, *Connection](func(s maphash.Seed, connId ConnectionId) uint64 {
+		return uint64(connId)
+	})
+
 	bytes, err := os.ReadFile(serverFsmPath)
 	if err == nil {
 		serverFsm, err = fsm.Load(bytes)
@@ -106,9 +116,8 @@ func InitConnections(serverFsmPath string, clientFsmPath string) {
 }
 
 func GetConnection(id ConnectionId) *Connection {
-	v, ok := allConnections.Load(id)
+	c, ok := allConnections.Load(id)
 	if ok {
-		c := v.(*Connection)
 		if c.IsClosing() {
 			return nil
 		}
@@ -216,7 +225,7 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 
 	for tries := 0; ; tries++ {
 		generateNextConnId(c, maxConnId)
-		if _, exists := allConnections.Load(nextConnectionId); !exists {
+		if _, exists := allConnections.Load(ConnectionId(nextConnectionId)); !exists {
 			break
 		}
 

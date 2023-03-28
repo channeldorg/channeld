@@ -43,6 +43,7 @@ type GlobalSettingsType struct {
 
 	SpatialControllerConfig NullableString
 	SpatialChannelIdStart   common.ChannelId
+	EntityChannelIdStart    common.ChannelId
 
 	ChannelSettings map[channeldpb.ChannelType]ChannelSettingsType
 
@@ -82,7 +83,8 @@ var GlobalSettings = GlobalSettingsType{
 	ConnectionAuthTimeoutMs: 5000,
 	MaxFailedAuthAttempts:   5,
 	MaxFsmDisallowed:        10,
-	SpatialChannelIdStart:   65536,
+	SpatialChannelIdStart:   0x00010000,
+	EntityChannelIdStart:    0x00080000,
 	ChannelSettings: map[channeldpb.ChannelType]ChannelSettingsType{
 		channeldpb.ChannelType_GLOBAL: {
 			TickIntervalMs:                 10,
@@ -169,7 +171,8 @@ func (s *GlobalSettingsType) ParseFlag() error {
 	// Use flag.Uint instead of flag.UintVar to avoid the default value being overwritten by the flag value
 	ct := flag.Uint("ct", 0, "the compression type, 0 = No, 1 = Snappy")
 	flag.Var(&s.SpatialControllerConfig, "scc", "the path to the spatial controller config file")
-	scs := flag.Uint("scs", uint(s.SpatialChannelIdStart), "start ChannelId of spatial channels. Default is 65535.")
+	scs := flag.Uint("scs", uint(s.SpatialChannelIdStart), "start ChannelId of spatial channels. Default is 0x00010000.")
+	ecs := flag.Uint("ecs", uint(s.EntityChannelIdStart), "start ChannelId of entity channels. Default is 0x00080000.")
 	mcb := flag.Uint("mcb", uint(s.MaxConnectionIdBits), "max bits of ConnectionId (e.g. 16 means max ConnectionId = 1<<16 - 1). Up to 32.")
 	cat := flag.Uint("cat", uint(s.ConnectionAuthTimeoutMs), "the duration to allow a connection stay unauthenticated before closing it. Default is 5000. (0 = no limit)")
 	mfaa := flag.Int("mfaa", s.MaxFailedAuthAttempts, "the max number of failed authentication attempts before closing the connection. Default is 5. (0 = no limit)")
@@ -185,6 +188,10 @@ func (s *GlobalSettingsType) ParseFlag() error {
 
 	if scs != nil {
 		s.SpatialChannelIdStart = common.ChannelId(*scs)
+	}
+
+	if ecs != nil {
+		s.EntityChannelIdStart = common.ChannelId(*ecs)
 	}
 
 	if mcb != nil {

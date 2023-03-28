@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"hash/maphash"
-	"math"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -188,6 +187,7 @@ func createChannelWithId(channelId common.ChannelId, t channeldpb.ChannelType, o
 	return ch
 }
 
+// Go-routine safe - should only be called in the GLOBAL channel
 func CreateChannel(t channeldpb.ChannelType, owner ConnectionInChannel) (*Channel, error) {
 	if t == channeldpb.ChannelType_GLOBAL && globalChannel != nil {
 		return nil, errors.New("failed to create GLOBAL channel as it already exists")
@@ -210,7 +210,7 @@ func CreateChannel(t channeldpb.ChannelType, owner ConnectionInChannel) (*Channe
 		if spatialChannelFull {
 			return nil, ErrSpatialChannelFull
 		}
-		channelId, ok = GetNextIdTyped[common.ChannelId, *Channel](allChannels, nextSpatialChannelId, GlobalSettings.SpatialChannelIdStart, math.MaxUint32)
+		channelId, ok = GetNextIdTyped[common.ChannelId, *Channel](allChannels, nextSpatialChannelId, GlobalSettings.SpatialChannelIdStart, GlobalSettings.EntityChannelIdStart-1)
 		if ok {
 			nextSpatialChannelId = channelId
 		} else {
