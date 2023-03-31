@@ -87,7 +87,7 @@ enum ChannelType {
     SPATIAL = 4;
 
     ENTITY = 5;
-    
+
     // The following are for tests.
     TEST = 100;
     TEST1 = 101;
@@ -137,6 +137,9 @@ enum MessageType {
 
     // Used by @UpdateSpatialInterestMessage
     UPDATE_SPATIAL_INTEREST = 14;
+
+    // Used by @CreateEntityChannelMessage
+    CREATE_ENTITY_CHANNEL = 15;
     
     // Used by @DebugGetSpatialRegionsMessage
     DEBUG_GET_SPATIAL_REGIONS = 99;
@@ -407,6 +410,15 @@ message SpatialInterestQuery {
 message UpdateSpatialInterestMessage {
     uint32 connId = 1;
     SpatialInterestQuery query = 2;
+}
+
+message CreateEntityChannelMessage {
+    uint32 entityId = 1;
+    string metadata = 2;
+    ChannelSubscriptionOptions subOptions = 3;
+    google.protobuf.Any data = 4;
+    ChannelDataMergeOptions mergeOptions = 5;
+    bool isWellKnown = 6;
 }
 
 // ------------------ DEBUG messages start ---------------------//

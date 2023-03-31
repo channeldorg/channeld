@@ -318,3 +318,28 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 
 	return nil
 }
+
+// Implement [channeld.MergeableChannelData]
+func (dstData *EntityChannelData) Merge(src common.ChannelDataMessage, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) error {
+	srcData, ok := src.(*EntityChannelData)
+	if !ok {
+		return errors.New("src is not a EntityChannelData")
+	}
+
+	if spatialNotifier != nil {
+		// src = the incoming update, dst = existing channel data
+		if srcData.ActorState != nil && srcData.ActorState.ReplicatedMovement != nil && srcData.ActorState.ReplicatedMovement.Location != nil &&
+			dstData.ActorState != nil && dstData.ActorState.ReplicatedMovement != nil && dstData.ActorState.ReplicatedMovement.Location != nil {
+			unreal.CheckEntityHandover(dstData.ObjRef, srcData.ActorState.ReplicatedMovement.Location, dstData.ActorState.ReplicatedMovement.Location, spatialNotifier)
+		}
+
+		if srcData.SceneComponentState != nil && srcData.SceneComponentState.RelativeLocation != nil &&
+			dstData.SceneComponentState != nil && dstData.SceneComponentState.RelativeLocation != nil {
+			unreal.CheckEntityHandover(dstData.ObjRef, srcData.SceneComponentState.RelativeLocation, dstData.SceneComponentState.RelativeLocation, spatialNotifier)
+		}
+	}
+
+	proto.Merge(dstData, srcData)
+
+	return nil
+}

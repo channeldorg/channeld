@@ -95,11 +95,6 @@ message SpawnObjectMessage {
     optional FVector location = 5;
 }
 
-message ServerSpawnedPlayerMessage {
-    uint32 clientConnId = 1;
-    FVector startPos = 2;
-}
-
 message DestroyObjectMessage {
     uint32 netId = 1;
     uint32 reason = 2;
@@ -140,6 +135,14 @@ message GetUnrealObjectRefMessage {
 
 message GetUnrealObjectRefResultMessage {
     repeated UnrealObjectRef objRef = 1;
+}
+
+message SpatialEntityState {
+    UnrealObjectRef objRef = 1;
+}
+
+message SpatialChannelData {
+    map<uint32, SpatialEntityState> entities = 1;
 }
 
 

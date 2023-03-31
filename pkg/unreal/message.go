@@ -19,6 +19,7 @@ var allSpawnedObjLock sync.RWMutex
 
 func InitMessageHandlers() {
 	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_SPAWN), &channeldpb.ServerForwardMessage{}, handleUnrealSpawnObject)
+	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_DESTROY), &channeldpb.ServerForwardMessage{}, handleUnrealDestroyObject)
 	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_HANDOVER_CONTEXT), &unrealpb.GetHandoverContextResultMessage{}, handleHandoverContextResult)
 	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_GET_UNREAL_OBJECT_REF), &unrealpb.GetUnrealObjectRefMessage{}, handleGetUnrealObjectRef)
 
@@ -102,6 +103,9 @@ func handleUnrealSpawnObject(ctx channeld.MessageContext) {
 				// Update the channel and let the new channel handle the message. Otherwise race conditions may happen.
 				ctx.Channel = channeld.GetChannel(spatialChId)
 				if ctx.Channel != nil {
+					ctx.Channel.Execute(func(ch *channeld.Channel) {
+						addSpatialEntity(ch, spawnMsg.Obj)
+					})
 					ctx.Channel.PutMessageContext(ctx, channeld.HandleServerToClientUserMessage)
 				} else {
 					ctx.Connection.Logger().Error("failed to handle the ServerForwardMessage as the new spatial channel doesn't exist", zap.Uint32("newChId", *spawnMsg.ChannelId))
@@ -111,20 +115,57 @@ func handleUnrealSpawnObject(ctx channeld.MessageContext) {
 			}
 		} else {
 			// ChannelId is not updated; handle the forward message in current channel.
+			addSpatialEntity(ctx.Channel, spawnMsg.Obj)
 			channeld.HandleServerToClientUserMessage(ctx)
 		}
 	} else {
+		addSpatialEntity(ctx.Channel, spawnMsg.Obj)
 		channeld.HandleServerToClientUserMessage(ctx)
 	}
 
-	defer allSpawnedObjLock.Unlock()
-	allSpawnedObjLock.Lock()
-	allSpawnedObj[*spawnMsg.Obj.NetGUID] = spawnMsg.Obj
-	channeld.RootLogger().Debug("stored UnrealObjectRef from spawn message",
-		zap.Uint32("netId", *spawnMsg.Obj.NetGUID),
-		zap.Uint32("oldChId", oldChId),
-		zap.Uint32("newChId", *spawnMsg.ChannelId),
-	)
+	/*
+		defer allSpawnedObjLock.Unlock()
+		allSpawnedObjLock.Lock()
+		allSpawnedObj[*spawnMsg.Obj.NetGUID] = spawnMsg.Obj
+		channeld.RootLogger().Debug("stored UnrealObjectRef from spawn message",
+			zap.Uint32("netId", *spawnMsg.Obj.NetGUID),
+			zap.Uint32("oldChId", oldChId),
+			zap.Uint32("newChId", *spawnMsg.ChannelId),
+		)
+	*/
+}
+
+func addSpatialEntity(ch *channeld.Channel, objRef *unrealpb.UnrealObjectRef) {
+	if ch.Type() != channeldpb.ChannelType_SPATIAL {
+		return
+	}
+
+	if ch.GetDataMessage() == nil {
+		return
+	}
+
+	spatialChannelData := ch.GetDataMessage().(*unrealpb.SpatialChannelData)
+	entityState := &unrealpb.SpatialEntityState{ObjRef: &unrealpb.UnrealObjectRef{}}
+	proto.Merge(entityState.ObjRef, objRef)
+	spatialChannelData.Entities[*objRef.NetGUID] = entityState
+	ch.Logger().Debug("added spatial entity", zap.Uint32("netId", *objRef.NetGUID))
+}
+
+func handleUnrealDestroyObject(ctx channeld.MessageContext) {
+	// server -> channeld -> client
+	msg, ok := ctx.Msg.(*channeldpb.ServerForwardMessage)
+	if !ok {
+		ctx.Connection.Logger().Error("message is not a ServerForwardMessage, will not be handled.")
+		return
+	}
+
+	destroyMsg := &unrealpb.DestroyObjectMessage{}
+	err := proto.Unmarshal(msg.Payload, destroyMsg)
+	if err != nil {
+		ctx.Connection.Logger().Error("failed to unmarshal DestroyObjectMessage")
+		return
+	}
+
 }
 
 // Runs in the source spatial channel

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"hash/maphash"
-	"math"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -116,7 +115,7 @@ func InitChannels() {
 	var err error
 	globalChannel, err = CreateChannel(channeldpb.ChannelType_GLOBAL, nil)
 	if err != nil {
-		rootLogger.Panic("Failed to create global channel", zap.Error(err))
+		rootLogger.Panic("failed to create global channel", zap.Error(err))
 	}
 
 	for chType, settings := range GlobalSettings.ChannelSettings {
@@ -173,7 +172,7 @@ func createChannelWithId(channelId common.ChannelId, t channeldpb.ChannelType, o
 		removing: 0,
 	}
 
-	if ch.channelType == channeldpb.ChannelType_SPATIAL {
+	if ch.channelType == channeldpb.ChannelType_ENTITY {
 		ch.spatialNotifier = spatialController
 	}
 
@@ -211,17 +210,19 @@ func CreateChannel(t channeldpb.ChannelType, owner ConnectionInChannel) (*Channe
 			spatialChannelFull = true
 			return nil, ErrSpatialChannelFull
 		}
-	} else if t == channeldpb.ChannelType_ENTITY {
-		if entityChannelFull {
-			return nil, ErrEntityChannelFull
-		}
-		channelId, ok = GetNextIdTyped[common.ChannelId, *Channel](allChannels, nextEntityChannelId, GlobalSettings.EntityChannelIdStart, math.MaxUint32)
-		if ok {
-			nextEntityChannelId = channelId
-		} else {
-			entityChannelFull = true
-			return nil, ErrEntityChannelFull
-		}
+		/* Entity channels use fixed channelId (= netId)
+		} else if t == channeldpb.ChannelType_ENTITY {
+			if entityChannelFull {
+				return nil, ErrEntityChannelFull
+			}
+			channelId, ok = GetNextIdTyped[common.ChannelId, *Channel](allChannels, nextEntityChannelId, GlobalSettings.EntityChannelIdStart, math.MaxUint32)
+			if ok {
+				nextEntityChannelId = channelId
+			} else {
+				entityChannelFull = true
+				return nil, ErrEntityChannelFull
+			}
+		*/
 	} else {
 		if nonSpatialChannelFull {
 			return nil, ErrNonSpatialChannelFull
@@ -257,6 +258,14 @@ func RemoveChannel(ch *Channel) {
 	channelNum.WithLabelValues(ch.channelType.String()).Dec()
 
 	Event_ChannelRemoved.Broadcast(ch.id)
+}
+
+func (ch *Channel) Id() common.ChannelId {
+	return ch.id
+}
+
+func (ch *Channel) Type() channeldpb.ChannelType {
+	return ch.channelType
 }
 
 func (ch *Channel) IsRemoving() bool {
@@ -312,6 +321,14 @@ func (ch *Channel) PutMessageInternal(msgType channeldpb.MessageType, msg common
 	}, handler: entry.handler}
 }
 
+// Runs a function in the channel's go-routine.
+// Any code that modifies the channel's data outside the the channel's go-routine should be run in this way.
+func (ch *Channel) Execute(callback func(ch *Channel)) {
+	ch.inMsgQueue <- channelMessage{handler: func(_ MessageContext) {
+		callback(ch)
+	}}
+}
+
 func (ch *Channel) GetTime() ChannelTime {
 	return ChannelTime(time.Since(ch.startTime))
 }
@@ -346,6 +363,13 @@ func (ch *Channel) Tick() {
 func (ch *Channel) tickMessages(tickStart time.Time) {
 	for len(ch.inMsgQueue) > 0 {
 		cm := <-ch.inMsgQueue
+
+		// No message in the context, just execute the handler.
+		if cm.ctx.Msg == nil {
+			cm.handler(cm.ctx)
+			continue
+		}
+
 		if cm.ctx.Connection == nil {
 			ch.Logger().Warn("drops message as the sender is lost", zap.Uint32("msgType", uint32(cm.ctx.MsgType)))
 			continue

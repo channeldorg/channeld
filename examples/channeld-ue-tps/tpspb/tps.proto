@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package tpspb;
 
-import "pkg/unrealpb/unreal_common.proto";
+import "unreal_common.proto";
 
 option go_package = "github.com/metaworking/channeld/examples/channeld-ue-tps/tpspb";
 
@@ -17,6 +17,20 @@ message TestRepPlayerControllerState {
 message TestNPCState {
     optional bool bMoving = 1;
     optional unrealpb.FVector goalLocation = 2;
+}
+
+message EntityChannelData {
+    unrealpb.UnrealObjectRef objRef = 1;
+    optional unrealpb.ActorState actorState = 2;
+    optional unrealpb.PawnState pawnState = 3;
+    optional unrealpb.CharacterState characterState = 4;
+    optional unrealpb.PlayerState playerState = 5;
+    optional unrealpb.ControllerState controllerState = 6;
+    optional unrealpb.PlayerControllerState playerControllerState = 7;
+    optional unrealpb.ActorComponentState actorComponentState = 8;
+    optional unrealpb.SceneComponentState sceneComponentState = 9;
+    optional TestRepPlayerControllerState testRepPlayerControllerState = 11;
+    optional TestNPCState testNPCState = 12;
 }
 
 message TestRepChannelData {

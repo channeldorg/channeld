@@ -52,6 +52,7 @@ var MessageMap = map[channeldpb.MessageType]*messageMapEntry{
 	channeldpb.MessageType_QUERY_SPATIAL_CHANNEL:     {&channeldpb.QuerySpatialChannelMessage{}, handleQuerySpatialChannel},
 	channeldpb.MessageType_DEBUG_GET_SPATIAL_REGIONS: {&channeldpb.DebugGetSpatialRegionsMessage{}, handleGetSpatialRegionsMessage},
 	channeldpb.MessageType_UPDATE_SPATIAL_INTEREST:   {&channeldpb.UpdateSpatialInterestMessage{}, handleUpdateSpatialInterest},
+	channeldpb.MessageType_CREATE_ENTITY_CHANNEL:     {&channeldpb.CreateEntityChannelMessage{}, handleCreateEntityChannel},
 }
 
 func RegisterMessageHandler(msgType uint32, msg common.Message, handler MessageHandlerFunc) {
@@ -443,6 +444,59 @@ func handleCreateSpatialChannel(ctx MessageContext, msg *channeldpb.CreateChanne
 		Regions: regions,
 	}
 	ctx.Connection.Send(ctx)
+}
+
+func handleCreateEntityChannel(ctx MessageContext) {
+	// Only the global and spatial channels can create the entity channels
+	if ctx.Channel != globalChannel && ctx.Channel.Type() != channeldpb.ChannelType_SPATIAL {
+		ctx.Connection.Logger().Error("illegal attemp to create entity channel outside the GLOBAL or SPATIAL channels")
+		return
+	}
+
+	msg, ok := ctx.Msg.(*channeldpb.CreateEntityChannelMessage)
+	if !ok {
+		ctx.Connection.Logger().Error("message is not a CreateEntityChannelMessage, will not be handled.")
+		return
+	}
+
+	newChannel := createChannelWithId(common.ChannelId(msg.EntityId), channeldpb.ChannelType_ENTITY, ctx.Connection)
+	newChannel.Logger().Info("created entity channel",
+		zap.Uint32("ownerConnId", uint32(newChannel.ownerConnection.Id())),
+	)
+
+	newChannel.metadata = msg.Metadata
+	if msg.Data != nil {
+		dataMsg, err := msg.Data.UnmarshalNew()
+		if err != nil {
+			newChannel.Logger().Error("failed to unmarshal data message for the new channel", zap.Error(err))
+		} else {
+			newChannel.InitData(dataMsg, msg.MergeOptions)
+		}
+	} else {
+		// Channel data should always be initialized
+		newChannel.InitData(nil, msg.MergeOptions)
+	}
+
+	ctx.Msg = &channeldpb.CreateChannelResultMessage{
+		ChannelType: newChannel.channelType,
+		Metadata:    newChannel.metadata,
+		OwnerConnId: uint32(ctx.Connection.Id()),
+		ChannelId:   uint32(newChannel.id),
+	}
+	ctx.Connection.Send(ctx)
+
+	// Should we also send the result to the GLOBAL channel owner?
+
+	// Subscribe to channel after creation
+	cs := ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
+	if cs != nil {
+		ctx.Connection.sendSubscribed(ctx, newChannel, ctx.Connection, 0, &cs.options)
+	}
+
+	/* We could sub all the connections in the spatial channel to the entity channel here,
+	 * but channeld doesn't know the sub options for each connection. So each connection
+	 * should subscribe to the entity channel by itself after received the Spawn message.
+	 */
 }
 
 func handleRemoveChannel(ctx MessageContext) {
