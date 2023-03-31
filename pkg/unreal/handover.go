@@ -86,7 +86,16 @@ func CheckSpatialInfoChange(netId uint32, newLoc, oldLoc *unrealpb.FVector, spat
 		spatialNotifier.Notify(
 			oldInfo,
 			newInfo,
-			func(srcChannelId common.ChannelId, dstChannelId common.ChannelId, handoverData chan common.Message) {
+			func(srcChannelId common.ChannelId, dstChannelId common.ChannelId, handoverData interface{}) {
+				msgProvider, ok := handoverData.(chan common.Message)
+				if !ok {
+					channeld.RootLogger().Error("handover data is not a chan message",
+						zap.Uint32("srcChannelId", uint32(srcChannelId)),
+						zap.Uint32("dstChannelId", uint32(dstChannelId)),
+					)
+					return
+				}
+
 				/* No matter if it's cross-server, always ask for the handover context.
 				// Handover happens within the spatial server - no need to ask for the handover context.
 				if channeld.GetChannel(srcChannelId).IsSameOwner(channeld.GetChannel(dstChannelId)) {
@@ -101,7 +110,7 @@ func CheckSpatialInfoChange(netId uint32, newLoc, oldLoc *unrealpb.FVector, spat
 						},
 					}
 				} else*/{
-					addHandoverDataProvider(netId, uint32(srcChannelId), handoverData)
+					addHandoverDataProvider(netId, uint32(srcChannelId), msgProvider)
 					channeld.GetChannel(srcChannelId).SendToOwner(uint32(unrealpb.MessageType_HANDOVER_CONTEXT), &unrealpb.GetHandoverContextMessage{
 						NetId:        netId,
 						SrcChannelId: uint32(srcChannelId),
@@ -156,15 +165,16 @@ func CheckEntityHandover(netId uint32, newLoc, oldLoc *unrealpb.FVector, spatial
 		spatialNotifier.Notify(
 			oldInfo,
 			newInfo,
-			func(srcChannelId common.ChannelId, dstChannelId common.ChannelId, handoverData chan common.Message) {
-				// Read the UnrealObjectRef in the source spatial channel (from the entity channel's goroutine)
-				srcChannel := channeld.GetChannel(srcChannelId)
-				if srcChannel == nil {
-					handoverData <- nil
+			func(srcChannelId common.ChannelId, dstChannelId common.ChannelId, handoverData interface{}) {
+				entityId, ok := handoverData.(*channeld.EntityId)
+				if !ok {
+					channeld.RootLogger().Error("handover data is not an entityId",
+						zap.Uint32("srcChannelId", uint32(srcChannelId)),
+						zap.Uint32("dstChannelId", uint32(dstChannelId)),
+					)
 					return
 				}
-
-				handoverData <- channeld.EntityId(netId)
+				*entityId = channeld.EntityId(netId)
 
 				/* We can't afford to wait in the message queue to send the handover message!
 				// Back to the source spatial channel's goroutine
@@ -174,6 +184,13 @@ func CheckEntityHandover(netId uint32, newLoc, oldLoc *unrealpb.FVector, spatial
 				*/
 
 				/*
+					// Read the UnrealObjectRef in the source spatial channel (from the entity channel's goroutine)
+					srcChannel := channeld.GetChannel(srcChannelId)
+					if srcChannel == nil {
+						handoverData <- nil
+						return
+					}
+
 					if srcChannel.GetDataMessage() == nil {
 						handoverData <- nil
 						return

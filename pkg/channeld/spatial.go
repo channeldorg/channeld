@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"time"
 
 	"github.com/metaworking/channeld/pkg/channeldpb"
 	"github.com/metaworking/channeld/pkg/common"
@@ -575,7 +574,7 @@ type HandoverDataWithPayload interface {
 }
 
 // Runs in the source spatial channel (shared instance)
-func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, newInfo common.SpatialInfo, handoverDataProvider func(common.ChannelId, common.ChannelId, chan common.Message)) {
+func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, newInfo common.SpatialInfo, handoverDataProvider func(common.ChannelId, common.ChannelId, interface{})) {
 	srcChannelId, err := ctl.GetChannelId(oldInfo)
 	if err != nil {
 		rootLogger.Error("failed to calculate srcChannelId", zap.Error(err), zap.String("oldInfo", oldInfo.String()))
@@ -609,29 +608,18 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 		rootLogger.Error("channel doesn't have owner, failed to handover channel data", zap.Uint32("dstChannelId", uint32(dstChannelId)))
 	}
 
-	// Handover data is provider by the Merger [channeld.MergeableChannelData]
-	c := make(chan common.Message)
-
 	if GlobalSettings.UseHandoverGroup {
-		// Should be provided instantly
-		t := time.Now()
-		handoverDataProvider(srcChannelId, dstChannelId, c)
-		handoverData := <-c
-		if duration := time.Since(t); duration >= time.Microsecond {
-			rootLogger.Warn("handover data provider took too long", zap.Duration("duration", duration))
-		}
-
-		entityId, ok := handoverData.(EntityId)
-		if !ok {
-			rootLogger.Error("handover data is not an EntityId", zap.String("data", dataMarshalOptions.Format(handoverData)))
-			return
-		}
+		var entityId EntityId
+		handoverDataProvider(srcChannelId, dstChannelId, &entityId)
 
 		// TODO: implement group-based handover
 		rootLogger.Warn("handover group", zap.Uint32("entityId", uint32(entityId)))
 
 		return
 	}
+
+	// Handover data is provider by the Merger [channeld.MergeableChannelData]
+	c := make(chan common.Message)
 
 	go func() {
 		handoverData := <-c

@@ -73,6 +73,7 @@ message UnrealObjectRef {
     optional bytes netGUIDBunch = 3;
     optional uint32 bunchBitsNum = 4;
     // optional uint32 objType = 5;
+    optional string classPath = 6;
 }
 
 message ActorComponentRef {
