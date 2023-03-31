@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"time"
 
 	"github.com/metaworking/channeld/pkg/channeldpb"
 	"github.com/metaworking/channeld/pkg/common"
@@ -610,6 +611,28 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 
 	// Handover data is provider by the Merger [channeld.MergeableChannelData]
 	c := make(chan common.Message)
+
+	if GlobalSettings.UseHandoverGroup {
+		// Should be provided instantly
+		t := time.Now()
+		handoverDataProvider(srcChannelId, dstChannelId, c)
+		handoverData := <-c
+		if duration := time.Since(t); duration >= time.Microsecond {
+			rootLogger.Warn("handover data provider took too long", zap.Duration("duration", duration))
+		}
+
+		entityId, ok := handoverData.(EntityId)
+		if !ok {
+			rootLogger.Error("handover data is not an EntityId", zap.String("data", dataMarshalOptions.Format(handoverData)))
+			return
+		}
+
+		// TODO: implement group-based handover
+		rootLogger.Warn("handover group", zap.Uint32("entityId", uint32(entityId)))
+
+		return
+	}
+
 	go func() {
 		handoverData := <-c
 		if handoverData == nil {

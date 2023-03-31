@@ -118,7 +118,7 @@ func CheckSpatialInfoChange(netId uint32, newLoc, oldLoc *unrealpb.FVector, spat
 	}
 }
 
-func CheckEntityHandover(objRef *unrealpb.UnrealObjectRef, newLoc, oldLoc *unrealpb.FVector, spatialNotifier common.SpatialInfoChangedNotifier) {
+func CheckEntityHandover(netId uint32, newLoc, oldLoc *unrealpb.FVector, spatialNotifier common.SpatialInfoChangedNotifier) {
 	var newX, newY, newZ float32
 
 	if newLoc.X != nil {
@@ -157,16 +157,56 @@ func CheckEntityHandover(objRef *unrealpb.UnrealObjectRef, newLoc, oldLoc *unrea
 			oldInfo,
 			newInfo,
 			func(srcChannelId common.ChannelId, dstChannelId common.ChannelId, handoverData chan common.Message) {
-
-				handoverData <- &unrealpb.HandoverData{
-					Context: []*unrealpb.HandoverContext{
-						{
-							Obj: objRef,
-							// ClientConnId: oldActorState.OwningConnId,
-						},
-					},
+				// Read the UnrealObjectRef in the source spatial channel (from the entity channel's goroutine)
+				srcChannel := channeld.GetChannel(srcChannelId)
+				if srcChannel == nil {
+					handoverData <- nil
+					return
 				}
 
+				handoverData <- channeld.EntityId(netId)
+
+				/* We can't afford to wait in the message queue to send the handover message!
+				// Back to the source spatial channel's goroutine
+				srcChannel.Execute(func(ch *channeld.Channel) {
+
+				})
+				*/
+
+				/*
+					if srcChannel.GetDataMessage() == nil {
+						handoverData <- nil
+						return
+					}
+
+					spatialChData, ok := srcChannel.GetDataMessage().(*unrealpb.SpatialChannelData)
+					if !ok {
+						handoverData <- nil
+						return
+					}
+
+					entities := spatialChData.GetEntities()
+					if entities == nil {
+						handoverData <- nil
+						return
+					}
+
+					// CAUTION: running outside the source spatial channel's goroutine may cause concurrent map read/write error!
+					entity, exists := entities[netId]
+					if !exists {
+						handoverData <- nil
+						return
+					}
+
+					handoverData <- &unrealpb.HandoverData{
+						Context: []*unrealpb.HandoverContext{
+							{
+								Obj: entity.ObjRef,
+								// ClientConnId: oldActorState.OwningConnId,
+							},
+						},
+					}
+				*/
 			},
 		)
 	}

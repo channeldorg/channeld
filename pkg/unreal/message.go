@@ -144,7 +144,13 @@ func addSpatialEntity(ch *channeld.Channel, objRef *unrealpb.UnrealObjectRef) {
 		return
 	}
 
-	spatialChannelData := ch.GetDataMessage().(*unrealpb.SpatialChannelData)
+	spatialChannelData, ok := ch.GetDataMessage().(*unrealpb.SpatialChannelData)
+	if !ok {
+		ch.Logger().Warn("channel data is not a SpatialChannelData",
+			zap.String("dataType", string(ch.GetDataMessage().ProtoReflect().Descriptor().FullName())))
+		return
+	}
+
 	entityState := &unrealpb.SpatialEntityState{ObjRef: &unrealpb.UnrealObjectRef{}}
 	proto.Merge(entityState.ObjRef, objRef)
 	spatialChannelData.Entities[*objRef.NetGUID] = entityState

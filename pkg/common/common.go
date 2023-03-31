@@ -23,6 +23,9 @@ type SpatialInfo struct {
 	Z float64
 }
 
+// Notifies the spatial/entity channel from the ChannelDataUpdate that the spatial info of an entity has changed,
+// so the channel's SpatialController will check the handover. If the handover happpens, `handoverDataProvider`
+// will be called to provide the data for the ChannelDataHandoverMessage.
 type SpatialInfoChangedNotifier interface {
 	// The handover data provider has three parameters:
 	// srcChannelId: the channel that an object is handed over from.

@@ -90,12 +90,10 @@ const (
 
 var nextChannelId common.ChannelId
 var nextSpatialChannelId common.ChannelId
-var nextEntityChannelId common.ChannelId
 
 // Cache the status so we don't have to check all the index in the sync map, until a channel is removed.
 var nonSpatialChannelFull bool = false
 var spatialChannelFull bool = false
-var entityChannelFull bool = false
 
 var allChannels *xsync.MapOf[common.ChannelId, *Channel]
 var globalChannel *Channel
@@ -111,7 +109,6 @@ func InitChannels() {
 
 	nextChannelId = 0
 	nextSpatialChannelId = GlobalSettings.SpatialChannelIdStart
-	nextEntityChannelId = GlobalSettings.EntityChannelIdStart
 	var err error
 	globalChannel, err = CreateChannel(channeldpb.ChannelType_GLOBAL, nil)
 	if err != nil {
@@ -248,8 +245,6 @@ func RemoveChannel(ch *Channel) {
 		spatialChannelFull = false
 		nextSpatialChannelId = ch.id
 	} else if ch.channelType == channeldpb.ChannelType_ENTITY {
-		entityChannelFull = false
-		nextEntityChannelId = ch.id
 	} else {
 		nonSpatialChannelFull = false
 		nextChannelId = ch.id

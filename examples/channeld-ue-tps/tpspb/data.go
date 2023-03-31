@@ -326,16 +326,16 @@ func (dstData *EntityChannelData) Merge(src common.ChannelDataMessage, options *
 		return errors.New("src is not a EntityChannelData")
 	}
 
-	if spatialNotifier != nil {
+	if spatialNotifier != nil && dstData.NetId != nil {
 		// src = the incoming update, dst = existing channel data
 		if srcData.ActorState != nil && srcData.ActorState.ReplicatedMovement != nil && srcData.ActorState.ReplicatedMovement.Location != nil &&
 			dstData.ActorState != nil && dstData.ActorState.ReplicatedMovement != nil && dstData.ActorState.ReplicatedMovement.Location != nil {
-			unreal.CheckEntityHandover(dstData.ObjRef, srcData.ActorState.ReplicatedMovement.Location, dstData.ActorState.ReplicatedMovement.Location, spatialNotifier)
+			unreal.CheckEntityHandover(*dstData.NetId, srcData.ActorState.ReplicatedMovement.Location, dstData.ActorState.ReplicatedMovement.Location, spatialNotifier)
 		}
 
 		if srcData.SceneComponentState != nil && srcData.SceneComponentState.RelativeLocation != nil &&
 			dstData.SceneComponentState != nil && dstData.SceneComponentState.RelativeLocation != nil {
-			unreal.CheckEntityHandover(dstData.ObjRef, srcData.SceneComponentState.RelativeLocation, dstData.SceneComponentState.RelativeLocation, spatialNotifier)
+			unreal.CheckEntityHandover(*dstData.NetId, srcData.SceneComponentState.RelativeLocation, dstData.SceneComponentState.RelativeLocation, spatialNotifier)
 		}
 	}
 

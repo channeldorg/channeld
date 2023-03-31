@@ -124,6 +124,7 @@ func (ch *Channel) Data() *ChannelData {
 	return ch.data
 }
 
+// CAUTION: this function is not goroutine-safe. Read/write to the channel data message should be done in the the channel's goroutine.
 func (ch *Channel) GetDataMessage() common.ChannelDataMessage {
 	if ch.data == nil {
 		return nil
