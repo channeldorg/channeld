@@ -10,6 +10,7 @@ import (
 	"github.com/metaworking/channeld/pkg/unrealpb"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 /*
@@ -326,20 +327,44 @@ func (dstData *EntityChannelData) Merge(src common.ChannelDataMessage, options *
 		return errors.New("src is not a EntityChannelData")
 	}
 
-	if spatialNotifier != nil && dstData.NetId != nil {
+	if spatialNotifier != nil && dstData.ObjRef != nil {
 		// src = the incoming update, dst = existing channel data
 		if srcData.ActorState != nil && srcData.ActorState.ReplicatedMovement != nil && srcData.ActorState.ReplicatedMovement.Location != nil &&
 			dstData.ActorState != nil && dstData.ActorState.ReplicatedMovement != nil && dstData.ActorState.ReplicatedMovement.Location != nil {
-			unreal.CheckEntityHandover(*dstData.NetId, srcData.ActorState.ReplicatedMovement.Location, dstData.ActorState.ReplicatedMovement.Location, spatialNotifier)
+			unreal.CheckEntityHandover(*dstData.ObjRef.NetGUID, srcData.ActorState.ReplicatedMovement.Location, dstData.ActorState.ReplicatedMovement.Location, spatialNotifier)
 		}
 
 		if srcData.SceneComponentState != nil && srcData.SceneComponentState.RelativeLocation != nil &&
 			dstData.SceneComponentState != nil && dstData.SceneComponentState.RelativeLocation != nil {
-			unreal.CheckEntityHandover(*dstData.NetId, srcData.SceneComponentState.RelativeLocation, dstData.SceneComponentState.RelativeLocation, spatialNotifier)
+			unreal.CheckEntityHandover(*dstData.ObjRef.NetGUID, srcData.SceneComponentState.RelativeLocation, dstData.SceneComponentState.RelativeLocation, spatialNotifier)
 		}
 	}
 
 	proto.Merge(dstData, srcData)
+
+	return nil
+}
+
+// Implement [channeld.HandoverDataMerger]
+func (entityData *EntityChannelData) MergeTo(msg common.Message, fullData bool) error {
+	handoverData, ok := msg.(*unrealpb.SpatialChannelData)
+	if !ok {
+		return errors.New("msg is not a SpatialChannelData")
+	}
+
+	entityState := &unrealpb.SpatialEntityState{
+		ObjRef: entityData.ObjRef,
+	}
+
+	if fullData {
+		anyData, err := anypb.New(entityData)
+		if err != nil {
+			return err
+		}
+		entityState.EntityData = anyData
+	}
+
+	handoverData.Entities[*entityData.ObjRef.NetGUID] = entityState
 
 	return nil
 }

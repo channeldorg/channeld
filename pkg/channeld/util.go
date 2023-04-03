@@ -1,6 +1,7 @@
 package channeld
 
 import (
+	"hash/maphash"
 	"net"
 	"strings"
 	"sync"
@@ -61,7 +62,7 @@ func GetNextIdSync(m *sync.Map, start common.ChannelId, min common.ChannelId, ma
 }
 
 type UintId interface {
-	common.ChannelId | ConnectionId | uint32
+	common.ChannelId | ConnectionId | EntityId | uint32
 }
 type MapRead[K comparable, V any] interface {
 	Load(key K) (value V, ok bool)
@@ -80,6 +81,12 @@ func GetNextIdTyped[K UintId, V any](m MapRead[K, V], start K, min K, max K) (K,
 	}
 
 	return 0, false
+}
+
+func UintIdHasher[T UintId]() func(maphash.Seed, T) uint64 {
+	return func(_ maphash.Seed, id T) uint64 {
+		return uint64(id)
+	}
 }
 
 func HashString(s string) uint32 {
@@ -101,6 +108,14 @@ func Difference[K comparable, V any](thisMap map[K]V, otherMap map[K]V) map[K]V 
 		if _, exists := otherMap[k]; !exists {
 			result[k] = v
 		}
+	}
+	return result
+}
+
+func CopyArray[FROM UintId, TO UintId](arr []FROM) []TO {
+	result := make([]TO, len(arr))
+	for i, v := range arr {
+		result[i] = TO(v)
 	}
 	return result
 }

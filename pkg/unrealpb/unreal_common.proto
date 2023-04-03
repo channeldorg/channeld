@@ -74,6 +74,7 @@ message UnrealObjectRef {
     optional uint32 bunchBitsNum = 4;
     // optional uint32 objType = 5;
     optional string classPath = 6;
+    optional uint32 owningConnId = 7;
 }
 
 message ActorComponentRef {
@@ -91,7 +92,7 @@ message SpawnObjectMessage {
     UnrealObjectRef obj = 1;
     optional uint32 channelId = 2;
     optional uint32 localRole = 3;
-    optional uint32 owningConnId = 4;
+    // optional uint32 owningConnId = 4;
     // Only used by the spatial channel
     optional FVector location = 5;
 }
@@ -140,6 +141,9 @@ message GetUnrealObjectRefResultMessage {
 
 message SpatialEntityState {
     UnrealObjectRef objRef = 1;
+    // optional uint32 owningConnId = 2;
+    // Full entity channel data. For cross-server handover only.
+    optional google.protobuf.Any entityData = 3;
 }
 
 message SpatialChannelData {

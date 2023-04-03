@@ -53,7 +53,7 @@ func (dst *TankGameChannelData) Merge(src common.ChannelDataMessage, options *ch
 							common.SpatialInfo{
 								X: float64(v.Position.X),
 								Z: float64(v.Position.Z)},
-							func(srcChannelId common.ChannelId, dstChannelId common.ChannelId, handoverData chan common.Message) {
+							func(srcChannelId common.ChannelId, dstChannelId common.ChannelId, handoverData interface{}) {
 								data := &TankGameChannelData{
 									TransformStates: map[uint32]*channeldpb.TransformState{
 										k: trans, //v,
@@ -65,7 +65,7 @@ func (dst *TankGameChannelData) Merge(src common.ChannelDataMessage, options *ch
 									data.TankStates[k] = tankState
 								}
 
-								handoverData <- data
+								handoverData.(chan common.Message) <- data
 							},
 						)
 					}

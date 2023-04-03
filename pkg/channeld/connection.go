@@ -2,7 +2,6 @@ package channeld
 
 import (
 	"fmt"
-	"hash/maphash"
 	"io"
 	"net"
 	"os"
@@ -82,9 +81,7 @@ func InitConnections(serverFsmPath string, clientFsmPath string) {
 		return
 	}
 
-	allConnections = xsync.NewTypedMapOf[ConnectionId, *Connection](func(s maphash.Seed, connId ConnectionId) uint64 {
-		return uint64(connId)
-	})
+	allConnections = xsync.NewTypedMapOf[ConnectionId, *Connection](UintIdHasher[ConnectionId]())
 
 	bytes, err := os.ReadFile(serverFsmPath)
 	if err == nil {

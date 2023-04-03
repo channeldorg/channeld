@@ -140,6 +140,10 @@ enum MessageType {
 
     // Used by @CreateEntityChannelMessage
     CREATE_ENTITY_CHANNEL = 15;
+
+    ENTITY_GROUP_ADD = 16;
+
+    ENTITY_GROUP_REMOVE = 17;
     
     // Used by @DebugGetSpatialRegionsMessage
     DEBUG_GET_SPATIAL_REGIONS = 99;
@@ -419,6 +423,22 @@ message CreateEntityChannelMessage {
     google.protobuf.Any data = 4;
     ChannelDataMergeOptions mergeOptions = 5;
     bool isWellKnown = 6;
+}
+
+enum EntityGroupType {
+    HANDOVER = 0;
+    LOCK = 1;
+}
+
+message AddEntityGroupMessage {
+    EntityGroupType type = 1;
+    uint32 JunctionEntityId = 2;
+    repeated uint32 EntitiesToAdd = 3;
+}
+
+message RemoveEntityGroupMessage {
+    EntityGroupType type = 1;
+    repeated uint32 EntitiesToRemove = 2;
 }
 
 // ------------------ DEBUG messages start ---------------------//

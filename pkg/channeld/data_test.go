@@ -280,7 +280,7 @@ func TestDataMergeOptions(t *testing.T) {
 
 func TestReflectChannelData(t *testing.T) {
 	RegisterChannelDataType(channeldpb.ChannelType_TEST, &testpb.TestChannelDataMessage{})
-	globalDataMsg, err := ReflectChannelDataMessage(channeldpb.ChannelType_TEST, nil)
+	globalDataMsg, err := ReflectChannelDataMessage(channeldpb.ChannelType_TEST)
 	assert.NoError(t, err)
 	assert.NotNil(t, globalDataMsg)
 	assert.IsType(t, &testpb.TestChannelDataMessage{}, globalDataMsg)

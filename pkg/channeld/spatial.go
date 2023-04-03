@@ -573,7 +573,12 @@ type HandoverDataWithPayload interface {
 	ClearPayload()
 }
 
-// Runs in the source spatial channel (shared instance)
+type HandoverDataMerger interface {
+	// Entity channel data merges itself to the spatial channel data for handover
+	MergeTo(common.Message, bool) error
+}
+
+// Runs in the source spatial(V1)/entity(V2) channel (shared instance)
 func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, newInfo common.SpatialInfo, handoverDataProvider func(common.ChannelId, common.ChannelId, interface{})) {
 	srcChannelId, err := ctl.GetChannelId(oldInfo)
 	if err != nil {
@@ -608,12 +613,91 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 		rootLogger.Error("channel doesn't have owner, failed to handover channel data", zap.Uint32("dstChannelId", uint32(dstChannelId)))
 	}
 
-	if GlobalSettings.UseHandoverGroup {
+	if GlobalSettings.UseHandoverV2 {
 		var entityId EntityId
 		handoverDataProvider(srcChannelId, dstChannelId, &entityId)
 
-		// TODO: implement group-based handover
-		rootLogger.Warn("handover group", zap.Uint32("entityId", uint32(entityId)))
+		rootLogger.Debug("handover group", zap.Uint32("entityId", uint32(entityId)))
+
+		spatialDataMsg, err := ReflectChannelDataMessage(channeldpb.ChannelType_SPATIAL)
+		if err != nil {
+			rootLogger.Error("failed to create handover data message for spatial channel", zap.Error(err))
+			return
+		}
+		spatialDataMsgFull := spatialDataMsg.ProtoReflect().New().Interface()
+
+		// If the src and dst channels are owned by different server, send the full entity data in the handover message
+		// fullData := !dstChannel.IsSameOwner(srcChannel)
+
+		entityIds := srcChannel.GetHandoverEntites(entityId)
+		for _, entityId := range entityIds {
+			entityChannel := GetChannel(common.ChannelId(entityId))
+			if entityChannel == nil {
+				rootLogger.Warn("failed to handover entity as the channel doesn't exist", zap.Uint32("entityId", uint32(entityId)))
+				continue
+			}
+
+			entityData := entityChannel.GetDataMessage()
+			if entityData == nil {
+				rootLogger.Warn("failed to handover entity as the channel doesn't have data", zap.Uint32("entityId", uint32(entityId)))
+				continue
+			}
+
+			if handoverMerger, ok := entityData.(HandoverDataMerger); ok {
+				err := handoverMerger.MergeTo(spatialDataMsgFull, true)
+				if err != nil {
+					rootLogger.Warn("failed to merge entity data to spatial channel data", zap.Error(err), zap.Uint32("entityId", uint32(entityId)))
+					continue
+				}
+				handoverMerger.MergeTo(spatialDataMsg, false)
+			} else {
+				rootLogger.Warn("entity data doesn't implement HandoverDataMerger",
+					zap.Uint32("entityId", uint32(entityId)),
+					zap.String("msgName", string(entityData.ProtoReflect().Descriptor().FullName())),
+				)
+				continue
+			}
+		}
+
+		handoverAnyData, err := anypb.New(spatialDataMsg)
+		if err != nil {
+			rootLogger.Error("failed to marshal spatial handover data", zap.Error(err))
+			return
+		}
+
+		// Don't forget to merge the handover channel data to the dst channel, otherwise it may miss some states.
+		dstChannelDataMsg := dstChannel.GetDataMessage()
+		if dstChannelDataMsg == nil {
+			// Set the data directly
+			dstChannel.Data().OnUpdate(spatialDataMsg, dstChannel.GetTime(), 0, nil)
+		} else {
+			updateMsg := &channeldpb.ChannelDataUpdateMessage{
+				Data: handoverAnyData,
+			}
+			dstChannel.PutMessageInternal(channeldpb.MessageType_CHANNEL_DATA_UPDATE, updateMsg)
+		}
+
+		handoverAnyDataFull, err := anypb.New(spatialDataMsgFull)
+		if err != nil {
+			rootLogger.Error("failed to marshal spatial handover data", zap.Error(err))
+			return
+		}
+
+		handoverMsg := &channeldpb.ChannelDataHandoverMessage{
+			SrcChannelId:  uint32(srcChannelId),
+			DstChannelId:  uint32(dstChannelId),
+			Data:          handoverAnyData,
+			ContextConnId: uint32(srcChannel.latestDataUpdateConnId),
+		}
+
+		handoverMsgFull := &channeldpb.ChannelDataHandoverMessage{
+			SrcChannelId:  uint32(srcChannelId),
+			DstChannelId:  uint32(dstChannelId),
+			Data:          handoverAnyDataFull,
+			ContextConnId: uint32(srcChannel.latestDataUpdateConnId),
+		}
+
+		sendHandoverMsg(srcChannel, dstChannel, handoverMsgFull, handoverMsg)
 
 		return
 	}
@@ -669,46 +753,51 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 			}
 		}
 
-		// Use GetAllConnections() to avoid race condition
-		srcChannelConns := srcChannel.GetAllConnections()
-		dstChanenlConns := dstChannel.GetAllConnections()
-		// Send the handover message to all connections in the srcChannel
-		for conn := range srcChannelConns {
-			// Avoid duplicate sending
-			if _, exists := dstChanenlConns[conn]; !exists {
-				msgToSend := handoverMsg
-
-				if c, ok := conn.(*Connection); ok {
-					_, hasInterestInDstChannel := c.spatialSubscriptions.Load(dstChannelId)
-					if !hasInterestInDstChannel {
-						// This connection has not interest in the dstChannel, no need to send the handover data payload
-						msgToSend = handoverMsgNoPayload
-					}
-				}
-
-				conn.Send(MessageContext{
-					MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
-					Msg:       msgToSend,
-					Broadcast: 0,
-					StubId:    0,
-					ChannelId: uint32(srcChannelId),
-				})
-			}
-		}
-
-		// Send the handover message to all connections in the dstChannel
-		for conn := range dstChanenlConns {
-			conn.Send(MessageContext{
-				MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
-				Msg:       handoverMsg,
-				Broadcast: 0,
-				StubId:    0,
-				ChannelId: uint32(dstChannelId),
-			})
-		}
+		sendHandoverMsg(srcChannel, dstChannel, handoverMsg, handoverMsgNoPayload)
 	}()
 
 	handoverDataProvider(srcChannelId, dstChannelId, c)
+}
+
+func sendHandoverMsg(srcChannel, dstChannel *Channel, handoverMsg common.Message, handoverMsgNoPayload common.Message) {
+	// Use GetAllConnections() to avoid race condition
+	srcChannelConns := srcChannel.GetAllConnections()
+	dstChannelConns := dstChannel.GetAllConnections()
+	// Send the handover message to all connections in the srcChannel
+	for conn := range srcChannelConns {
+		// Avoid duplicate sending
+		if _, exists := dstChannelConns[conn]; !exists {
+			msgToSend := handoverMsg
+
+			if c, ok := conn.(*Connection); ok {
+				_, hasInterestInDstChannel := c.spatialSubscriptions.Load(dstChannel.Id())
+				if !hasInterestInDstChannel {
+					// This connection has not interest in the dstChannel, no need to send the handover data payload
+					msgToSend = handoverMsgNoPayload
+				}
+			}
+
+			conn.Send(MessageContext{
+				MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
+				Msg:       msgToSend,
+				Broadcast: 0,
+				StubId:    0,
+				ChannelId: uint32(srcChannel.Id()),
+			})
+		}
+	}
+
+	// Send the handover message to all connections in the dstChannel
+	for conn := range dstChannelConns {
+		conn.Send(MessageContext{
+			MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
+			Msg:       handoverMsg,
+			Broadcast: 0,
+			StubId:    0,
+			ChannelId: uint32(dstChannel.Id()),
+		})
+	}
+
 }
 
 func (ctl *StaticGrid2DSpatialController) initServerConnections() {

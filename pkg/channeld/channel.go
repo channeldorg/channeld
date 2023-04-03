@@ -4,7 +4,6 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
-	"hash/maphash"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -73,6 +72,7 @@ type Channel struct {
 	// The ID of the client connection that causes the latest ChannelDataUpdate
 	latestDataUpdateConnId ConnectionId
 	spatialNotifier        common.SpatialInfoChangedNotifier
+	entityController       EntityGroupController
 	inMsgQueue             chan channelMessage
 	fanOutQueue            *list.List
 	// Time since channel created
@@ -103,9 +103,7 @@ func InitChannels() {
 		return
 	}
 
-	allChannels = xsync.NewTypedMapOf[common.ChannelId, *Channel](func(s maphash.Seed, chId common.ChannelId) uint64 {
-		return uint64(chId)
-	})
+	allChannels = xsync.NewTypedMapOf[common.ChannelId, *Channel](UintIdHasher[common.ChannelId]())
 
 	nextChannelId = 0
 	nextSpatialChannelId = GlobalSettings.SpatialChannelIdStart

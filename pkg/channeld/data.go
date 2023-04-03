@@ -77,7 +77,7 @@ func RegisterChannelDataType(channelType channeldpb.ChannelType, msgTemplate pro
 
 }
 
-func ReflectChannelDataMessage(channelType channeldpb.ChannelType, mergeOptions *channeldpb.ChannelDataMergeOptions) (common.ChannelDataMessage, error) {
+func ReflectChannelDataMessage(channelType channeldpb.ChannelType) (common.ChannelDataMessage, error) {
 	/*
 		channelTypeName := channelType.String()
 		dataTypeName := fmt.Sprintf("channeld.%sChannelDataMessage",
@@ -104,7 +104,7 @@ func (ch *Channel) InitData(dataMsg common.ChannelDataMessage, mergeOptions *cha
 
 	if dataMsg == nil {
 		var err error
-		ch.data.msg, err = ReflectChannelDataMessage(ch.channelType, mergeOptions)
+		ch.data.msg, err = ReflectChannelDataMessage(ch.channelType)
 		if err != nil {
 			ch.logger.Info("unable to create default channel data message; will use the first received message to set", zap.String("chType", ch.channelType.String()), zap.Error(err))
 			return
