@@ -24,6 +24,7 @@ func defaultSubOptions(t channeldpb.ChannelType) *channeldpb.ChannelSubscription
 		FanOutDelayMs:        proto.Int32(GlobalSettings.GetChannelSettings(t).DefaultFanOutDelayMs),
 		FanOutIntervalMs:     proto.Uint32(GlobalSettings.GetChannelSettings(t).DefaultFanOutIntervalMs),
 		SkipSelfUpdateFanOut: proto.Bool(false),
+		SkipFirstFanOut:      proto.Bool(false),
 	}
 	return options
 }
@@ -52,7 +53,7 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.Channel
 
 	cs.fanOutElement = ch.fanOutQueue.PushFront(&fanOutConnection{
 		conn:           c,
-		hadFirstFanOut: false,
+		hadFirstFanOut: *cs.options.SkipFirstFanOut,
 		// Delay the first fanout, to solve the spawn & update order issue in Mirror & UE.
 		lastFanOutTime: ch.GetTime().OffsetMs(*cs.options.FanOutDelayMs),
 	})

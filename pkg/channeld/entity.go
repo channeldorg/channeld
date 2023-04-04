@@ -38,13 +38,6 @@ type EntityChannelGroupController struct {
 	lockGroup     *EntityGroup
 }
 
-func newEntityGroupController() *EntityChannelGroupController {
-	return &EntityChannelGroupController{
-		// handoverGroup: newEntityGroup(),
-		// lockGroup:     newEntityGroup(),
-	}
-}
-
 func (ctl *EntityChannelGroupController) SetGroup(t channeldpb.EntityGroupType, group *EntityGroup) {
 	ctl.rwLock.Lock()
 	defer ctl.rwLock.Unlock()
@@ -73,7 +66,8 @@ func (ctl *EntityChannelGroupController) AddToGroup(t channeldpb.EntityGroupType
 			}
 
 			if ch.entityController == nil {
-				ch.entityController = newEntityGroupController()
+				ch.Logger().Error("channel doesn't have the entity controller")
+				continue
 			}
 
 			// All entity channels of the same group use the same handover group
@@ -104,9 +98,10 @@ func (ctl *EntityChannelGroupController) GetHandoverEntities() []EntityId {
 	return arr
 }
 
-func (ch *Channel) GetHandoverEntites(notifyingEntityId EntityId) []EntityId {
+func (ch *Channel) GetHandoverEntities(notifyingEntityId EntityId) []EntityId {
 	if ch.entityController == nil {
-		return make([]EntityId, 0)
+		ch.Logger().Error("channel doesn't have the entity controller")
+		return nil
 	}
 
 	return ch.entityController.GetHandoverEntities()
@@ -126,11 +121,8 @@ func handleAddEntityGroup(ctx MessageContext) {
 	}
 
 	if ctx.Channel.entityController == nil {
-		/*
-			ctx.Channel.Logger().Error("entityController is nil, will not be handled.")
-			return
-		*/
-		ctx.Channel.entityController = newEntityGroupController()
+		ctx.Channel.Logger().Error("channel doesn't have the entity controller")
+		return
 	}
 
 	if ctx.Channel.entityController.AddToGroup(addMsg.Type, EntityId(addMsg.JunctionEntityId), CopyArray[uint32, EntityId](addMsg.EntitiesToAdd)) != nil {

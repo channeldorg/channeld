@@ -364,7 +364,15 @@ func (entityData *EntityChannelData) MergeTo(msg common.Message, fullData bool) 
 		entityState.EntityData = anyData
 	}
 
+	if handoverData.Entities == nil {
+		handoverData.Entities = make(map[uint32]*unrealpb.SpatialEntityState)
+	}
 	handoverData.Entities[*entityData.ObjRef.NetGUID] = entityState
 
 	return nil
+}
+
+// Implement [unreal.UnrealObjectEntityData]
+func (entityData *EntityChannelData) SetObjRef(objRef *unrealpb.UnrealObjectRef) {
+	entityData.ObjRef = objRef
 }

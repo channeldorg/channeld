@@ -133,6 +133,24 @@ func handleUnrealSpawnObject(ctx channeld.MessageContext) {
 			zap.Uint32("newChId", *spawnMsg.ChannelId),
 		)
 	*/
+
+	entityChannel := channeld.GetChannel(common.ChannelId(*spawnMsg.Obj.NetGUID))
+	if entityChannel == nil {
+		return
+	}
+
+	// Set the objRef of the entity channel's data
+	entityChannel.Execute(func(ch *channeld.Channel) {
+		if entityData, ok := ch.GetDataMessage().(UnrealObjectEntityData); ok {
+			entityData.SetObjRef(spawnMsg.Obj)
+			ch.Logger().Debug("set entity data's objRef")
+		}
+	})
+}
+
+// Entity channel data that contains an UnrealObjectRef should implement this interface.
+type UnrealObjectEntityData interface {
+	SetObjRef(objRef *unrealpb.UnrealObjectRef)
 }
 
 func addSpatialEntity(ch *channeld.Channel, objRef *unrealpb.UnrealObjectRef) {

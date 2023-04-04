@@ -17,6 +17,7 @@ type MessageContext struct {
 	Broadcast uint32 //channeldpb.BroadcastType
 	StubId    uint32
 	// The original channelId in the Packet, could be different from Channel.id.
+	// Used for both send and receive.
 	ChannelId uint32
 
 	// The connection that received the message. Required for BroadcastType_ALL_BUT_SENDER but not for sending.

@@ -217,6 +217,9 @@ message ChannelSubscriptionOptions {
 
     // Whether the subscriber should skip the fan-out of its own ChannelDataUpdate. Default is false.
     optional bool skipSelfUpdateFanOut = 5;
+
+    // Whether the subscriber should skip the first fan-out that contains the full states. Default is false.
+    optional bool skipFirstFanOut = 6;
 }
 
 // Defines how two @ChannelDataUpdateMessage.data are merged.
