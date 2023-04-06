@@ -98,13 +98,24 @@ func (ctl *EntityChannelGroupController) GetHandoverEntities() []EntityId {
 	return arr
 }
 
-func (ch *Channel) GetHandoverEntities(notifyingEntityId EntityId) []EntityId {
+func (ch *Channel) GetHandoverEntities(notifyingEntityId EntityId) map[EntityId]common.Message {
 	if ch.entityController == nil {
 		ch.Logger().Error("channel doesn't have the entity controller")
 		return nil
 	}
 
-	return ch.entityController.GetHandoverEntities()
+	entityIds := ch.entityController.GetHandoverEntities()
+	entities := make(map[EntityId]common.Message, len(entityIds))
+	for _, entityId := range entityIds {
+		entityChannel := GetChannel(common.ChannelId(entityId))
+		if entityChannel == nil {
+			entities[entityId] = nil
+			continue
+		}
+		entities[entityId] = entityChannel.GetDataMessage()
+	}
+
+	return entities
 }
 
 func handleAddEntityGroup(ctx MessageContext) {

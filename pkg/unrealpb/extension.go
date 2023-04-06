@@ -3,6 +3,7 @@ package unrealpb
 import (
 	"errors"
 
+	"github.com/metaworking/channeld/pkg/channeld"
 	"github.com/metaworking/channeld/pkg/channeldpb"
 	"github.com/metaworking/channeld/pkg/common"
 )
@@ -31,5 +32,29 @@ func (dst *SpatialChannelData) Merge(src common.ChannelDataMessage, options *cha
 		}
 	}
 
+	return nil
+}
+
+// Entity channel data should implement this interface
+type EntityChannelDataWithObjRef interface {
+	GetObjRef() *UnrealObjectRef
+}
+
+// Implement [channeld.SpatialChannelDataUpdater]
+func (dst *SpatialChannelData) AddEntity(entityId channeld.EntityId, msg common.Message) error {
+	entityData, ok := msg.(EntityChannelDataWithObjRef)
+	if !ok {
+		return errors.New("msg is doesn't have GetObjRef()")
+	}
+
+	dst.Entities[uint32(entityId)] = &SpatialEntityState{
+		ObjRef: entityData.GetObjRef(),
+	}
+
+	return nil
+}
+
+func (dst *SpatialChannelData) RemoveEntity(entityId channeld.EntityId) error {
+	delete(dst.Entities, uint32(entityId))
 	return nil
 }

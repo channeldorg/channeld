@@ -80,6 +80,7 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.Channel
 		zap.Uint32("fanOutIntervalMs", *cs.options.FanOutIntervalMs),
 		zap.Int32("fanOutDelayMs", *cs.options.FanOutDelayMs),
 		zap.Bool("skipSelfUpdateFanOut", *cs.options.SkipSelfUpdateFanOut),
+		zap.Bool("skipFirstFanOut", *cs.options.SkipFirstFanOut),
 	)
 	return cs
 }
