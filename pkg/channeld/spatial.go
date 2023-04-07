@@ -655,7 +655,28 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 			return
 		}
 
-		// Remove the entities from the src spatial channel's data
+		// Step 1: Handle the cross-server handover
+		// Should be done as soon as possible to prevent the src spatial server from sending the entity channel data update.
+		if !srcChannel.IsSameOwner(dstChannel) {
+			for entityId := range handoverEntities {
+				entityCh := GetChannel(common.ChannelId(entityId))
+				if entityCh == nil {
+					continue
+				}
+
+				if srcChannel.HasOwner() {
+					// Unsub the src spatial server from the entity channel
+					srcChannel.ownerConnection.UnsubscribeFromChannel(entityCh)
+					srcChannel.ownerConnection.sendUnsubscribed(MessageContext{}, entityCh, nil, 0)
+				}
+
+				// Set the owner of the entity channel to the dst spatial server, so the src spatial server's residual update will be ignored.
+				// Otherwise repeating handover may happen!
+				entityCh.ownerConnection = dstChannel.ownerConnection
+			}
+		}
+
+		// Step 2-1: Remove the entities from the src spatial channel's data
 		srcChannel.Execute(func(ch *Channel) {
 			updater, ok := ch.GetDataMessage().(SpatialChannelEntityUpdater)
 			if !ok {
@@ -671,7 +692,7 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 			}
 		})
 
-		// Add the entities to the dst spatial channel's data
+		// Step 2-2: Add the entities to the dst spatial channel's data
 		dstChannel.Execute(func(ch *Channel) {
 			updater, ok := ch.GetDataMessage().(SpatialChannelEntityUpdater)
 			if !ok {
@@ -691,7 +712,7 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 			}
 		})
 
-		// Merge the entities to the spatial data message
+		// Step 3-1: Merge the entities to the spatial data message
 		for entityId, entityData := range handoverEntities {
 			if entityData == nil {
 				rootLogger.Warn("failed to handover entity as its channel doesn't have data", zap.Uint32("entityId", uint32(entityId)))
@@ -708,6 +729,7 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 			}
 		}
 
+		// Step 3-2: Prepare the handover message
 		handoverAnyData, err := anypb.New(spatialDataMsg)
 		if err != nil {
 			rootLogger.Error("failed to marshal spatial handover data", zap.Error(err))
@@ -727,10 +749,11 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 			ChannelId: uint32(dstChannelId),
 		}
 
+		// Step 4: Send the handover message to all connections in the srcChannel and dstChannel
 		srcChannelSubConns := srcChannel.GetAllConnections()
 		dstChannelSubConns := dstChannel.GetAllConnections()
 
-		// Send the handover message to all connections in the srcChannel
+		// Step 4-1: Send to the connections in the srcChannel. The handover message doesn't contain the entity data.
 		for conn := range srcChannelSubConns {
 			// Avoid duplicate sending
 			if _, exists := dstChannelSubConns[conn]; exists {
@@ -740,7 +763,7 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 			conn.Send(handoverMsgCtx)
 		}
 
-		// Send the handover message to all connections in the dstChannel
+		// Step 4-2: Send the connections in the dstChannel. The handover message contains the entity data if the connection hasn't subscribed to the entity channel yet.
 		for conn := range dstChannelSubConns {
 			handoverDataMsg := spatialDataMsg.ProtoReflect().New().Interface()
 
@@ -760,7 +783,7 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 
 				entityChannelSubConns := entityCh.GetAllConnections()
 
-				// Subscribe to the entity channel for every connection in the spatial channel
+				// Subscribe to the entity channel for every connection in the dst spatial channel
 				_, hasSubedEntity := entityChannelSubConns[conn]
 				if !hasSubedEntity {
 					subOptions := &channeldpb.ChannelSubscriptionOptions{

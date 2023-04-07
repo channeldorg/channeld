@@ -684,7 +684,7 @@ func handleUnsubFromChannel(ctx MessageContext) {
 
 	_, err := connToUnsub.UnsubscribeFromChannel(ctx.Channel)
 	if err != nil {
-		ctx.Connection.Logger().Error("failed to unsub from channel",
+		ctx.Connection.Logger().Warn("failed to unsub from channel",
 			zap.String("channelType", ctx.Channel.channelType.String()),
 			zap.Uint32("channelId", uint32(ctx.Channel.id)),
 			zap.Error(err),

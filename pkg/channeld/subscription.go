@@ -19,7 +19,7 @@ type ChannelSubscription struct {
 
 func defaultSubOptions(t channeldpb.ChannelType) *channeldpb.ChannelSubscriptionOptions {
 	options := &channeldpb.ChannelSubscriptionOptions{
-		DataAccess:           Pointer(channeldpb.ChannelDataAccess_WRITE_ACCESS),
+		DataAccess:           Pointer(channeldpb.ChannelDataAccess_READ_ACCESS),
 		DataFieldMasks:       make([]string, 0),
 		FanOutDelayMs:        proto.Int32(GlobalSettings.GetChannelSettings(t).DefaultFanOutDelayMs),
 		FanOutIntervalMs:     proto.Uint32(GlobalSettings.GetChannelSettings(t).DefaultFanOutIntervalMs),
@@ -148,6 +148,9 @@ func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel, connToSub C
 }
 
 func (c *Connection) sendUnsubscribed(ctx MessageContext, ch *Channel, connToUnsub *Connection, stubId uint32) {
+	if connToUnsub == nil {
+		connToUnsub = c
+	}
 	ctx.ChannelId = uint32(ch.id)
 	ctx.StubId = stubId
 	ctx.MsgType = channeldpb.MessageType_UNSUB_FROM_CHANNEL

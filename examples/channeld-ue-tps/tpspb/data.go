@@ -327,20 +327,87 @@ func (dstData *EntityChannelData) Merge(src common.ChannelDataMessage, options *
 		return errors.New("src is not a EntityChannelData")
 	}
 
+	hasHandover := false
+	var oldInfo, newInfo *common.SpatialInfo
 	if spatialNotifier != nil && dstData.ObjRef != nil {
 		// src = the incoming update, dst = existing channel data
 		if srcData.ActorState != nil && srcData.ActorState.ReplicatedMovement != nil && srcData.ActorState.ReplicatedMovement.Location != nil &&
 			dstData.ActorState != nil && dstData.ActorState.ReplicatedMovement != nil && dstData.ActorState.ReplicatedMovement.Location != nil {
-			unreal.CheckEntityHandover(*dstData.ObjRef.NetGUID, srcData.ActorState.ReplicatedMovement.Location, dstData.ActorState.ReplicatedMovement.Location, spatialNotifier)
+			hasHandover, oldInfo, newInfo = unreal.CheckEntityHandover(*dstData.ObjRef.NetGUID, srcData.ActorState.ReplicatedMovement.Location, dstData.ActorState.ReplicatedMovement.Location)
 		}
 
-		if srcData.SceneComponentState != nil && srcData.SceneComponentState.RelativeLocation != nil &&
+		if !hasHandover && srcData.SceneComponentState != nil && srcData.SceneComponentState.RelativeLocation != nil &&
 			dstData.SceneComponentState != nil && dstData.SceneComponentState.RelativeLocation != nil {
-			unreal.CheckEntityHandover(*dstData.ObjRef.NetGUID, srcData.SceneComponentState.RelativeLocation, dstData.SceneComponentState.RelativeLocation, spatialNotifier)
+			hasHandover, oldInfo, newInfo = unreal.CheckEntityHandover(*dstData.ObjRef.NetGUID, srcData.SceneComponentState.RelativeLocation, dstData.SceneComponentState.RelativeLocation)
 		}
 	}
 
 	proto.Merge(dstData, srcData)
+
+	if hasHandover {
+		spatialNotifier.Notify(*oldInfo, *newInfo,
+			func(srcChannelId common.ChannelId, dstChannelId common.ChannelId, handoverData interface{}) {
+				entityId, ok := handoverData.(*channeld.EntityId)
+				if !ok {
+					channeld.RootLogger().Error("handover data is not an entityId",
+						zap.Uint32("srcChannelId", uint32(srcChannelId)),
+						zap.Uint32("dstChannelId", uint32(dstChannelId)),
+					)
+					return
+				}
+				*entityId = channeld.EntityId(*dstData.ObjRef.NetGUID)
+
+				/* We can't afford to wait in the message queue to send the handover message!
+				// Back to the source spatial channel's goroutine
+				srcChannel.Execute(func(ch *channeld.Channel) {
+
+				})
+				*/
+
+				/*
+					// Read the UnrealObjectRef in the source spatial channel (from the entity channel's goroutine)
+					srcChannel := channeld.GetChannel(srcChannelId)
+					if srcChannel == nil {
+						handoverData <- nil
+						return
+					}
+
+					if srcChannel.GetDataMessage() == nil {
+						handoverData <- nil
+						return
+					}
+
+					spatialChData, ok := srcChannel.GetDataMessage().(*unrealpb.SpatialChannelData)
+					if !ok {
+						handoverData <- nil
+						return
+					}
+
+					entities := spatialChData.GetEntities()
+					if entities == nil {
+						handoverData <- nil
+						return
+					}
+
+					// CAUTION: running outside the source spatial channel's goroutine may cause concurrent map read/write error!
+					entity, exists := entities[netId]
+					if !exists {
+						handoverData <- nil
+						return
+					}
+
+					handoverData <- &unrealpb.HandoverData{
+						Context: []*unrealpb.HandoverContext{
+							{
+								Obj: entity.ObjRef,
+								// ClientConnId: oldActorState.OwningConnId,
+							},
+						},
+					}
+				*/
+			},
+		)
+	}
 
 	return nil
 }

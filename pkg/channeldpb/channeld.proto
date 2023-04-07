@@ -291,7 +291,7 @@ message SubscribedToChannelMessage {
 }
 
 message SubscribedToChannelResultMessage {
-    // The connection that subsribed.
+    // The connection that subscribed.
     uint32 connId = 1;
     ChannelSubscriptionOptions subOptions = 2;
     ConnectionType connType = 3;

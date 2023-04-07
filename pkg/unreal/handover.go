@@ -127,7 +127,7 @@ func CheckSpatialInfoChange(netId uint32, newLoc, oldLoc *unrealpb.FVector, spat
 	}
 }
 
-func CheckEntityHandover(netId uint32, newLoc, oldLoc *unrealpb.FVector, spatialNotifier common.SpatialInfoChangedNotifier) {
+func CheckEntityHandover(netId uint32, newLoc, oldLoc *unrealpb.FVector) (bool, *common.SpatialInfo, *common.SpatialInfo) { //, spatialNotifier common.SpatialInfoChangedNotifier) {
 	var newX, newY, newZ float32
 
 	if newLoc.X != nil {
@@ -151,80 +151,19 @@ func CheckEntityHandover(netId uint32, newLoc, oldLoc *unrealpb.FVector, spatial
 
 	if newX != oldLoc.GetX() || newY != oldLoc.GetY() || newZ != oldLoc.GetZ() {
 		// Swap the Y and Z as UE uses the Z-Up rule but channeld uses the Y-up rule.
-		oldInfo := common.SpatialInfo{
+		oldInfo := &common.SpatialInfo{
 			X: float64(oldLoc.GetX()),
 			Y: float64(oldLoc.GetZ()),
 			Z: float64(oldLoc.GetY()),
 		}
-		newInfo := common.SpatialInfo{
+		newInfo := &common.SpatialInfo{
 			X: float64(newX),
 			Y: float64(newZ),
 			Z: float64(newY),
 		}
 
-		spatialNotifier.Notify(
-			oldInfo,
-			newInfo,
-			func(srcChannelId common.ChannelId, dstChannelId common.ChannelId, handoverData interface{}) {
-				entityId, ok := handoverData.(*channeld.EntityId)
-				if !ok {
-					channeld.RootLogger().Error("handover data is not an entityId",
-						zap.Uint32("srcChannelId", uint32(srcChannelId)),
-						zap.Uint32("dstChannelId", uint32(dstChannelId)),
-					)
-					return
-				}
-				*entityId = channeld.EntityId(netId)
-
-				/* We can't afford to wait in the message queue to send the handover message!
-				// Back to the source spatial channel's goroutine
-				srcChannel.Execute(func(ch *channeld.Channel) {
-
-				})
-				*/
-
-				/*
-					// Read the UnrealObjectRef in the source spatial channel (from the entity channel's goroutine)
-					srcChannel := channeld.GetChannel(srcChannelId)
-					if srcChannel == nil {
-						handoverData <- nil
-						return
-					}
-
-					if srcChannel.GetDataMessage() == nil {
-						handoverData <- nil
-						return
-					}
-
-					spatialChData, ok := srcChannel.GetDataMessage().(*unrealpb.SpatialChannelData)
-					if !ok {
-						handoverData <- nil
-						return
-					}
-
-					entities := spatialChData.GetEntities()
-					if entities == nil {
-						handoverData <- nil
-						return
-					}
-
-					// CAUTION: running outside the source spatial channel's goroutine may cause concurrent map read/write error!
-					entity, exists := entities[netId]
-					if !exists {
-						handoverData <- nil
-						return
-					}
-
-					handoverData <- &unrealpb.HandoverData{
-						Context: []*unrealpb.HandoverContext{
-							{
-								Obj: entity.ObjRef,
-								// ClientConnId: oldActorState.OwningConnId,
-							},
-						},
-					}
-				*/
-			},
-		)
+		return true, oldInfo, newInfo
 	}
+
+	return false, nil, nil
 }
