@@ -141,8 +141,10 @@ enum MessageType {
     // Used by @CreateEntityChannelMessage
     CREATE_ENTITY_CHANNEL = 15;
 
+    // Used by @AddEntityGroupMessage
     ENTITY_GROUP_ADD = 16;
 
+    // Used by @RemoveEntityGroupMessage
     ENTITY_GROUP_REMOVE = 17;
     
     // Used by @DebugGetSpatialRegionsMessage
@@ -433,11 +435,13 @@ enum EntityGroupType {
     LOCK = 1;
 }
 
+// Add specified entities to the handover/lock group of the entity channel. Should sent by the entity channel owner.
 message AddEntityGroupMessage {
     EntityGroupType type = 1;
     repeated uint32 EntitiesToAdd = 2;
 }
 
+// Remove specified entities from the handover/lock group of the entity channel. Should sent by the entity channel owner.
 message RemoveEntityGroupMessage {
     EntityGroupType type = 1;
     repeated uint32 EntitiesToRemove = 2;

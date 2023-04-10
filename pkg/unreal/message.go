@@ -175,6 +175,26 @@ func addSpatialEntity(ch *channeld.Channel, objRef *unrealpb.UnrealObjectRef) {
 	ch.Logger().Debug("added spatial entity", zap.Uint32("netId", *objRef.NetGUID))
 }
 
+func removeSpatialEntity(ch *channeld.Channel, netId uint32) {
+	if ch.Type() != channeldpb.ChannelType_SPATIAL {
+		return
+	}
+
+	if ch.GetDataMessage() == nil {
+		return
+	}
+
+	spatialChannelData, ok := ch.GetDataMessage().(*unrealpb.SpatialChannelData)
+	if !ok {
+		ch.Logger().Warn("channel data is not a SpatialChannelData",
+			zap.String("dataType", string(ch.GetDataMessage().ProtoReflect().Descriptor().FullName())))
+		return
+	}
+
+	delete(spatialChannelData.Entities, netId)
+	ch.Logger().Debug("removed spatial entity", zap.Uint32("netId", netId))
+}
+
 func handleUnrealDestroyObject(ctx channeld.MessageContext) {
 	// server -> channeld -> client
 	msg, ok := ctx.Msg.(*channeldpb.ServerForwardMessage)
@@ -190,6 +210,15 @@ func handleUnrealDestroyObject(ctx channeld.MessageContext) {
 		return
 	}
 
+	removeSpatialEntity(ctx.Channel, destroyMsg.NetId)
+	// Send/broadcast the message
+	channeld.HandleServerToClientUserMessage(ctx)
+
+	entityCh := channeld.GetChannel(common.ChannelId(destroyMsg.NetId))
+	if entityCh != nil {
+		entityCh.Logger().Info("removing entity channel from unrealpb.DestroyObjectMessage")
+		channeld.RemoveChannel(entityCh)
+	}
 }
 
 // Runs in the source spatial channel

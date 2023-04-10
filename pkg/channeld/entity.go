@@ -37,6 +37,15 @@ func (g *EntityGroup) Add(groupToAdd *EntityGroup) {
 	})
 }
 
+func toArray[T UintId](g *EntityGroup) []T {
+	arr := []T{}
+	g.entityIds.Range(func(key EntityId, value interface{}) bool {
+		arr = append(arr, T(key))
+		return true
+	})
+	return arr
+}
+
 type EntityGroupController interface {
 	cascadeGroup(t channeldpb.EntityGroupType, group *EntityGroup)
 	AddToGroup(t channeldpb.EntityGroupType, entitiesToAdd []EntityId) error
@@ -101,6 +110,10 @@ func (ctl *FlatEntityGroupController) AddToGroup(t channeldpb.EntityGroupType, e
 			// All entity channels of the same group share the same handover group instance
 			ch.entityController.cascadeGroup(t, ctl.handoverGroup)
 		}
+
+		rootLogger.Debug("updated handover group", zap.Uint32("entityId", uint32(ctl.entityId)),
+			zap.Any("handoverGroup", toArray[EntityId](ctl.handoverGroup)))
+
 	} else if t == channeldpb.EntityGroupType_LOCK {
 		if ctl.lockGroup == nil {
 			ctl.lockGroup = newEntityGroup()
@@ -122,6 +135,9 @@ func (ctl *FlatEntityGroupController) AddToGroup(t channeldpb.EntityGroupType, e
 			// All entity channels of the same group share the same lock group instance
 			ch.entityController.cascadeGroup(t, ctl.lockGroup)
 		}
+
+		rootLogger.Debug("updated lock group", zap.Uint32("entityId", uint32(ctl.entityId)),
+			zap.Any("lockGroup", toArray[EntityId](ctl.lockGroup)))
 	}
 
 	return nil
@@ -209,6 +225,11 @@ func (ch *Channel) GetHandoverEntities(notifyingEntityId EntityId) map[EntityId]
 }
 
 func handleAddEntityGroup(ctx MessageContext) {
+	if ctx.Connection != ctx.Channel.ownerConnection {
+		ctx.Connection.Logger().Error("only the owner connection of the entity channel can handle the message.")
+		return
+	}
+
 	addMsg, ok := ctx.Msg.(*channeldpb.AddEntityGroupMessage)
 	if !ok {
 		ctx.Connection.Logger().Error("message is not an AddEntityGroupMessage, will not be handled.")
@@ -229,6 +250,11 @@ func handleAddEntityGroup(ctx MessageContext) {
 }
 
 func handleRemoveEntityGroup(ctx MessageContext) {
+	if ctx.Connection != ctx.Channel.ownerConnection {
+		ctx.Connection.Logger().Error("only the owner connection of the entity channel can handle the message.")
+		return
+	}
+
 	removeMsg, ok := ctx.Msg.(*channeldpb.RemoveEntityGroupMessage)
 	if !ok {
 		ctx.Connection.Logger().Error("message is not an RemoveEntityGroupMessage, will not be handled.")
