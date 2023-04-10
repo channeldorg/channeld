@@ -435,8 +435,7 @@ enum EntityGroupType {
 
 message AddEntityGroupMessage {
     EntityGroupType type = 1;
-    uint32 JunctionEntityId = 2;
-    repeated uint32 EntitiesToAdd = 3;
+    repeated uint32 EntitiesToAdd = 2;
 }
 
 message RemoveEntityGroupMessage {

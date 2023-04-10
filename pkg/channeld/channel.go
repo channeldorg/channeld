@@ -169,7 +169,7 @@ func createChannelWithId(channelId common.ChannelId, t channeldpb.ChannelType, o
 
 	if ch.channelType == channeldpb.ChannelType_ENTITY {
 		ch.spatialNotifier = spatialController
-		ch.entityController = &EntityChannelGroupController{}
+		ch.entityController = &FlatEntityGroupController{entityId: EntityId(channelId)}
 	}
 
 	if ch.HasOwner() {
