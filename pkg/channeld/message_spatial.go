@@ -77,9 +77,7 @@ func handleUpdateSpatialInterest(ctx MessageContext) {
 	}
 
 	existingsSubs := make(map[common.ChannelId]*channeldpb.ChannelSubscriptionOptions)
-	clientConn.spatialSubscriptions.Range(func(key, value interface{}) bool {
-		chId := key.(common.ChannelId)
-		subOptions := value.(*channeldpb.ChannelSubscriptionOptions)
+	clientConn.spatialSubscriptions.Range(func(chId common.ChannelId, subOptions *channeldpb.ChannelSubscriptionOptions) bool {
 		existingsSubs[chId] = subOptions
 		return true
 	})

@@ -2,6 +2,7 @@ package channeld
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/metaworking/channeld/pkg/channeldpb"
@@ -67,6 +68,18 @@ type FlatEntityGroupController struct {
 
 func (ctl *FlatEntityGroupController) Initialize(ch *Channel) {
 	ctl.entityId = EntityId(ch.Id())
+
+	if strings.Contains(ch.metadata, "well-known") {
+		Event_AuthComplete.ListenFor(ctl, func(data AuthEventData) {
+			if data.AuthResult == channeldpb.AuthResultMessage_SUCCESSFUL {
+				// FIXME: subOptions
+				data.Connection.SubscribeToChannel(ch, nil)
+				data.Connection.sendSubscribed(MessageContext{}, ch, data.Connection, 0, nil)
+
+				ch.Logger().Debug("subscribed new connection for the entity")
+			}
+		})
+	}
 }
 
 func (ctl *FlatEntityGroupController) Uninitialize(ch *Channel) {
@@ -77,6 +90,8 @@ func (ctl *FlatEntityGroupController) Uninitialize(ch *Channel) {
 	// Remove the entity itself from its current groups (which may be shared between multiple entity channels)
 	ctl.RemoveFromGroup(channeldpb.EntityGroupType_HANDOVER, []EntityId{ctl.entityId})
 	ctl.RemoveFromGroup(channeldpb.EntityGroupType_LOCK, []EntityId{ctl.entityId})
+
+	Event_AuthComplete.UnlistenFor(ctl)
 }
 
 func (ctl *FlatEntityGroupController) cascadeGroup(t channeldpb.EntityGroupType, group *EntityGroup) {

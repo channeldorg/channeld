@@ -54,6 +54,7 @@ type ConnectionInChannel interface {
 	UnsubscribeFromChannel(ch *Channel) (*channeldpb.ChannelSubscriptionOptions, error)
 	sendSubscribed(ctx MessageContext, ch *Channel, connToSub ConnectionInChannel, stubId uint32, subOptions *channeldpb.ChannelSubscriptionOptions)
 	sendUnsubscribed(ctx MessageContext, ch *Channel, connToUnsub *Connection, stubId uint32)
+	HasInterestIn(spatialChId common.ChannelId) bool
 	Logger() *Logger
 	RemoteAddr() net.Addr
 }

@@ -134,6 +134,7 @@ func handleUnrealSpawnObject(ctx channeld.MessageContext) {
 		)
 	*/
 
+	// Entity channel should already be created by the spatial server.
 	entityChannel := channeld.GetChannel(common.ChannelId(*spawnMsg.Obj.NetGUID))
 	if entityChannel == nil {
 		return

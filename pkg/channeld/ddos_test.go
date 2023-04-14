@@ -65,7 +65,7 @@ func TestInvalidUsername(t *testing.T) {
 	sendMessage(conn, uint32(channeldpb.MessageType_AUTH), &channeldpb.AuthMessage{
 		PlayerIdentifierToken: "user2",
 	})
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 200)
 	assert.EqualValues(t, 2, failedAuthCounters["127.0.0.1"], "Failed auth counter should be 2")
 	// Read all bytes to clear the read buffer, so checkConnOpen/Closed can work
 	readAll(conn)
@@ -165,6 +165,7 @@ func sendMessage(conn net.Conn, msgType uint32, msg proto.Message) {
 
 func readAll(conn net.Conn) []byte {
 	buff := make([]byte, 1024)
+	conn.SetReadDeadline(time.Now().Add(time.Millisecond * 50))
 	n, _ := conn.Read(buff)
 	return buff[:n]
 }

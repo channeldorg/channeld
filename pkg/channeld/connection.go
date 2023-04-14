@@ -6,7 +6,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -68,7 +67,7 @@ type Connection struct {
 	connTime             time.Time
 	closeHandlers        []func()
 	replaySession        *replaypb.ReplaySession
-	spatialSubscriptions sync.Map //map[common.ChannelId]*channeldpb.ChannelSubscriptionOptions
+	spatialSubscriptions *xsync.MapOf[common.ChannelId, *channeldpb.ChannelSubscriptionOptions]
 }
 
 var allConnections *xsync.MapOf[ConnectionId, *Connection]
@@ -251,7 +250,7 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 		state:                ConnectionState_UNAUTHENTICATED,
 		connTime:             time.Now(),
 		closeHandlers:        make([]func(), 0),
-		spatialSubscriptions: sync.Map{}, //make(map[common.ChannelId]*channeldpb.ChannelSubscriptionOptions),
+		spatialSubscriptions: xsync.NewTypedMapOf[common.ChannelId, *channeldpb.ChannelSubscriptionOptions](UintIdHasher[common.ChannelId]()),
 	}
 
 	if connection.isPacketRecordingEnabled() {
@@ -727,9 +726,12 @@ func (c *Connection) Logger() *Logger {
 }
 
 func (c *Connection) RemoteAddr() net.Addr {
+	/* The address should still be available even after the connection is closed.
+	 * In this way, the anit-DDoS can save the address to the blacklist.
 	if c.IsClosing() {
 		return nil
 	}
+	*/
 	return c.conn.RemoteAddr()
 }
 

@@ -272,13 +272,13 @@ func handleAuth(ctx MessageContext) {
 				ctx.Connection.Close()
 			} else {
 
-				if authResult != channeldpb.AuthResultMessage_SUCCESSFUL {
-					Event_AuthFailed.Broadcast(AuthFailedEventData{
-						AuthResult:            authResult,
-						Connection:            ctx.Connection,
-						PlayerIdentifierToken: msg.PlayerIdentifierToken,
-					})
-				}
+				//if authResult != channeldpb.AuthResultMessage_SUCCESSFUL {
+				Event_AuthComplete.Broadcast(AuthEventData{
+					AuthResult:            authResult,
+					Connection:            ctx.Connection,
+					PlayerIdentifierToken: msg.PlayerIdentifierToken,
+				})
+				//}
 
 				onAuthComplete(ctx, authResult, msg.PlayerIdentifierToken)
 			}

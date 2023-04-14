@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/metaworking/channeld/pkg/channeldpb"
+	"github.com/metaworking/channeld/pkg/common"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
@@ -162,6 +163,10 @@ func (c *Connection) sendUnsubscribed(ctx MessageContext, ch *Channel, connToUns
 	c.Send(ctx)
 }
 
-func (ch *Channel) AddConnectionSubscribedNotification(connId ConnectionId) {
-
+func (c *Connection) HasInterestIn(spatialChId common.ChannelId) bool {
+	if c.spatialSubscriptions == nil {
+		return false
+	}
+	_, exists := c.spatialSubscriptions.Load(spatialChId)
+	return exists
 }

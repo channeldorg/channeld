@@ -664,8 +664,8 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 					continue
 				}
 
-				if srcChannel.HasOwner() {
-					// Unsub the src spatial server from the entity channel
+				if srcChannel.HasOwner() && !srcChannel.ownerConnection.HasInterestIn(dstChannelId) {
+					// Unsub the src spatial server from the entity channel if the server has no interest in the dst spatial channel
 					srcChannel.ownerConnection.UnsubscribeFromChannel(entityCh)
 					srcChannel.ownerConnection.sendUnsubscribed(MessageContext{}, entityCh, nil, 0)
 				}

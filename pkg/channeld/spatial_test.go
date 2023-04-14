@@ -743,6 +743,10 @@ func (c *testConnection) sendUnsubscribed(ctx MessageContext, ch *Channel, connT
 
 }
 
+func (c *testConnection) HasInterestIn(spatialChId common.ChannelId) bool {
+	return false
+}
+
 func (c *testConnection) Logger() *Logger {
 	return rootLogger
 }
