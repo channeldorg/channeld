@@ -10,6 +10,7 @@ import (
 var Event_GlobalChannelPossessed = &Event[*Channel]{}
 var Event_GlobalChannelUnpossessed = &Event[struct{}]{}
 var Event_ChannelCreated = &Event[*Channel]{}
+var Event_ChannelRemoving = &Event[*Channel]{}
 var Event_ChannelRemoved = &Event[common.ChannelId]{}
 
 type AuthFailedEventData struct {

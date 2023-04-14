@@ -168,8 +168,9 @@ func createChannelWithId(channelId common.ChannelId, t channeldpb.ChannelType, o
 	}
 
 	if ch.channelType == channeldpb.ChannelType_ENTITY {
-		ch.spatialNotifier = spatialController
-		ch.entityController = &FlatEntityGroupController{entityId: EntityId(channelId)}
+		ch.spatialNotifier = GetSpatialController()
+		ch.entityController = &FlatEntityGroupController{}
+		ch.entityController.Initialize(ch)
 	}
 
 	if ch.HasOwner() {
@@ -236,6 +237,12 @@ func CreateChannel(t channeldpb.ChannelType, owner ConnectionInChannel) (*Channe
 }
 
 func RemoveChannel(ch *Channel) {
+	Event_ChannelRemoving.Broadcast(ch)
+
+	if ch.channelType == channeldpb.ChannelType_ENTITY {
+		ch.entityController.Uninitialize(ch)
+	}
+
 	atomic.AddInt32(&ch.removing, 1)
 	close(ch.inMsgQueue)
 	allChannels.Delete(ch.id)

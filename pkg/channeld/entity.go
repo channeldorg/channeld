@@ -47,6 +47,8 @@ func toArray[T UintId](g *EntityGroup) []T {
 }
 
 type EntityGroupController interface {
+	Initialize(ch *Channel)
+	Uninitialize(ch *Channel)
 	cascadeGroup(t channeldpb.EntityGroupType, group *EntityGroup)
 	AddToGroup(t channeldpb.EntityGroupType, entitiesToAdd []EntityId) error
 	RemoveFromGroup(t channeldpb.EntityGroupType, entitiesToRemove []EntityId) error
@@ -63,14 +65,25 @@ type FlatEntityGroupController struct {
 	lockGroup     *EntityGroup
 }
 
+func (ctl *FlatEntityGroupController) Initialize(ch *Channel) {
+	ctl.entityId = EntityId(ch.Id())
+}
+
+func (ctl *FlatEntityGroupController) Uninitialize(ch *Channel) {
+	if ch.Type() != channeldpb.ChannelType_ENTITY {
+		return
+	}
+
+	// Remove the entity itself from its current groups (which may be shared between multiple entity channels)
+	ctl.RemoveFromGroup(channeldpb.EntityGroupType_HANDOVER, []EntityId{ctl.entityId})
+	ctl.RemoveFromGroup(channeldpb.EntityGroupType_LOCK, []EntityId{ctl.entityId})
+}
+
 func (ctl *FlatEntityGroupController) cascadeGroup(t channeldpb.EntityGroupType, group *EntityGroup) {
 	// Current entity is already locked, won't cascade.
 	if ctl.lockGroup != nil && ctl.lockGroup.entityIds.Size() > 0 {
 		return
 	}
-
-	ctl.rwLock.Lock()
-	defer ctl.rwLock.Unlock()
 
 	if t == channeldpb.EntityGroupType_HANDOVER {
 		// Add the entities in current group to the new group
@@ -89,6 +102,9 @@ func (ctl *FlatEntityGroupController) cascadeGroup(t channeldpb.EntityGroupType,
 }
 
 func (ctl *FlatEntityGroupController) AddToGroup(t channeldpb.EntityGroupType, entitiesToAdd []EntityId) error {
+	ctl.rwLock.Lock()
+	defer ctl.rwLock.Unlock()
+
 	if t == channeldpb.EntityGroupType_HANDOVER {
 		if ctl.handoverGroup == nil {
 			ctl.handoverGroup = newEntityGroup()
@@ -144,6 +160,9 @@ func (ctl *FlatEntityGroupController) AddToGroup(t channeldpb.EntityGroupType, e
 }
 
 func (ctl *FlatEntityGroupController) RemoveFromGroup(t channeldpb.EntityGroupType, entitiesToRemove []EntityId) error {
+	ctl.rwLock.Lock()
+	defer ctl.rwLock.Unlock()
+
 	if t == channeldpb.EntityGroupType_HANDOVER {
 		if ctl.handoverGroup != nil {
 			for _, entityId := range entitiesToRemove {
@@ -226,7 +245,7 @@ func (ch *Channel) GetHandoverEntities(notifyingEntityId EntityId) map[EntityId]
 
 func handleAddEntityGroup(ctx MessageContext) {
 	if ctx.Connection != ctx.Channel.ownerConnection {
-		ctx.Connection.Logger().Error("only the owner connection of the entity channel can handle the message.")
+		ctx.Connection.Logger().Error("AddEntityGroupMessage should only handled for the owner connection of the entity channel")
 		return
 	}
 
@@ -251,7 +270,7 @@ func handleAddEntityGroup(ctx MessageContext) {
 
 func handleRemoveEntityGroup(ctx MessageContext) {
 	if ctx.Connection != ctx.Channel.ownerConnection {
-		ctx.Connection.Logger().Error("only the owner connection of the entity channel can handle the message.")
+		ctx.Connection.Logger().Error("RemoveEntityGroupMessage should only handled for the owner connection of the entity channel")
 		return
 	}
 
