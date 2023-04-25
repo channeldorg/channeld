@@ -242,6 +242,7 @@ func RemoveChannel(ch *Channel) {
 
 	if ch.channelType == channeldpb.ChannelType_ENTITY {
 		ch.entityController.Uninitialize(ch)
+		Event_AuthComplete.UnlistenFor(ch)
 	}
 
 	atomic.AddInt32(&ch.removing, 1)

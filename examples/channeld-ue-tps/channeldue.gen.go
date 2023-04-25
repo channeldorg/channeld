@@ -3,11 +3,11 @@
 package main
 
 import (
-	"github.com/metaworking/channeld/examples/channeld-ue-tps/channeldgenpb"
+	"github.com/metaworking/channeld/examples/channeld-ue-tps/tpspb"
 	"github.com/metaworking/channeld/pkg/channeld"
 	"github.com/metaworking/channeld/pkg/channeldpb"
 )
 
 func InitChannelDataTypes() {
-	channeld.RegisterChannelDataType(channeldpb.ChannelType_GLOBAL, &channeldgenpb.DefaultChannelData{})
+	channeld.RegisterChannelDataType(channeldpb.ChannelType_GLOBAL, &tpspb.TestRepChannelData{})
 }

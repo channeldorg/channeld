@@ -490,10 +490,35 @@ func handleCreateEntityChannel(ctx MessageContext) {
 
 	// Should we also send the result to the GLOBAL channel owner?
 
-	// Subscribe to channel after creation
-	cs := ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
-	if cs != nil {
-		ctx.Connection.sendSubscribed(ctx, newChannel, ctx.Connection, 0, &cs.options)
+	if msg.IsWellKnown {
+		// Subscribe ALL the connections to the entity channel
+		allConnections.Range(func(_ ConnectionId, conn *Connection) bool {
+			// FIXME: different subOptions for different connection?
+			cs := conn.SubscribeToChannel(newChannel, msg.SubOptions)
+			if cs != nil {
+				conn.sendSubscribed(MessageContext{}, newChannel, conn, 0, nil)
+				newChannel.Logger().Debug("subscribed existing connection for the well-known entity", zap.Uint32("connId", uint32(conn.Id())))
+			}
+			return true
+		})
+
+		// Add hook to subscribe the new connection to the entity channel
+		Event_AuthComplete.ListenFor(newChannel, func(data AuthEventData) {
+			if data.AuthResult == channeldpb.AuthResultMessage_SUCCESSFUL {
+				// FIXME: different subOptions for different connection?
+				cs := data.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
+				if cs != nil {
+					data.Connection.sendSubscribed(MessageContext{}, newChannel, data.Connection, 0, nil)
+					newChannel.Logger().Debug("subscribed new connection for the well-known entity", zap.Uint32("connId", uint32(data.Connection.Id())))
+				}
+			}
+		})
+	} else {
+		// Subscribe the owner to channel after creation
+		cs := ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
+		if cs != nil {
+			ctx.Connection.sendSubscribed(ctx, newChannel, ctx.Connection, 0, &cs.options)
+		}
 	}
 
 	/* We could sub all the connections in the spatial channel to the entity channel here,
