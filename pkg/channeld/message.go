@@ -493,10 +493,15 @@ func handleCreateEntityChannel(ctx MessageContext) {
 	if msg.IsWellKnown {
 		// Subscribe ALL the connections to the entity channel
 		allConnections.Range(func(_ ConnectionId, conn *Connection) bool {
+			// Ignore the well-known entity for server
+			if conn.GetConnectionType() == channeldpb.ConnectionType_SERVER {
+				return true
+			}
+
 			// FIXME: different subOptions for different connection?
-			cs := conn.SubscribeToChannel(newChannel, msg.SubOptions)
+			cs := conn.SubscribeToChannel(newChannel, nil)
 			if cs != nil {
-				conn.sendSubscribed(MessageContext{}, newChannel, conn, 0, nil)
+				conn.sendSubscribed(MessageContext{}, newChannel, conn, 0, &cs.options)
 				newChannel.Logger().Debug("subscribed existing connection for the well-known entity", zap.Uint32("connId", uint32(conn.Id())))
 			}
 			return true
@@ -504,11 +509,16 @@ func handleCreateEntityChannel(ctx MessageContext) {
 
 		// Add hook to subscribe the new connection to the entity channel
 		Event_AuthComplete.ListenFor(newChannel, func(data AuthEventData) {
+			// Ignore the well-known entity for server
+			if data.Connection.GetConnectionType() == channeldpb.ConnectionType_SERVER {
+				return
+			}
+
 			if data.AuthResult == channeldpb.AuthResultMessage_SUCCESSFUL {
 				// FIXME: different subOptions for different connection?
-				cs := data.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
+				cs := data.Connection.SubscribeToChannel(newChannel, nil)
 				if cs != nil {
-					data.Connection.sendSubscribed(MessageContext{}, newChannel, data.Connection, 0, nil)
+					data.Connection.sendSubscribed(MessageContext{}, newChannel, data.Connection, 0, &cs.options)
 					newChannel.Logger().Debug("subscribed new connection for the well-known entity", zap.Uint32("connId", uint32(data.Connection.Id())))
 				}
 			}

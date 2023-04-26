@@ -217,7 +217,7 @@ message ChannelSubscriptionOptions {
     // In Mirror, it can take up to 100ms to wait.
     optional int32 fanOutDelayMs = 4;
 
-    // Whether the subscriber should skip the fan-out of its own ChannelDataUpdate. Default is false.
+    // Whether the subscriber should skip the fan-out of its own ChannelDataUpdate. Default is true.
     optional bool skipSelfUpdateFanOut = 5;
 
     // Whether the subscriber should skip the first fan-out that contains the full states. Default is false.

@@ -256,8 +256,10 @@ const (
 	MessageType_UPDATE_SPATIAL_INTEREST MessageType = 14
 	// Used by @CreateEntityChannelMessage
 	MessageType_CREATE_ENTITY_CHANNEL MessageType = 15
-	MessageType_ENTITY_GROUP_ADD      MessageType = 16
-	MessageType_ENTITY_GROUP_REMOVE   MessageType = 17
+	// Used by @AddEntityGroupMessage
+	MessageType_ENTITY_GROUP_ADD MessageType = 16
+	// Used by @RemoveEntityGroupMessage
+	MessageType_ENTITY_GROUP_REMOVE MessageType = 17
 	// Used by @DebugGetSpatialRegionsMessage
 	MessageType_DEBUG_GET_SPATIAL_REGIONS MessageType = 99
 	// Start of any user-space defined message
@@ -867,7 +869,7 @@ type ChannelSubscriptionOptions struct {
 	// Fan-out delay is useful when the clients need spawn message (sent from the backend server) to be handled, before handling the ChannelDataUpdateMessage properly.
 	// In Mirror, it can take up to 100ms to wait.
 	FanOutDelayMs *int32 `protobuf:"varint,4,opt,name=fanOutDelayMs,proto3,oneof" json:"fanOutDelayMs,omitempty"`
-	// Whether the subscriber should skip the fan-out of its own ChannelDataUpdate. Default is false.
+	// Whether the subscriber should skip the fan-out of its own ChannelDataUpdate. Default is true.
 	SkipSelfUpdateFanOut *bool `protobuf:"varint,5,opt,name=skipSelfUpdateFanOut,proto3,oneof" json:"skipSelfUpdateFanOut,omitempty"`
 	// Whether the subscriber should skip the first fan-out that contains the full states. Default is false.
 	SkipFirstFanOut *bool `protobuf:"varint,6,opt,name=skipFirstFanOut,proto3,oneof" json:"skipFirstFanOut,omitempty"`
@@ -2320,6 +2322,7 @@ func (x *CreateEntityChannelMessage) GetIsWellKnown() bool {
 	return false
 }
 
+// Add specified entities to the handover/lock group of the entity channel. Should sent by the entity channel owner.
 type AddEntityGroupMessage struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -2375,6 +2378,7 @@ func (x *AddEntityGroupMessage) GetEntitiesToAdd() []uint32 {
 	return nil
 }
 
+// Remove specified entities from the handover/lock group of the entity channel. Should sent by the entity channel owner.
 type RemoveEntityGroupMessage struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

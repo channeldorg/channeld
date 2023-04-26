@@ -793,8 +793,14 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 					}
 					// TODO: set subOptions from the entity's replication settings in the engine.
 
-					conn.SubscribeToChannel(entityCh, subOptions)
-					conn.sendSubscribed(MessageContext{}, entityCh, conn, 0, subOptions)
+					// Only the owner can update the entity
+					if conn == entityCh.ownerConnection {
+						subOptions.DataAccess = Pointer(channeldpb.ChannelDataAccess_WRITE_ACCESS)
+					}
+
+					if cs := conn.SubscribeToChannel(entityCh, subOptions); cs != nil {
+						conn.sendSubscribed(MessageContext{}, entityCh, conn, 0, &cs.options)
+					}
 				}
 
 				if hasMerger {

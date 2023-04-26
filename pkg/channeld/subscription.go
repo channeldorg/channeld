@@ -24,7 +24,7 @@ func defaultSubOptions(t channeldpb.ChannelType) *channeldpb.ChannelSubscription
 		DataFieldMasks:       make([]string, 0),
 		FanOutDelayMs:        proto.Int32(GlobalSettings.GetChannelSettings(t).DefaultFanOutDelayMs),
 		FanOutIntervalMs:     proto.Uint32(GlobalSettings.GetChannelSettings(t).DefaultFanOutIntervalMs),
-		SkipSelfUpdateFanOut: proto.Bool(false),
+		SkipSelfUpdateFanOut: proto.Bool(true),
 		SkipFirstFanOut:      proto.Bool(false),
 	}
 	return options
