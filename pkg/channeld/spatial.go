@@ -490,7 +490,7 @@ func (ctl *StaticGrid2DSpatialController) subToAdjacentChannels(serverIndex uint
 				if channelToSub == nil {
 					return fmt.Errorf("failed to subscribe border channel %d as it doesn't exist", channelId)
 				}
-				cs := serverConn.SubscribeToChannel(channelToSub, subOptions)
+				cs, _ := serverConn.SubscribeToChannel(channelToSub, subOptions)
 				if cs != nil {
 					serverConn.sendSubscribed(MessageContext{}, channelToSub, serverConn, 0, &cs.options)
 				}
@@ -512,7 +512,7 @@ func (ctl *StaticGrid2DSpatialController) subToAdjacentChannels(serverIndex uint
 				if channelToSub == nil {
 					return fmt.Errorf("failed to subscribe border channel %d as it doesn't exist", channelId)
 				}
-				cs := serverConn.SubscribeToChannel(channelToSub, subOptions)
+				cs, _ := serverConn.SubscribeToChannel(channelToSub, subOptions)
 				if cs != nil {
 					serverConn.sendSubscribed(MessageContext{}, channelToSub, serverConn, 0, &cs.options)
 				}
@@ -534,7 +534,7 @@ func (ctl *StaticGrid2DSpatialController) subToAdjacentChannels(serverIndex uint
 				if channelToSub == nil {
 					return fmt.Errorf("failed to subscribe border channel %d as it doesn't exist", channelId)
 				}
-				cs := serverConn.SubscribeToChannel(channelToSub, subOptions)
+				cs, _ := serverConn.SubscribeToChannel(channelToSub, subOptions)
 				if cs != nil {
 					serverConn.sendSubscribed(MessageContext{}, channelToSub, serverConn, 0, &cs.options)
 				}
@@ -556,7 +556,7 @@ func (ctl *StaticGrid2DSpatialController) subToAdjacentChannels(serverIndex uint
 				if channelToSub == nil {
 					return fmt.Errorf("failed to subscribe border channel %d as it doesn't exist", channelId)
 				}
-				cs := serverConn.SubscribeToChannel(channelToSub, subOptions)
+				cs, _ := serverConn.SubscribeToChannel(channelToSub, subOptions)
 				if cs != nil {
 					serverConn.sendSubscribed(MessageContext{}, channelToSub, serverConn, 0, &cs.options)
 				}
@@ -764,6 +764,13 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 		}
 
 		// Step 4-2: Send the connections in the dstChannel. The handover message contains the entity data if the connection hasn't subscribed to the entity channel yet.
+		// Also, subscribe the connection to the entity channel if it hasn't subscribed yet.
+		subOptions := &channeldpb.ChannelSubscriptionOptions{
+			SkipSelfUpdateFanOut: Pointer(true),
+			// Since we already wrap the entity data in the handover message, no need to fan out again.
+			SkipFirstFanOut: Pointer(true),
+		}
+
 		for conn := range dstChannelSubConns {
 			handoverDataMsg := spatialDataMsg.ProtoReflect().New().Interface()
 
@@ -779,32 +786,24 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 					continue
 				}
 
-				handoverMerger, hasMerger := entityData.(HandoverDataMerger)
-
-				entityChannelSubConns := entityCh.GetAllConnections()
+				dataAccess := channeldpb.ChannelDataAccess_READ_ACCESS
+				// Only the owner can update the entity
+				if conn == entityCh.ownerConnection {
+					dataAccess = channeldpb.ChannelDataAccess_WRITE_ACCESS
+				}
+				// TODO: set subOptions from the entity's replication settings in the engine.
 
 				// Subscribe to the entity channel for every connection in the dst spatial channel
-				_, hasSubedEntity := entityChannelSubConns[conn]
-				if !hasSubedEntity {
-					subOptions := &channeldpb.ChannelSubscriptionOptions{
-						SkipSelfUpdateFanOut: Pointer(true),
-						// Since we already wrap the entity data in the handover message, no need to fan out again.
-						SkipFirstFanOut: Pointer(true),
-					}
-					// TODO: set subOptions from the entity's replication settings in the engine.
-
-					// Only the owner can update the entity
-					if conn == entityCh.ownerConnection {
-						subOptions.DataAccess = Pointer(channeldpb.ChannelDataAccess_WRITE_ACCESS)
-					}
-
-					if cs := conn.SubscribeToChannel(entityCh, subOptions); cs != nil {
-						conn.sendSubscribed(MessageContext{}, entityCh, conn, 0, &cs.options)
-					}
+				cs, alreadySubed := conn.SubscribeToChannel(entityCh, subOptions)
+				// If the data access changes, the SubscribedToChannelResultMessage must be sent, otherwise the connection may have problem sending the ChannelDataUpdateMessage..
+				if !alreadySubed || *cs.options.DataAccess != dataAccess {
+					cs.options.DataAccess = &dataAccess
+					conn.sendSubscribed(MessageContext{}, entityCh, conn, 0, &cs.options)
 				}
 
+				handoverMerger, hasMerger := entityData.(HandoverDataMerger)
 				if hasMerger {
-					handoverMerger.MergeTo(handoverDataMsg, !hasSubedEntity)
+					handoverMerger.MergeTo(handoverDataMsg, !alreadySubed)
 				} else {
 					rootLogger.Warn("entity data doesn't implement HandoverDataMerger",
 						zap.Uint32("entityId", uint32(handoverEntityId)),

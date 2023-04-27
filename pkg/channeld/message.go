@@ -6,7 +6,6 @@ import (
 	"github.com/metaworking/channeld/pkg/channeldpb"
 	"github.com/metaworking/channeld/pkg/common"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 )
 
 // The context of a message for both sending and receiving
@@ -383,7 +382,7 @@ func handleCreateChannel(ctx MessageContext) {
 	}
 
 	// Subscribe to channel after creation
-	cs := ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
+	cs, _ := ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
 	if cs != nil {
 		ctx.Connection.sendSubscribed(ctx, newChannel, ctx.Connection, 0, &cs.options)
 	}
@@ -427,7 +426,7 @@ func handleCreateSpatialChannel(ctx MessageContext, msg *channeldpb.CreateChanne
 
 	for _, newChannel := range channels {
 		// Subscribe to channel after creation
-		cs := ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
+		cs, _ := ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
 		if cs != nil {
 			ctx.Connection.sendSubscribed(ctx, newChannel, ctx.Connection, 0, &cs.options)
 		}
@@ -499,8 +498,8 @@ func handleCreateEntityChannel(ctx MessageContext) {
 			}
 
 			// FIXME: different subOptions for different connection?
-			cs := conn.SubscribeToChannel(newChannel, nil)
-			if cs != nil {
+			cs, alreadySubed := conn.SubscribeToChannel(newChannel, nil)
+			if cs != nil && !alreadySubed {
 				conn.sendSubscribed(MessageContext{}, newChannel, conn, 0, &cs.options)
 				newChannel.Logger().Debug("subscribed existing connection for the well-known entity", zap.Uint32("connId", uint32(conn.Id())))
 			}
@@ -516,7 +515,7 @@ func handleCreateEntityChannel(ctx MessageContext) {
 
 			if data.AuthResult == channeldpb.AuthResultMessage_SUCCESSFUL {
 				// FIXME: different subOptions for different connection?
-				cs := data.Connection.SubscribeToChannel(newChannel, nil)
+				cs, _ := data.Connection.SubscribeToChannel(newChannel, nil)
 				if cs != nil {
 					data.Connection.sendSubscribed(MessageContext{}, newChannel, data.Connection, 0, &cs.options)
 					newChannel.Logger().Debug("subscribed new connection for the well-known entity", zap.Uint32("connId", uint32(data.Connection.Id())))
@@ -525,7 +524,7 @@ func handleCreateEntityChannel(ctx MessageContext) {
 		})
 	} else {
 		// Subscribe the owner to channel after creation
-		cs := ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
+		cs, _ := ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
 		if cs != nil {
 			ctx.Connection.sendSubscribed(ctx, newChannel, ctx.Connection, 0, &cs.options)
 		}
@@ -661,33 +660,37 @@ func handleSubToChannel(ctx MessageContext) {
 		return
 	}
 
-	cs, exists := ctx.Channel.subscribedConnections[connToSub]
-	if exists {
-		ctx.Connection.Logger().Debug("already subscribed to channel, the subscription options will be merged",
-			zap.String("channelType", ctx.Channel.channelType.String()),
-			zap.Uint32("channelId", uint32(ctx.Channel.id)),
-		)
-		if msg.SubOptions != nil {
-			proto.Merge(&cs.options, msg.SubOptions)
+	/*
+		cs, exists := ctx.Channel.subscribedConnections[connToSub]
+		if exists {
+			ctx.Connection.Logger().Debug("already subscribed to channel, the subscription options will be merged",
+				zap.String("channelType", ctx.Channel.channelType.String()),
+				zap.Uint32("channelId", uint32(ctx.Channel.id)),
+			)
+			if msg.SubOptions != nil {
+				proto.Merge(&cs.options, msg.SubOptions)
+			}
+			connToSub.sendSubscribed(ctx, ctx.Channel, connToSub, 0, &cs.options)
+			// Do not send the SubscribedToChannelResultMessage to the sender or channel owner if already subed.
+			return
 		}
-		connToSub.sendSubscribed(ctx, ctx.Channel, connToSub, 0, &cs.options)
-		// Do not send the SubscribedToChannelResultMessage to the sender or channel owner if already subed.
-		return
-	}
+	*/
 
-	cs = connToSub.SubscribeToChannel(ctx.Channel, msg.SubOptions)
+	cs, alreadySubed := connToSub.SubscribeToChannel(ctx.Channel, msg.SubOptions)
 	if cs == nil {
 		return
 	}
-	// Notify the sender.
+
+	// Always notify the sender - may need to update the sub options.
 	ctx.Connection.sendSubscribed(ctx, ctx.Channel, connToSub, ctx.StubId, &cs.options)
 
-	// Notify the subscribed (if not the sender).
+	// Notify the subscribed if it's not the sender.
 	if connToSub != ctx.Connection {
 		connToSub.sendSubscribed(ctx, ctx.Channel, connToSub, 0, &cs.options)
 	}
-	// Notify the channel owner.
-	if ctx.Channel.HasOwner() && ctx.Channel.ownerConnection != ctx.Connection {
+
+	// Notify the channel owner if not already subed and it's not the sender.
+	if !alreadySubed && ctx.Channel.HasOwner() && ctx.Channel.ownerConnection != ctx.Connection {
 		ctx.Channel.ownerConnection.sendSubscribed(ctx, ctx.Channel, connToSub, 0, &cs.options)
 	}
 }

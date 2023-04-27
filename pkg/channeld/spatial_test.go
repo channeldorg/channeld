@@ -723,11 +723,11 @@ func (c *testConnection) Send(ctx MessageContext) {
 
 }
 
-func (c *testConnection) SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) *ChannelSubscription {
+func (c *testConnection) SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) (*ChannelSubscription, bool) {
 	c.subscribedChannels[ch.id] = ch
 	return &ChannelSubscription{
 		options: *defaultSubOptions(ch.channelType),
-	}
+	}, false
 }
 
 func (c *testConnection) UnsubscribeFromChannel(ch *Channel) (*channeldpb.ChannelSubscriptionOptions, error) {

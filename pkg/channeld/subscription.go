@@ -30,18 +30,29 @@ func defaultSubOptions(t channeldpb.ChannelType) *channeldpb.ChannelSubscription
 	return options
 }
 
-func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) *ChannelSubscription {
+func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) (*ChannelSubscription, bool) {
+	if c.IsClosing() {
+		return nil, false
+	}
+
 	defer func() {
 		ch.connectionsLock.Unlock()
 	}()
 	ch.connectionsLock.Lock()
 
-	if ch.subscribedConnections[c] != nil {
-		c.Logger().Info("already subscribed", zap.String("channel", ch.String()))
-		return nil
+	cs, exists := ch.subscribedConnections[c]
+	if exists {
+		if options != nil {
+			c.Logger().Debug("already subed to channel, the sub options will be merged",
+				zap.String("channelType", ch.channelType.String()),
+				zap.Uint32("channelId", uint32(ch.id)),
+			)
+			proto.Merge(&cs.options, options)
+		}
+		return cs, exists
 	}
 
-	cs := &ChannelSubscription{
+	cs = &ChannelSubscription{
 		options: *defaultSubOptions(ch.channelType),
 		// Send the whole data to the connection when subscribed
 		//fanOutDataMsg: ch.Data().msg,
@@ -83,7 +94,7 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.Channel
 		zap.Bool("skipSelfUpdateFanOut", *cs.options.SkipSelfUpdateFanOut),
 		zap.Bool("skipFirstFanOut", *cs.options.SkipFirstFanOut),
 	)
-	return cs
+	return cs, false
 }
 
 func (c *Connection) UnsubscribeFromChannel(ch *Channel) (*channeldpb.ChannelSubscriptionOptions, error) {

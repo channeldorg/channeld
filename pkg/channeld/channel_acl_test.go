@@ -40,10 +40,10 @@ func (c *aclTestConnection) Send(ctx MessageContext) {
 
 }
 
-func (c *aclTestConnection) SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) *ChannelSubscription {
+func (c *aclTestConnection) SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) (*ChannelSubscription, bool) {
 	return &ChannelSubscription{
 		options: *defaultSubOptions(ch.channelType),
-	}
+	}, false
 }
 
 func (c *aclTestConnection) UnsubscribeFromChannel(ch *Channel) (*channeldpb.ChannelSubscriptionOptions, error) {

@@ -89,11 +89,13 @@ func TestFanOutChannelData(t *testing.T) {
 	// We need to manually tick the channel. Set the interval to a very large value.
 	testChannel.tickInterval = time.Hour
 
-	c0.SubscribeToChannel(testChannel, nil)
+	cs, _ := c0.SubscribeToChannel(testChannel, nil)
+	assert.NotNil(t, cs)
 	subOptions1 := &channeldpb.ChannelSubscriptionOptions{
 		FanOutIntervalMs: proto.Uint32(50),
 	}
-	c1.SubscribeToChannel(testChannel, subOptions1)
+	cs, _ = c1.SubscribeToChannel(testChannel, subOptions1)
+	assert.NotNil(t, cs)
 
 	channelStartTime := ChannelTime(100 * int64(time.Millisecond))
 	// F0 = the whole data
@@ -105,7 +107,8 @@ func TestFanOutChannelData(t *testing.T) {
 	subOptions2 := &channeldpb.ChannelSubscriptionOptions{
 		FanOutIntervalMs: proto.Uint32(100),
 	}
-	c2.SubscribeToChannel(testChannel, subOptions2)
+	cs, _ = c2.SubscribeToChannel(testChannel, subOptions2)
+	assert.NotNil(t, cs)
 	// F1 = no data, F7 = the whole data
 	testChannel.tickData(channelStartTime.AddMs(50))
 	assert.Equal(t, 1, len(c1.testQueue()))
@@ -114,7 +117,7 @@ func TestFanOutChannelData(t *testing.T) {
 
 	// U1 arrives
 	u1 := &testpb.TestChannelDataMessage{Text: "b"}
-	testChannel.Data().OnUpdate(u1, channelStartTime.AddMs(60), c1.Id(), nil)
+	testChannel.Data().OnUpdate(u1, channelStartTime.AddMs(60), c0.Id(), nil)
 
 	// F2 = U1
 	testChannel.tickData(channelStartTime.AddMs(100))
@@ -127,7 +130,7 @@ func TestFanOutChannelData(t *testing.T) {
 
 	// U2 arrives
 	u2 := &testpb.TestChannelDataMessage{Text: "c"}
-	testChannel.Data().OnUpdate(u2, channelStartTime.AddMs(120), c2.Id(), nil)
+	testChannel.Data().OnUpdate(u2, channelStartTime.AddMs(120), c0.Id(), nil)
 
 	// F8=U1+U2; F3 = U2
 	testChannel.tickData(channelStartTime.AddMs(150))
