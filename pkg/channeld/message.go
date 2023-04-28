@@ -270,15 +270,6 @@ func handleAuth(ctx MessageContext) {
 				ctx.Connection.Logger().Error("failed to do auth", zap.Error(err))
 				ctx.Connection.Close()
 			} else {
-
-				//if authResult != channeldpb.AuthResultMessage_SUCCESSFUL {
-				Event_AuthComplete.Broadcast(AuthEventData{
-					AuthResult:            authResult,
-					Connection:            ctx.Connection,
-					PlayerIdentifierToken: msg.PlayerIdentifierToken,
-				})
-				//}
-
 				onAuthComplete(ctx, authResult, msg.PlayerIdentifierToken)
 			}
 		}()
@@ -308,6 +299,12 @@ func onAuthComplete(ctx MessageContext, authResult channeldpb.AuthResultMessage_
 		ctx.StubId = 0
 		globalChannel.ownerConnection.Send(ctx)
 	}
+
+	Event_AuthComplete.Broadcast(AuthEventData{
+		AuthResult:            authResult,
+		Connection:            ctx.Connection,
+		PlayerIdentifierToken: pit,
+	})
 }
 
 func handleCreateChannel(ctx MessageContext) {
@@ -496,6 +493,8 @@ func handleCreateEntityChannel(ctx MessageContext) {
 			if conn.GetConnectionType() == channeldpb.ConnectionType_SERVER {
 				return true
 			}
+			/*
+			 */
 
 			// FIXME: different subOptions for different connection?
 			cs, alreadySubed := conn.SubscribeToChannel(newChannel, nil)
@@ -522,12 +521,12 @@ func handleCreateEntityChannel(ctx MessageContext) {
 				}
 			}
 		})
-	} else {
-		// Subscribe the owner to channel after creation
-		cs, _ := ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
-		if cs != nil {
-			ctx.Connection.sendSubscribed(ctx, newChannel, ctx.Connection, 0, &cs.options)
-		}
+	}
+
+	// Subscribe the owner to channel after creation
+	cs, _ := ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
+	if cs != nil {
+		ctx.Connection.sendSubscribed(ctx, newChannel, ctx.Connection, 0, &cs.options)
 	}
 
 	/* We could sub all the connections in the spatial channel to the entity channel here,

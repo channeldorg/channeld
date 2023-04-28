@@ -342,6 +342,10 @@ func (dstData *EntityChannelData) Merge(src common.ChannelDataMessage, options *
 		}
 	}
 
+	/* Merging EntityChannelData directly may cause the accumulation of objRef.context,
+	 * so we should remove the objRef from source first.
+	 */
+	srcData.ObjRef = nil
 	proto.Merge(dstData, srcData)
 
 	if hasHandover {
