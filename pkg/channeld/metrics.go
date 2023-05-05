@@ -106,6 +106,13 @@ var channelTickDuration = prometheus.NewGaugeVec(
 	},
 	[]string{"type"},
 )
+var connectionClosed = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "connection_closed",
+		Help: "connection closed",
+	},
+	[]string{"connType"},
+)
 
 func InitMetrics() {
 	prometheus.MustRegister(logNum)
@@ -121,4 +128,5 @@ func InitMetrics() {
 	prometheus.MustRegister(connectionNum)
 	prometheus.MustRegister(channelNum)
 	prometheus.MustRegister(channelTickDuration)
+	prometheus.MustRegister(connectionClosed)
 }

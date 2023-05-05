@@ -211,7 +211,9 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 	} else {
 		rootLogger.Panic("invalid connection type", zap.Int32("connType", int32(t)))
 	}
-
+	if readerSize < MaxPacketSize+PacketHeaderSize {
+		readerSize = MaxPacketSize + PacketHeaderSize
+	}
 	maxConnId := uint32(1)<<GlobalSettings.MaxConnectionIdBits - 1
 
 	for tries := 0; ; tries++ {
@@ -345,7 +347,6 @@ func (c *Connection) receive() {
 		c.Close()
 		return
 	}
-
 	c.readPos += bytesRead
 	if c.readPos < PacketHeaderSize {
 		// Unfinished header
@@ -423,28 +424,28 @@ func (c *Connection) receive() {
 		packetReceived.WithLabelValues(c.connectionType.String()).Inc()
 
 	*/
-
-	for bufPos := 0; bufPos < c.readPos; {
+	bufPos := 0
+	for bufPos = 0; bufPos < c.readPos; {
 		if c.readPacket(&bufPos) == nil {
-			return
+			break
 		}
-		if bufPos < c.readPos {
-			combinedPacketCount.WithLabelValues(c.connectionType.String()).Inc()
-		}
+		combinedPacketCount.WithLabelValues(c.connectionType.String()).Inc()
 	}
 
+	//move unhandled content to the front
+	copy(c.readBuffer, c.readBuffer[bufPos:c.readPos])
 	// Reset read position
-	c.readPos = 0
+	c.readPos = c.readPos - bufPos
 }
 
 func (c *Connection) readPacket(bufPos *int) *channeldpb.Packet {
 	tag := c.readBuffer[*bufPos : *bufPos+PacketHeaderSize]
 	if tag[0] != 67 {
-		c.readPos = 0
-		packetDropped.WithLabelValues(c.connectionType.String()).Inc()
-		c.Logger().Warn("invalid tag, the packet will be dropped",
+		connectionClosed.WithLabelValues(c.connectionType.String()).Inc()
+		c.Logger().Warn("invalid tag, the connection will be closed",
 			zap.ByteString("tag", tag),
 		)
+		c.Close()
 		return nil
 	}
 
@@ -454,25 +455,21 @@ func (c *Connection) readPacket(bufPos *int) *channeldpb.Packet {
 	} else if tag[2] != 78 {
 		packetSize = packetSize | int(tag[2])<<8
 	}
-
 	if packetSize > int(MaxPacketSize) {
-		c.readPos = 0
-		packetDropped.WithLabelValues(c.connectionType.String()).Inc()
-		c.Logger().Warn("packet size exceeds the limit, the packet will be dropped", zap.Int("packetSize", packetSize))
+		connectionClosed.WithLabelValues(c.connectionType.String()).Inc()
+		c.Logger().Warn("packet size exceeds the read buffer, the connection will be closed", zap.Int("packetSize", packetSize), zap.Int("bufferSize", len(c.readBuffer)))
+		c.Close()
 		return nil
 	}
 
 	fullSize := PacketHeaderSize + packetSize
-	if c.readPos < fullSize {
-		// Unfinished packet
-		fragmentedPacketCount.WithLabelValues(c.connectionType.String()).Inc()
-		return nil
-	}
 
-	if *bufPos+fullSize >= len(c.readBuffer) {
-		c.readPos = 0
-		packetDropped.WithLabelValues(c.connectionType.String()).Inc()
-		c.Logger().Warn("packet size exceeds the read buffer, the packet will be dropped", zap.Int("packetSize", packetSize))
+	if c.readPos < *bufPos+fullSize {
+		// Unfinished packet
+
+		fragmentedPacketCount.WithLabelValues(c.connectionType.String()).Inc()
+		// this is a normal case, turn off the logs
+		//c.Logger().Info("read part of package", zap.Int("readpos", c.readPos), zap.Int("full size", fullSize))
 		return nil
 	}
 
@@ -517,7 +514,6 @@ func (c *Connection) readPacket(bufPos *int) *channeldpb.Packet {
 	}
 
 	*bufPos += fullSize
-
 	return &p
 }
 
