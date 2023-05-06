@@ -141,7 +141,7 @@ message GetUnrealObjectRefResultMessage {
 
 message SpatialEntityState {
     UnrealObjectRef objRef = 1;
-    // optional uint32 owningConnId = 2;
+    bool removed = 2;
     // Full entity channel data. For cross-server handover only.
     optional google.protobuf.Any entityData = 3;
 }

@@ -178,7 +178,7 @@ func (ch *Channel) tickData(t ChannelTime) {
 			continue
 		}
 		cs := ch.subscribedConnections[conn]
-		if cs == nil {
+		if cs == nil || *cs.options.DataAccess == channeldpb.ChannelDataAccess_NO_ACCESS {
 			focp = focp.Next()
 			continue
 		}
@@ -237,6 +237,13 @@ func (ch *Channel) tickData(t ChannelTime) {
 						}
 						lastUpdateTime = be.arrivalTime
 					}
+
+					/* TODO: remove the out-dated buffer element to decrease the iteration time
+					if be.arrivalTime.AddMs(ch.data.maxFanOutIntervalMs) < t {
+						ch.data.updateMsgBuffer.Remove(bufp)
+					}
+					*/
+
 					bufp = bufp.Next()
 				}
 

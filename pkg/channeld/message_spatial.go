@@ -66,10 +66,12 @@ func handleUpdateSpatialInterest(ctx MessageContext) {
 		dampSettings := getSpatialDampingSettings(dist)
 		if dampSettings == nil {
 			channelsToSub[chId] = &channeldpb.ChannelSubscriptionOptions{
+				// DataAccess:       Pointer(channeldpb.ChannelDataAccess_NO_ACCESS),
 				FanOutIntervalMs: proto.Uint32(GlobalSettings.GetChannelSettings(channeldpb.ChannelType_SPATIAL).DefaultFanOutIntervalMs),
 			}
 		} else {
 			channelsToSub[chId] = &channeldpb.ChannelSubscriptionOptions{
+				// DataAccess:       Pointer(channeldpb.ChannelDataAccess_NO_ACCESS),
 				FanOutIntervalMs: proto.Uint32(dampSettings.FanOutIntervalMs),
 				DataFieldMasks:   dampSettings.DataFieldMasks,
 			}

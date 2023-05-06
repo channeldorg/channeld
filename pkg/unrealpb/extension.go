@@ -26,9 +26,20 @@ func (dst *SpatialChannelData) Merge(src common.ChannelDataMessage, options *cha
 		return errors.New("src is not a SpatialChannelData")
 	}
 
-	for id, entity := range srcData.Entities {
-		if _, exists := dst.Entities[id]; !exists {
-			dst.Entities[id] = entity
+	for netId, entity := range srcData.Entities {
+		if entity.Removed {
+			delete(dst.Entities, netId)
+
+			entityCh := channeld.GetChannel(common.ChannelId(netId))
+			if entityCh != nil {
+				entityCh.Logger().Info("removing entity channel from SpatialChannelData.Merge()")
+				channeld.RemoveChannel(entityCh)
+			}
+		} else {
+			// Do not merge the SpatialEntityState if it already exists in the channel data
+			if _, exists := dst.Entities[netId]; !exists {
+				dst.Entities[netId] = entity
+			}
 		}
 	}
 
