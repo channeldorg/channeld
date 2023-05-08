@@ -353,77 +353,6 @@ func (c *Connection) receive() {
 		return
 	}
 
-	/*
-		tag := c.readBuffer[:PacketHeaderSize]
-		if tag[0] != 67 {
-			c.readPos = 0
-			c.Logger().Warn("invalid tag, the packet will be dropped",
-				zap.ByteString("tag", tag),
-			)
-			return
-		}
-
-		packetSize := int(tag[3])
-		if tag[1] != 72 {
-			packetSize = packetSize | int(tag[1])<<16 | int(tag[2])<<8
-		} else if tag[2] != 78 {
-			packetSize = packetSize | int(tag[2])<<8
-		}
-
-		if packetSize > int(MaxPacketSize) {
-			c.readPos = 0
-			c.Logger().Warn("packet size exceeds the limit, the packet will be dropped", zap.Int("packetSize", packetSize))
-			return
-		}
-
-		fullSize := PacketHeaderSize + packetSize
-		if c.readPos < fullSize {
-			// Unfinished packet
-			return
-		}
-
-		bytes := c.readBuffer[PacketHeaderSize:fullSize]
-
-		bytesReceived.WithLabelValues(c.connectionType.String()).Add(float64(fullSize))
-
-		// Apply the decompression from the 5th byte in the header
-		ct := tag[4]
-		_, valid := channeldpb.CompressionType_name[int32(ct)]
-		if valid && ct != 0 {
-			c.compressionType = channeldpb.CompressionType(ct)
-			if c.compressionType == channeldpb.CompressionType_SNAPPY {
-				len, err := snappy.DecodedLen(bytes)
-				if err != nil {
-					c.Logger().Error("snappy.DecodedLen", zap.Error(err))
-					return
-				}
-				dst := make([]byte, len)
-				bytes, err = snappy.Decode(dst, bytes)
-				if err != nil {
-					c.Logger().Error("snappy.Decode", zap.Error(err))
-					return
-				}
-			}
-		}
-
-		var p channeldpb.Packet
-		if err := proto.Unmarshal(bytes, &p); err != nil {
-			c.Logger().Error("unmarshalling packet", zap.Error(err))
-			return
-		}
-
-		if c.isPacketRecordingEnabled() {
-			c.recordPacket(&p)
-		}
-
-		for _, mp := range p.Messages {
-			c.receiveMessage(mp)
-		}
-
-		packetReceived.WithLabelValues(c.connectionType.String()).Inc()
-
-	*/
-
 	for bufPos := 0; bufPos < c.readPos; {
 		if c.readPacket(&bufPos) == nil {
 			return
@@ -437,22 +366,27 @@ func (c *Connection) receive() {
 	c.readPos = 0
 }
 
+func readSize(tag []byte) int {
+	if tag[0] != 67 || tag[1] != 72 {
+		return 0
+	}
+
+	size := int(tag[3]) | int(tag[2])<<8
+
+	return size
+}
+
 func (c *Connection) readPacket(bufPos *int) *channeldpb.Packet {
 	tag := c.readBuffer[*bufPos : *bufPos+PacketHeaderSize]
-	if tag[0] != 67 {
+
+	packetSize := readSize(tag)
+	if packetSize == 0 {
 		c.readPos = 0
 		packetDropped.WithLabelValues(c.connectionType.String()).Inc()
 		c.Logger().Warn("invalid tag, the packet will be dropped",
 			zap.ByteString("tag", tag),
 		)
 		return nil
-	}
-
-	packetSize := int(tag[3])
-	if tag[1] != 72 {
-		packetSize = packetSize | int(tag[1])<<16 | int(tag[2])<<8
-	} else if tag[2] != 78 {
-		packetSize = packetSize | int(tag[2])<<8
 	}
 
 	if packetSize > int(MaxPacketSize) {
@@ -612,9 +546,13 @@ func (c *Connection) flush() {
 	// For now we don't limit the message numbers per packet
 	for len(c.sendQueue) > 0 {
 		mc := <-c.sendQueue
-		// The packet size should not exceed the capacity of 3 bytes
-		if size+proto.Size(mc.Msg) >= 0xfffff0 {
-			c.Logger().Warn("packet is going to be oversized")
+		// The packet size should not exceed the capacity of 2 bytes
+		msgSize := proto.Size(mc.Msg)
+		if size+msgSize+PacketHeaderSize > MaxPacketSize {
+			c.Logger().Info("packet is going to be oversized", zap.Uint32("msgType", uint32(mc.MsgType)), zap.Int("msgSize", msgSize))
+			// Put the message back to the queue
+			// FIXME: order may matter
+			c.sendQueue <- mc
 			break
 		}
 		msgBody, err := proto.Marshal(mc.Msg)
@@ -658,8 +596,10 @@ func (c *Connection) flush() {
 	if len > 0xff {
 		tag[2] = byte((len >> 8) & 0xff)
 	}
-	if len > 0xffff {
-		tag[1] = byte((len >> 16) & 0xff)
+	if len > MaxPacketSize {
+		// Should never happen, but log it just in case
+		c.Logger().Error("packet is oversized", zap.Int("size", len))
+		return
 	}
 
 	/* Avoid writing multple times. With WebSocket, every Write() sends a message.

@@ -67,6 +67,30 @@ func (c *pipelineConn) SetWriteDeadline(t time.Time) error {
 	return nil
 }
 
+func TestReadSize(t *testing.T) {
+	var tag []byte
+
+	tag = []byte{0, 0, 0, 0}
+	assert.Equal(t, 0, readSize(tag))
+	tag[3] = 1
+	assert.Equal(t, 0, readSize(tag))
+
+	tag = []byte{67, 0, 0, 0}
+	assert.Equal(t, 0, readSize(tag))
+	tag[3] = 1
+	assert.Equal(t, 0, readSize(tag))
+
+	tag = []byte{67, 72, 78, 0}
+	assert.Equal(t, 78<<8, readSize(tag))
+	tag[3] = 1
+	assert.Equal(t, 78<<8+1, readSize(tag))
+
+	tag = []byte{67, 72, 0, 0}
+	assert.Equal(t, 0, readSize(tag))
+	tag[3] = 1
+	assert.Equal(t, 1, readSize(tag))
+}
+
 func TestDropPacket(t *testing.T) {
 	pipeReader, pipeWriter := io.Pipe()
 	c := &Connection{
@@ -123,6 +147,8 @@ func TestWebSocketConnection(t *testing.T) {
 }
 
 func TestConcurrentAccessConnections(t *testing.T) {
+	InitConnections("../../config/server_conn_fsm_test.json", "../../config/client_non_authoratative_fsm.json")
+
 	wg := sync.WaitGroup{}
 
 	wg.Add(1)
