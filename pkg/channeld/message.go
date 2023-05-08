@@ -514,7 +514,9 @@ func handleCreateEntityChannel(ctx MessageContext) {
 
 			if data.AuthResult == channeldpb.AuthResultMessage_SUCCESSFUL {
 				// FIXME: different subOptions for different connection?
-				cs, _ := data.Connection.SubscribeToChannel(newChannel, nil)
+				// Add some delay so the client won't have to spawn the entity immediately after the auth.
+				subOptions := &channeldpb.ChannelSubscriptionOptions{FanOutDelayMs: Pointer(int32(1000))}
+				cs, _ := data.Connection.SubscribeToChannel(newChannel, subOptions)
 				if cs != nil {
 					data.Connection.sendSubscribed(MessageContext{}, newChannel, data.Connection, 0, &cs.options)
 					newChannel.Logger().Debug("subscribed new connection for the well-known entity", zap.Uint32("connId", uint32(data.Connection.Id())))

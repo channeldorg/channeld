@@ -36,6 +36,10 @@ enum MessageType {
     // See @GetUnrealObjectRefMessage and @GetUnrealObjectRefResultMessage
     GET_UNREAL_OBJECT_REF = 106;
 
+    // Used by the UE servers to sync the NetId of the static and well-known objects.
+    SYNC_NET_ID = 107;
+
+    // Deprecated
     SERVER_PLAYER_SPAWNED = 201;
 
     // Used by the Master server to broadcast the player leave (@UnsubscribedFromChannelResultMessage) to the spatial servers.
@@ -137,6 +141,14 @@ message GetUnrealObjectRefMessage {
 
 message GetUnrealObjectRefResultMessage {
     repeated UnrealObjectRef objRef = 1;
+}
+
+message SyncNetIdMessage {
+    message NetIdPath {
+        uint32 netId = 1;
+        string path = 2;
+    }
+    repeated NetIdPath netIdPaths = 1;
 }
 
 message SpatialEntityState {
