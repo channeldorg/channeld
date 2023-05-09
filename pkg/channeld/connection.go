@@ -593,9 +593,7 @@ func (c *Connection) flush() {
 	tag := []byte{67, 72, 78, 76, byte(c.compressionType)}
 	len := len(bytes)
 	tag[3] = byte(len & 0xff)
-	if len > 0xff {
-		tag[2] = byte((len >> 8) & 0xff)
-	}
+	tag[2] = byte((len >> 8) & 0xff)
 	if len > MaxPacketSize {
 		// Should never happen, but log it just in case
 		c.Logger().Error("packet is oversized", zap.Int("size", len))
