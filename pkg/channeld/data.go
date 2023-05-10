@@ -18,8 +18,9 @@ type ChannelData struct {
 	mergeOptions *channeldpb.ChannelDataMergeOptions
 	msg          common.ChannelDataMessage
 	//updateMsg       common.ChannelDataMessage
-	updateMsgBuffer     *list.List
-	maxFanOutIntervalMs uint32
+	accumulatedUpdateMsg common.ChannelDataMessage
+	updateMsgBuffer      *list.List
+	maxFanOutIntervalMs  uint32
 }
 
 // Indicate that the channel data message should be initialized with default values.
@@ -109,6 +110,7 @@ func (ch *Channel) InitData(dataMsg common.ChannelDataMessage, mergeOptions *cha
 			ch.logger.Info("unable to create default channel data message; will use the first received message to set", zap.String("chType", ch.channelType.String()), zap.Error(err))
 			return
 		}
+		ch.data.accumulatedUpdateMsg = proto.Clone(ch.data.msg)
 	}
 
 	initializer, ok := ch.data.msg.(ChannelDataInitializer)
@@ -177,7 +179,9 @@ func (ch *Channel) tickData(t ChannelTime) {
 			focp = tmp
 			continue
 		}
+		ch.connectionsLock.RLock()
 		cs := ch.subscribedConnections[conn]
+		ch.connectionsLock.RUnlock()
 		if cs == nil || *cs.options.DataAccess == channeldpb.ChannelDataAccess_NO_ACCESS {
 			focp = focp.Next()
 			continue
@@ -194,7 +198,12 @@ func (ch *Channel) tickData(t ChannelTime) {
 
 			var lastUpdateTime ChannelTime
 			bufp := ch.data.updateMsgBuffer.Front()
-			var accumulatedUpdateMsg common.ChannelDataMessage = nil
+			if ch.data.accumulatedUpdateMsg == nil {
+				ch.data.accumulatedUpdateMsg = ch.data.msg.ProtoReflect().New().Interface()
+			} else {
+				proto.Reset(ch.data.accumulatedUpdateMsg)
+			}
+			hasEverMerged := false
 
 			//if foc.lastFanOutTime <= cs.subTime {
 			if !foc.hadFirstFanOut {
@@ -216,13 +225,15 @@ func (ch *Channel) tickData(t ChannelTime) {
 				//for be := bufp.Value.(*updateMsgBufferElement); bufp != nil && be.arrivalTime >= lastUpdateTime && be.arrivalTime <= nextFanOutTime; bufp = bufp.Next() {
 				for bufi := 0; bufi < ch.data.updateMsgBuffer.Len(); bufi++ {
 					be := bufp.Value.(*updateMsgBufferElement)
-					ch.Logger().Trace("going through updateMsgBuffer",
-						zap.Int("bufi", bufi),
-						zap.Int64("lastUpdateTime", int64(lastUpdateTime)/1000),
-						zap.Int64("arrivalTime", int64(be.arrivalTime)/1000),
-						zap.Int64("nextFanOutTime", int64(nextFanOutTime)/1000),
-						zap.Uint32("senderConnId", uint32(be.senderConnId)),
-					)
+					/*
+						ch.Logger().Trace("going through updateMsgBuffer",
+							zap.Int("bufi", bufi),
+							zap.Int64("lastUpdateTime", int64(lastUpdateTime)/1000),
+							zap.Int64("arrivalTime", int64(be.arrivalTime)/1000),
+							zap.Int64("nextFanOutTime", int64(nextFanOutTime)/1000),
+							zap.Uint32("senderConnId", uint32(be.senderConnId)),
+						)
+					*/
 
 					if be.senderConnId == conn.Id() && *cs.options.SkipSelfUpdateFanOut {
 						bufp = bufp.Next()
@@ -230,16 +241,17 @@ func (ch *Channel) tickData(t ChannelTime) {
 					}
 
 					if be.arrivalTime >= lastUpdateTime && be.arrivalTime <= nextFanOutTime {
-						if accumulatedUpdateMsg == nil {
-							accumulatedUpdateMsg = proto.Clone(be.updateMsg)
+						if !hasEverMerged {
+							proto.Merge(ch.data.accumulatedUpdateMsg, be.updateMsg)
 						} else {
-							mergeWithOptions(accumulatedUpdateMsg, be.updateMsg, ch.data.mergeOptions, nil)
+							mergeWithOptions(ch.data.accumulatedUpdateMsg, be.updateMsg, ch.data.mergeOptions, nil)
 						}
+						hasEverMerged = true
 						lastUpdateTime = be.arrivalTime
 					}
 
 					/* TODO: remove the out-dated buffer element to decrease the iteration time
-					if be.arrivalTime.AddMs(ch.data.maxFanOutIntervalMs) < t {
+					if be.arrivalTime.AddMs(ch.data.maxFanOutIntervalMs*2) < t {
 						ch.data.updateMsgBuffer.Remove(bufp)
 					}
 					*/
@@ -247,8 +259,8 @@ func (ch *Channel) tickData(t ChannelTime) {
 					bufp = bufp.Next()
 				}
 
-				if accumulatedUpdateMsg != nil {
-					ch.fanOutDataUpdate(conn, cs, accumulatedUpdateMsg)
+				if hasEverMerged {
+					ch.fanOutDataUpdate(conn, cs, ch.data.accumulatedUpdateMsg)
 				}
 			}
 
@@ -285,11 +297,13 @@ func (ch *Channel) fanOutDataUpdate(conn ConnectionInChannel, cs *ChannelSubscri
 		StubId:     0,
 		ChannelId:  uint32(ch.id),
 	})
-	conn.Logger().Trace("fan out",
-		zap.Int64("channelTime", int64(ch.GetTime())),
-		zap.Int64("lastFanOutTime", int64(cs.fanOutElement.Value.(*fanOutConnection).lastFanOutTime)),
-		zap.Stringer("updateMsg", updateMsg.(fmt.Stringer)),
-	)
+	/*
+		conn.Logger().Trace("fan out",
+			zap.Int64("channelTime", int64(ch.GetTime())),
+			zap.Int64("lastFanOutTime", int64(cs.fanOutElement.Value.(*fanOutConnection).lastFanOutTime)),
+			zap.Stringer("updateMsg", updateMsg.(fmt.Stringer)),
+		)
+	*/
 	// cs.lastFanOutTime = time.Now()
 	// cs.fanOutDataMsg = nil
 }
