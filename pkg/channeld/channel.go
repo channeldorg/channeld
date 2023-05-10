@@ -293,12 +293,13 @@ func (ch *Channel) Tick() {
 			return
 		}
 
+		tickStart := time.Now()
+
 		// Run the code of SpatialController only in GLOBAL channel, to avoid any race condition.
 		if ch.channelType == channeldpb.ChannelType_GLOBAL && spatialController != nil {
 			spatialController.Tick()
 		}
 
-		tickStart := time.Now()
 		ch.tickFrames++
 
 		ch.tickMessages(tickStart)
