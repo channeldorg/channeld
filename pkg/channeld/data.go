@@ -20,6 +20,7 @@ type ChannelData struct {
 	//updateMsg       common.ChannelDataMessage
 	updateMsgBuffer     *list.List
 	maxFanOutIntervalMs uint32
+	msgIndex            uint64
 }
 
 // Indicate that the channel data message should be initialized with default values.
@@ -33,15 +34,17 @@ type RemovableMapField interface {
 }
 
 type fanOutConnection struct {
-	conn           ConnectionInChannel
-	hadFirstFanOut bool
-	lastFanOutTime ChannelTime
+	conn             ConnectionInChannel
+	hadFirstFanOut   bool
+	lastFanOutTime   ChannelTime
+	lastMessageIndex uint64
 }
 
 type updateMsgBufferElement struct {
 	updateMsg    common.ChannelDataMessage
 	arrivalTime  ChannelTime
 	senderConnId ConnectionId
+	messageIndex uint64
 }
 
 const (
@@ -145,11 +148,12 @@ func (d *ChannelData) OnUpdate(updateMsg common.ChannelDataMessage, t ChannelTim
 	} else {
 		mergeWithOptions(d.msg, updateMsg, d.mergeOptions, spatialNotifier)
 	}
-
+	d.msgIndex = d.msgIndex + 1
 	d.updateMsgBuffer.PushBack(&updateMsgBufferElement{
 		updateMsg:    updateMsg,
 		arrivalTime:  t,
 		senderConnId: senderConnId,
+		messageIndex: d.msgIndex,
 	})
 	if d.updateMsgBuffer.Len() > MaxUpdateMsgBufferSize {
 		oldest := d.updateMsgBuffer.Front()
@@ -174,6 +178,7 @@ func (ch *Channel) tickData(t ChannelTime) {
 			tmp := focp.Next()
 			ch.fanOutQueue.Remove(focp)
 			focp = tmp
+			foci--
 			continue
 		}
 		cs := ch.subscribedConnections[conn]
@@ -194,12 +199,12 @@ func (ch *Channel) tickData(t ChannelTime) {
 			var lastUpdateTime ChannelTime
 			bufp := ch.data.updateMsgBuffer.Front()
 			var accumulatedUpdateMsg common.ChannelDataMessage = nil
-
 			//if foc.lastFanOutTime <= cs.subTime {
 			if !foc.hadFirstFanOut {
 				// Send the whole data for the first time
 				ch.fanOutDataUpdate(conn, cs, ch.data.msg)
 				foc.hadFirstFanOut = true
+				foc.lastMessageIndex = ch.data.msgIndex
 				// Use a hacky way to prevent the first update msg being fanned out twice (only happens when the channel doesn't have init data)
 				//t++
 				// rootLogger.Info("conn first fan out",
@@ -228,14 +233,16 @@ func (ch *Channel) tickData(t ChannelTime) {
 						continue
 					}
 
-					if be.arrivalTime >= lastUpdateTime && be.arrivalTime <= nextFanOutTime {
+					if be.messageIndex > foc.lastMessageIndex && be.arrivalTime <= nextFanOutTime {
 						if accumulatedUpdateMsg == nil {
 							accumulatedUpdateMsg = proto.Clone(be.updateMsg)
 						} else {
 							mergeWithOptions(accumulatedUpdateMsg, be.updateMsg, ch.data.mergeOptions, nil)
 						}
 						lastUpdateTime = be.arrivalTime
+						foc.lastMessageIndex = be.messageIndex
 					}
+
 					bufp = bufp.Next()
 				}
 
@@ -243,7 +250,6 @@ func (ch *Channel) tickData(t ChannelTime) {
 					ch.fanOutDataUpdate(conn, cs, accumulatedUpdateMsg)
 				}
 			}
-
 			foc.lastFanOutTime = t
 
 			temp := focp.Next()
