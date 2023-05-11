@@ -171,14 +171,13 @@ func (ch *Channel) tickData(t ChannelTime) {
 
 	focp := ch.fanOutQueue.Front()
 
-	for foci := 0; foci < ch.fanOutQueue.Len() && focp != nil; foci++ {
+	for focp != nil {
 		foc := focp.Value.(*fanOutConnection)
 		conn := foc.conn
 		if conn == nil || conn.IsClosing() {
 			tmp := focp.Next()
 			ch.fanOutQueue.Remove(focp)
 			focp = tmp
-			foci--
 			continue
 		}
 		cs := ch.subscribedConnections[conn]
@@ -194,8 +193,9 @@ func (ch *Channel) tickData(t ChannelTime) {
 			   subTime                 firstFanOutTime      secondFanOutTime
 		*/
 		nextFanOutTime := foc.lastFanOutTime.AddMs(*cs.options.FanOutIntervalMs)
+		LatestFanoutTime := foc.lastFanOutTime
 		if t >= nextFanOutTime {
-
+			LatestFanoutTime = nextFanOutTime
 			var lastUpdateTime ChannelTime
 			bufp := ch.data.updateMsgBuffer.Front()
 			var accumulatedUpdateMsg common.ChannelDataMessage = nil
@@ -205,19 +205,12 @@ func (ch *Channel) tickData(t ChannelTime) {
 				ch.fanOutDataUpdate(conn, cs, ch.data.msg)
 				foc.hadFirstFanOut = true
 				foc.lastMessageIndex = ch.data.msgIndex
-				// Use a hacky way to prevent the first update msg being fanned out twice (only happens when the channel doesn't have init data)
-				//t++
-				// rootLogger.Info("conn first fan out",
-				// 	zap.Uint32("connId", uint32(foc.conn.Id())),
-				// 	zap.Int64("channelTime", int64(t)),
-				// 	zap.Int64("nextFanOutTime", int64(nextFanOutTime)),
-				// )
+				LatestFanoutTime = t
 			} else if bufp != nil {
 				if foc.lastFanOutTime >= lastUpdateTime {
 					lastUpdateTime = foc.lastFanOutTime
 				}
 
-				//for be := bufp.Value.(*updateMsgBufferElement); bufp != nil && be.arrivalTime >= lastUpdateTime && be.arrivalTime <= nextFanOutTime; bufp = bufp.Next() {
 				for bufi := 0; bufi < ch.data.updateMsgBuffer.Len(); bufi++ {
 					be := bufp.Value.(*updateMsgBufferElement)
 					ch.Logger().Trace("going through updateMsgBuffer",
@@ -250,14 +243,19 @@ func (ch *Channel) tickData(t ChannelTime) {
 					ch.fanOutDataUpdate(conn, cs, accumulatedUpdateMsg)
 				}
 			}
-			foc.lastFanOutTime = t
+			foc.lastFanOutTime = LatestFanoutTime
 
-			temp := focp.Next()
+			temp := focp.Prev()
 			// Move the fanned-out connection to the back of the queue
 			for be := ch.fanOutQueue.Back(); be != nil; be = be.Prev() {
 				if be.Value.(*fanOutConnection).lastFanOutTime <= foc.lastFanOutTime {
 					ch.fanOutQueue.MoveAfter(focp, be)
-					focp = temp
+					if temp != nil {
+						focp = temp.Next()
+					} else {
+						focp = ch.fanOutQueue.Front()
+					}
+
 					break
 				}
 			}
