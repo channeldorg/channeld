@@ -1,6 +1,7 @@
 package channeld
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -426,9 +427,17 @@ func (c *Connection) receive() {
 	*/
 	bufPos := 0
 	for bufPos = 0; bufPos < c.readPos; {
-		if c.readPacket(&bufPos) == nil {
+		packet, err := c.readPacket(&bufPos)
+		// there's a wire format error, close the connection to give a quick feedback to the other end.
+		if err != nil {
+			c.Close()
 			break
 		}
+		// all fully received packets are handled
+		if packet == nil {
+			break
+		}
+
 		combinedPacketCount.WithLabelValues(c.connectionType.String()).Inc()
 	}
 
@@ -438,15 +447,14 @@ func (c *Connection) receive() {
 	c.readPos = c.readPos - bufPos
 }
 
-func (c *Connection) readPacket(bufPos *int) *channeldpb.Packet {
+func (c *Connection) readPacket(bufPos *int) (*channeldpb.Packet, error) {
 	tag := c.readBuffer[*bufPos : *bufPos+PacketHeaderSize]
 	if tag[0] != 67 {
 		connectionClosed.WithLabelValues(c.connectionType.String()).Inc()
 		c.Logger().Warn("invalid tag, the connection will be closed",
 			zap.ByteString("tag", tag),
 		)
-		c.Close()
-		return nil
+		return nil, errors.New("invlaid tag")
 	}
 
 	packetSize := int(tag[3])
@@ -458,8 +466,7 @@ func (c *Connection) readPacket(bufPos *int) *channeldpb.Packet {
 	if packetSize > int(MaxPacketSize) {
 		connectionClosed.WithLabelValues(c.connectionType.String()).Inc()
 		c.Logger().Warn("packet size exceeds the read buffer, the connection will be closed", zap.Int("packetSize", packetSize), zap.Int("bufferSize", len(c.readBuffer)))
-		c.Close()
-		return nil
+		return nil, errors.New("packetSize too large")
 	}
 
 	fullSize := PacketHeaderSize + packetSize
@@ -470,7 +477,7 @@ func (c *Connection) readPacket(bufPos *int) *channeldpb.Packet {
 		fragmentedPacketCount.WithLabelValues(c.connectionType.String()).Inc()
 		// this is a normal case, turn off the logs
 		//c.Logger().Info("read part of package", zap.Int("readpos", c.readPos), zap.Int("full size", fullSize))
-		return nil
+		return nil, nil
 	}
 
 	bytes := c.readBuffer[*bufPos+PacketHeaderSize : *bufPos+fullSize]
@@ -486,13 +493,13 @@ func (c *Connection) readPacket(bufPos *int) *channeldpb.Packet {
 			len, err := snappy.DecodedLen(bytes)
 			if err != nil {
 				c.Logger().Error("snappy.DecodedLen", zap.Error(err))
-				return nil
+				return nil, nil
 			}
 			dst := make([]byte, len)
 			bytes, err = snappy.Decode(dst, bytes)
 			if err != nil {
 				c.Logger().Error("snappy.Decode", zap.Error(err))
-				return nil
+				return nil, nil
 			}
 		}
 	}
@@ -500,7 +507,7 @@ func (c *Connection) readPacket(bufPos *int) *channeldpb.Packet {
 	var p channeldpb.Packet
 	if err := proto.Unmarshal(bytes, &p); err != nil {
 		c.Logger().Error("unmarshalling packet", zap.Error(err))
-		return nil
+		return nil, nil
 	}
 
 	packetReceived.WithLabelValues(c.connectionType.String()).Inc()
@@ -514,7 +521,7 @@ func (c *Connection) readPacket(bufPos *int) *channeldpb.Packet {
 	}
 
 	*bufPos += fullSize
-	return &p
+	return &p, nil
 }
 
 func (c *Connection) isPacketRecordingEnabled() bool {
