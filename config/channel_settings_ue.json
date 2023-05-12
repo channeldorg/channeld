@@ -8,8 +8,7 @@
             "Sub": 3,
             "Unsub": 3,
             "Remove": 0
-        },
-        "DataMsgFullName": "channeldgenpb.DefaultChannelData"
+        }
     },
     "2": {
         "TickIntervalMs": 20,
@@ -20,8 +19,7 @@
             "Sub": 2,
             "Unsub": 2,
             "Remove": 2
-        },
-        "DataMsgFullName": "channeldgenpb.DefaultChannelData"
+        }
     },
     "3": {
         "TickIntervalMs": 20,
@@ -32,8 +30,7 @@
             "Sub": 3,
             "Unsub": 3,
             "Remove": 2
-        },
-        "DataMsgFullName": "channeldgenpb.DefaultChannelData"
+        }
     },
     "4": {
         "TickIntervalMs": 20,
@@ -44,7 +41,6 @@
             "Sub": 3,
             "Unsub": 3,
             "Remove": 2
-        },
-        "DataMsgFullName": "channeldgenpb.DefaultChannelData"
+        }
     }
 }
