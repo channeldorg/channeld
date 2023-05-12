@@ -67,6 +67,32 @@ func testChannelDataMessageProcessor(msg common.Message) (common.Message, error)
 	return updateMsg, err
 }
 
+// Reproduce the issue that the message dequeued is not in the same order as the message is queued
+func TestMessageReceiveOrder(t *testing.T) {
+	NUM := 100
+	inMsgQueue := make(chan struct {
+		order int
+		time  ChannelTime
+	}, NUM)
+	startTime := time.Now()
+
+	for i := 0; i < NUM; i++ {
+		go func(order int) {
+			inMsgQueue <- struct {
+				order int
+				time  ChannelTime
+			}{order: order, time: ChannelTime(time.Since(startTime))}
+		}(i)
+	}
+
+	time.Sleep(10 * time.Millisecond)
+
+	for len(inMsgQueue) > 0 {
+		msg := <-inMsgQueue
+		fmt.Printf("%d: %v\n", msg.order, msg.time)
+	}
+}
+
 // See the test case in [the design doc](doc/design.md#fan-out)
 // TODO: add test cases with FieldMasks (no fan-out if no property is updated)
 func TestFanOutChannelData(t *testing.T) {
@@ -123,7 +149,7 @@ func TestFanOutChannelData(t *testing.T) {
 	testChannel.tickData(channelStartTime.AddMs(100))
 	assert.Equal(t, 2, len(c1.testQueue()))
 	assert.Equal(t, 1, len(c2.testQueue()))
-	// U1 doesn't have "ClientConnNum" property
+	// U1 doesn't have "Num" property
 	assert.NotEqualValues(t, dataMsg.Num, c1.latestMsg().(*testpb.TestChannelDataMessage).Num)
 	assert.EqualValues(t, "b", c1.latestMsg().(*testpb.TestChannelDataMessage).Text)
 	assert.EqualValues(t, "a", c2.latestMsg().(*testpb.TestChannelDataMessage).Text)
