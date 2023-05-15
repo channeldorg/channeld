@@ -3,10 +3,10 @@
     "Config": {
         "WorldOffsetX": -15000,
         "WorldOffsetZ": -15000,
-        "GridWidth": 2500,
-        "GridHeight": 2500,
-        "GridCols": 12,
-        "GridRows": 12,
+        "GridWidth": 2000,
+        "GridHeight": 2000,
+        "GridCols": 15,
+        "GridRows": 15,
         "ServerCols": 3,
         "ServerRows": 3,
         "ServerInterestBorderSize": 0

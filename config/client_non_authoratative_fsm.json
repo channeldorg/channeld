@@ -7,7 +7,7 @@
         },
         {
             "Name": "OPEN",
-            "MsgTypeWhitelist": "6,7,100-65535",
+            "MsgTypeWhitelist": "7,99-65535",
             "MsgTypeBlacklist": ""
         }
     ],
