@@ -442,7 +442,10 @@ func (c *Connection) receive() {
 	}
 
 	//move unhandled content to the front
-	copy(c.readBuffer, c.readBuffer[bufPos:c.readPos])
+	if bufPos < c.readPos {
+		copy(c.readBuffer, c.readBuffer[bufPos:c.readPos])
+	}
+
 	// Reset read position
 	c.readPos = c.readPos - bufPos
 }
