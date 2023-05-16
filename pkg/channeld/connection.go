@@ -500,7 +500,8 @@ func (c *Connection) readPacket(bufPos *int) (*channeldpb.Packet, error) {
 			bytes, err = snappy.Decode(dst, bytes)
 			if err != nil {
 				c.Logger().Error("snappy.Decode", zap.Error(err))
-				return nil, nil
+				return nil, err
+
 			}
 		}
 	}
