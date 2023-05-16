@@ -493,7 +493,8 @@ func (c *Connection) readPacket(bufPos *int) (*channeldpb.Packet, error) {
 			len, err := snappy.DecodedLen(bytes)
 			if err != nil {
 				c.Logger().Error("snappy.DecodedLen", zap.Error(err))
-				return nil, nil
+				return nil, err
+
 			}
 			dst := make([]byte, len)
 			bytes, err = snappy.Decode(dst, bytes)
