@@ -431,7 +431,8 @@ func (c *Connection) receive() {
 		// there's a wire format error, close the connection to give a quick feedback to the other end.
 		if err != nil {
 			c.Close()
-			break
+			return
+
 		}
 		// all fully received packets are handled
 		if packet == nil {
