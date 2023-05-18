@@ -39,12 +39,34 @@ type MessageSender interface {
 	Send(c *Connection, ctx MessageContext) //(c *Connection, channelId ChannelId, msgType channeldpb.MessageType, msg Message)
 }
 
-type queuedMessageSender struct {
+/*
+type queuedMessageCtxSender struct {
 	MessageSender
 }
 
-func (s *queuedMessageSender) Send(c *Connection, ctx MessageContext) {
+func (s *queuedMessageCtxSender) Send(c *Connection, ctx MessageContext) {
 	c.sendQueue <- ctx
+}
+*/
+
+type queuedMessagePackSender struct {
+	MessageSender
+}
+
+func (s *queuedMessagePackSender) Send(c *Connection, ctx MessageContext) {
+	msgBody, err := proto.Marshal(ctx.Msg)
+	if err != nil {
+		c.logger.Error("failed to marshal message", zap.Error(err), zap.Uint32("msgType", uint32(ctx.MsgType)))
+		return
+	}
+
+	c.sendQueue <- &channeldpb.MessagePack{
+		ChannelId: ctx.ChannelId,
+		Broadcast: ctx.Broadcast,
+		StubId:    ctx.StubId,
+		MsgType:   uint32(ctx.MsgType),
+		MsgBody:   msgBody,
+	}
 }
 
 type Connection struct {
@@ -58,7 +80,7 @@ type Connection struct {
 	// reader          *bufio.Reader
 	// writer          *bufio.Writer
 	sender               MessageSender
-	sendQueue            chan MessageContext
+	sendQueue            chan *channeldpb.MessagePack //MessageContext
 	pit                  string
 	fsm                  *fsm.FiniteStateMachine
 	fsmDisallowedCounter int
@@ -171,6 +193,16 @@ func StartListening(t channeldpb.ConnectionType, network string, address string)
 		if err != nil {
 			rootLogger.Error("failed to accept connection", zap.Error(err))
 		} else {
+			if network == "tcp" {
+				tcpConn := conn.(*net.TCPConn)
+				if err := tcpConn.SetReadBuffer(0x0fffff); err != nil {
+					rootLogger.Error("failed to set read buffer size", zap.Error(err))
+				}
+				if err := tcpConn.SetWriteBuffer(0x0fffff); err != nil {
+					rootLogger.Error("failed to set write buffer size", zap.Error(err))
+				}
+				tcpConn.SetNoDelay(true)
+			}
 
 			// Check if the IP address is banned.
 			ip := GetIP(conn.RemoteAddr())
@@ -216,7 +248,9 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 	} else {
 		rootLogger.Panic("invalid connection type", zap.Int32("connType", int32(t)))
 	}
-
+	if readerSize < MaxPacketSize+PacketHeaderSize {
+		readerSize = MaxPacketSize + PacketHeaderSize
+	}
 	maxConnId := uint32(1)<<GlobalSettings.MaxConnectionIdBits - 1
 
 	for tries := 0; ; tries++ {
@@ -240,8 +274,8 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 		readPos:         0,
 		// reader:    bufio.NewReaderSize(c, readerSize),
 		// writer:    bufio.NewWriterSize(c, writerSize),
-		sender:               &queuedMessageSender{},
-		sendQueue:            make(chan MessageContext, 128),
+		sender:               &queuedMessagePackSender{},
+		sendQueue:            make(chan *channeldpb.MessagePack, 128),
 		fsmDisallowedCounter: 0,
 		logger: &Logger{rootLogger.With(
 			zap.String("connType", t.String()),
@@ -350,7 +384,6 @@ func (c *Connection) receive() {
 		c.Close()
 		return
 	}
-
 	c.readPos += bytesRead
 	if c.readPos < PacketHeaderSize {
 		// Unfinished header
@@ -358,17 +391,27 @@ func (c *Connection) receive() {
 		return
 	}
 
-	for bufPos := 0; bufPos < c.readPos; {
+	bufPos := 0
+	for bufPos = 0; bufPos < c.readPos; {
 		if c.readPacket(&bufPos) == nil {
-			return
+			break
 		}
 		if bufPos < c.readPos {
 			combinedPacketCount.WithLabelValues(c.connectionType.String()).Inc()
 		}
 	}
 
-	// Reset read position
-	c.readPos = 0
+	if c.IsClosing() {
+		return
+	}
+
+	if bufPos < c.readPos {
+		// Move unhandled content to the front
+		copy(c.readBuffer, c.readBuffer[bufPos:c.readPos])
+	}
+
+	// Move read position
+	c.readPos -= bufPos
 }
 
 func readSize(tag []byte) int {
@@ -387,31 +430,29 @@ func (c *Connection) readPacket(bufPos *int) *channeldpb.Packet {
 	packetSize := readSize(tag)
 	if packetSize == 0 {
 		c.readPos = 0
-		packetDropped.WithLabelValues(c.connectionType.String()).Inc()
-		c.Logger().Warn("invalid tag, the packet will be dropped",
-			zap.ByteString("tag", tag),
+		connectionClosed.WithLabelValues(c.connectionType.String()).Inc()
+		c.Logger().Warn("invalid tag, the connection will be closed",
+			zap.Binary("tag", tag),
 		)
+		c.Close()
 		return nil
 	}
 
-	if packetSize > int(MaxPacketSize) {
+	if packetSize > MaxPacketSize {
 		c.readPos = 0
-		packetDropped.WithLabelValues(c.connectionType.String()).Inc()
-		c.Logger().Warn("packet size exceeds the limit, the packet will be dropped", zap.Int("packetSize", packetSize))
+		connectionClosed.WithLabelValues(c.connectionType.String()).Inc()
+		c.Logger().Warn("packet size exceeds the limit, the connection will be closed", zap.Int("packetSize", packetSize), zap.Int("bufferSize", len(c.readBuffer)))
+		c.Close()
 		return nil
 	}
 
 	fullSize := PacketHeaderSize + packetSize
-	if c.readPos < fullSize {
+
+	if c.readPos < *bufPos+fullSize {
 		// Unfinished packet
 		fragmentedPacketCount.WithLabelValues(c.connectionType.String()).Inc()
-		return nil
-	}
-
-	if *bufPos+fullSize >= len(c.readBuffer) {
-		c.readPos = 0
-		packetDropped.WithLabelValues(c.connectionType.String()).Inc()
-		c.Logger().Warn("packet size exceeds the read buffer, the packet will be dropped", zap.Int("packetSize", packetSize))
+		// this is a normal case, turn off the logs
+		//c.Logger().Info("read part of package", zap.Int("readpos", c.readPos), zap.Int("full size", fullSize))
 		return nil
 	}
 
@@ -441,7 +482,19 @@ func (c *Connection) readPacket(bufPos *int) *channeldpb.Packet {
 
 	var p channeldpb.Packet
 	if err := proto.Unmarshal(bytes, &p); err != nil {
-		c.Logger().Error("unmarshalling packet", zap.Error(err))
+		c.Logger().Error("failed to unmarshall packet, the connection will be closed", zap.Error(err),
+			zap.Uint32("size", uint32(packetSize)),
+			zap.Binary("tag", tag),
+		)
+		//if c.connectionType == channeldpb.ConnectionType_CLIENT {
+		connectionClosed.WithLabelValues(c.connectionType.String()).Inc()
+		c.Close()
+		/*
+			} else {
+				// Drop the packet sent from server
+				*bufPos += fullSize
+			}
+		*/
 		return nil
 	}
 
@@ -456,7 +509,6 @@ func (c *Connection) readPacket(bufPos *int) *channeldpb.Packet {
 	}
 
 	*bufPos += fullSize
-
 	return &p
 }
 
@@ -550,31 +602,28 @@ func (c *Connection) flush() {
 
 	// For now we don't limit the message numbers per packet
 	for len(c.sendQueue) > 0 {
-		mc := <-c.sendQueue
-		// The packet size should not exceed the capacity of 2 bytes
-		msgSize := proto.Size(mc.Msg)
-		if size+msgSize+PacketHeaderSize > MaxPacketSize {
-			c.Logger().Info("packet is going to be oversized", zap.Uint32("msgType", uint32(mc.MsgType)), zap.Int("msgSize", msgSize))
+		mp := <-c.sendQueue
+		p.Messages = append(p.Messages, mp)
+		size = proto.Size(&p)
+		if size > MaxPacketSize {
+			c.Logger().Info("packet is going to be oversized",
+				zap.Int("packetSize", size),
+				zap.Uint32("msgType", uint32(mp.MsgType)),
+				zap.Int("msgSize", len(mp.MsgBody)),
+				zap.Int("msgNum", len(p.Messages)),
+				zap.Int("msgInQueue", len(c.sendQueue)),
+			)
+
+			// Revert adding the message that causes the oversize
+			p.Messages = p.Messages[:len(p.Messages)-1]
+
 			// Put the message back to the queue
 			// FIXME: order may matter
-			c.sendQueue <- mc
+			c.sendQueue <- mp
 			break
 		}
-		msgBody, err := proto.Marshal(mc.Msg)
-		if err != nil {
-			c.Logger().Error("error marshalling message", zap.Error(err))
-			continue
-		}
-		p.Messages = append(p.Messages, &channeldpb.MessagePack{
-			ChannelId: mc.ChannelId,
-			Broadcast: mc.Broadcast,
-			StubId:    mc.StubId,
-			MsgType:   uint32(mc.MsgType),
-			MsgBody:   msgBody,
-		})
-		size = proto.Size(&p)
 
-		c.Logger().VeryVerbose("sent message", zap.Uint32("msgType", uint32(mc.MsgType)), zap.Int("size", len(msgBody)))
+		c.Logger().VeryVerbose("sent message", zap.Uint32("msgType", uint32(mp.MsgType)), zap.Int("size", len(mp.MsgBody)))
 
 		msgSent.WithLabelValues(c.connectionType.String()).Inc() /*.WithLabelValues(
 			strconv.FormatUint(uint64(e.Channel.id), 10),
@@ -584,7 +633,7 @@ func (c *Connection) flush() {
 
 	bytes, err := proto.Marshal(&p)
 	if err != nil {
-		c.Logger().Error("error marshalling packet", zap.Error(err))
+		c.Logger().Error("failed to marshal packet", zap.Error(err))
 		return
 	}
 
