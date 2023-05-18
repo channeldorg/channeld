@@ -795,6 +795,9 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 
 				// Subscribe to the entity channel for every connection in the dst spatial channel
 				cs, alreadySubed := conn.SubscribeToChannel(entityCh, subOptions)
+				if cs == nil {
+					continue
+				}
 				// If the data access changes, the SubscribedToChannelResultMessage must be sent, otherwise the connection may have problem sending the ChannelDataUpdateMessage..
 				if !alreadySubed || *cs.options.DataAccess != dataAccess {
 					cs.options.DataAccess = &dataAccess
