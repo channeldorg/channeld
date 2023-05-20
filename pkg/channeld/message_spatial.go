@@ -51,7 +51,7 @@ func handleUpdateSpatialInterest(ctx MessageContext) {
 
 	clientConn := GetConnection(ConnectionId(msg.ConnId))
 	if clientConn == nil {
-		ctx.Connection.Logger().Error("cannot find client connection to update spatial interest", zap.Uint32("connId", msg.ConnId))
+		ctx.Connection.Logger().Error("cannot find client connection to update spatial interest", zap.Uint32("clientConnId", msg.ConnId))
 		return
 	}
 

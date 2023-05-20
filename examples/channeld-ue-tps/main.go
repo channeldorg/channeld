@@ -7,6 +7,7 @@ import (
 	"github.com/metaworking/channeld/pkg/channeld"
 	"github.com/metaworking/channeld/pkg/channeldpb"
 	"github.com/metaworking/channeld/pkg/unreal"
+	"github.com/metaworking/channeld/pkg/unrealpb"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -23,6 +24,7 @@ func main() {
 	channeld.InitSpatialController()
 
 	unreal.InitMessageHandlers()
+	channeld.RegisterChannelDataType(channeldpb.ChannelType_SPATIAL, &unrealpb.SpatialChannelData{})
 
 	// Setup Prometheus
 	http.Handle("/metrics", promhttp.Handler())
