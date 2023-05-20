@@ -198,9 +198,9 @@ func (ch *Channel) tickData(t ChannelTime) {
 			   subTime                 firstFanOutTime      secondFanOutTime
 		*/
 		nextFanOutTime := foc.lastFanOutTime.AddMs(*cs.options.FanOutIntervalMs)
-		LatestFanoutTime := foc.lastFanOutTime
+		// latestFanoutTime := foc.lastFanOutTime
 		if t >= nextFanOutTime {
-			LatestFanoutTime = nextFanOutTime
+			latestFanoutTime := nextFanOutTime
 			var lastUpdateTime ChannelTime
 			bufp := ch.data.updateMsgBuffer.Front()
 			if ch.data.accumulatedUpdateMsg == nil {
@@ -216,7 +216,7 @@ func (ch *Channel) tickData(t ChannelTime) {
 				ch.fanOutDataUpdate(conn, cs, ch.data.msg)
 				foc.hadFirstFanOut = true
 				foc.lastMessageIndex = ch.data.msgIndex
-				LatestFanoutTime = t
+				latestFanoutTime = t
 			} else if bufp != nil {
 				if foc.lastFanOutTime >= lastUpdateTime {
 					lastUpdateTime = foc.lastFanOutTime
@@ -263,7 +263,7 @@ func (ch *Channel) tickData(t ChannelTime) {
 					ch.fanOutDataUpdate(conn, cs, ch.data.accumulatedUpdateMsg)
 				}
 			}
-			foc.lastFanOutTime = LatestFanoutTime
+			foc.lastFanOutTime = latestFanoutTime
 
 			temp := focp.Prev()
 			// Move the fanned-out connection to the back of the queue
