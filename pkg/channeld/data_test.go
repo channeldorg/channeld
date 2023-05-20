@@ -164,6 +164,37 @@ func TestFanOutChannelData(t *testing.T) {
 	assert.Equal(t, 2, len(c2.testQueue()))
 	assert.EqualValues(t, "c", c1.latestMsg().(*testpb.TestChannelDataMessage).Text)
 	assert.EqualValues(t, "c", c2.latestMsg().(*testpb.TestChannelDataMessage).Text)
+
+	u3 := &testpb.TestChannelDataMessage{Text: "d"}
+	testChannel.Data().OnUpdate(u3, channelStartTime.AddMs(205), c2.Id(), nil)
+	testChannel.tickData(channelStartTime.AddMs(210))
+	assert.Equal(t, 3, len(c1.testQueue()))
+	assert.Equal(t, 2, len(c2.testQueue()))
+	assert.EqualValues(t, "c", c1.latestMsg().(*testpb.TestChannelDataMessage).Text)
+	assert.EqualValues(t, "c", c2.latestMsg().(*testpb.TestChannelDataMessage).Text)
+
+	testChannel.tickData(channelStartTime.AddMs(250))
+
+	assert.Equal(t, 4, len(c1.testQueue()))
+	assert.Equal(t, 3, len(c2.testQueue()))
+	assert.EqualValues(t, "d", c1.latestMsg().(*testpb.TestChannelDataMessage).Text)
+	assert.EqualValues(t, "d", c2.latestMsg().(*testpb.TestChannelDataMessage).Text)
+
+	u4 := &testpb.TestChannelDataMessage{Text: "e"}
+	testChannel.Data().OnUpdate(u4, channelStartTime.AddMs(206), c1.Id(), nil)
+	testChannel.tickData(channelStartTime.AddMs(300))
+
+	assert.Equal(t, 5, len(c1.testQueue()))
+	assert.Equal(t, 3, len(c2.testQueue()))
+	assert.EqualValues(t, "e", c1.latestMsg().(*testpb.TestChannelDataMessage).Text)
+	assert.EqualValues(t, "d", c2.latestMsg().(*testpb.TestChannelDataMessage).Text)
+
+	testChannel.tickData(channelStartTime.AddMs(350))
+
+	assert.Equal(t, 5, len(c1.testQueue()))
+	assert.Equal(t, 4, len(c2.testQueue()))
+	assert.EqualValues(t, "e", c1.latestMsg().(*testpb.TestChannelDataMessage).Text)
+	assert.EqualValues(t, "e", c2.latestMsg().(*testpb.TestChannelDataMessage).Text)
 }
 
 func BenchmarkCustomMergeMap(b *testing.B) {
