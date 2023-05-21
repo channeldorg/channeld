@@ -1,57 +1,17 @@
 package unreal
 
 import (
-	"sync"
-
 	"github.com/metaworking/channeld/pkg/channeld"
 	"github.com/metaworking/channeld/pkg/channeldpb"
 	"github.com/metaworking/channeld/pkg/common"
 	"github.com/metaworking/channeld/pkg/unrealpb"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 )
-
-// Stores all UObjects ever spawned in server and sent to client.
-// Only in this way we can send the UnrealObjectRef as the handover data.
-var allSpawnedObj map[uint32]*unrealpb.UnrealObjectRef = make(map[uint32]*unrealpb.UnrealObjectRef)
-var allSpawnedObjLock sync.RWMutex
 
 func InitMessageHandlers() {
 	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_SPAWN), &channeldpb.ServerForwardMessage{}, handleUnrealSpawnObject)
 	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_DESTROY), &channeldpb.ServerForwardMessage{}, handleUnrealDestroyObject)
-	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_HANDOVER_CONTEXT), &unrealpb.GetHandoverContextResultMessage{}, handleHandoverContextResult)
-	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_GET_UNREAL_OBJECT_REF), &unrealpb.GetUnrealObjectRefMessage{}, handleGetUnrealObjectRef)
-
-	channeld.Event_GlobalChannelUnpossessed.Listen(func(struct{}) {
-		// Global server exits. Clear up all the cache.
-		allSpawnedObjLock.Lock()
-		defer allSpawnedObjLock.Unlock()
-		allSpawnedObj = make(map[uint32]*unrealpb.UnrealObjectRef)
-		resetHandoverDataProviders()
-	})
-}
-
-func handleGetUnrealObjectRef(ctx channeld.MessageContext) {
-	msg, ok := ctx.Msg.(*unrealpb.GetUnrealObjectRefMessage)
-	if !ok {
-		ctx.Connection.Logger().Error("message is not a GetUnrealObjectRefMessage, will not be handled.")
-		return
-	}
-
-	resultMsg := &unrealpb.GetUnrealObjectRefResultMessage{}
-	resultMsg.ObjRef = make([]*unrealpb.UnrealObjectRef, 0)
-
-	defer allSpawnedObjLock.RLocker().Unlock()
-	allSpawnedObjLock.RLock()
-	for _, netId := range msg.NetGUID {
-		objRef, exists := allSpawnedObj[netId]
-		if exists {
-			resultMsg.ObjRef = append(resultMsg.ObjRef, objRef)
-		}
-	}
-	ctx.Msg = resultMsg
-	ctx.Connection.Send(ctx)
 }
 
 func handleUnrealSpawnObject(ctx channeld.MessageContext) {
@@ -220,108 +180,4 @@ func handleUnrealDestroyObject(ctx channeld.MessageContext) {
 		entityCh.Logger().Info("removing entity channel from unrealpb.DestroyObjectMessage")
 		channeld.RemoveChannel(entityCh)
 	}
-}
-
-// Runs in the source spatial channel
-func handleHandoverContextResult(ctx channeld.MessageContext) {
-	msg, ok := ctx.Msg.(*unrealpb.GetHandoverContextResultMessage)
-	if !ok {
-		ctx.Connection.Logger().Error("message is not a GetHandoverContextResultMessage, will not be handled.")
-		return
-	}
-
-	provider, exists := getHandoverDataProvider(msg.NetId, msg.SrcChannelId)
-	if !exists {
-		ctx.Connection.Logger().Error("could not find the handover data provider", zap.Uint32("netId", msg.NetId))
-		return
-	}
-
-	defer removeHandoverDataProvider(msg.NetId, msg.SrcChannelId)
-
-	// No context - no handover will happen
-	if len(msg.Context) == 0 {
-		provider <- nil
-		return
-	}
-
-	fullChannelData := ctx.Channel.GetDataMessage()
-
-	if fullChannelData == nil {
-		ctx.Channel.Logger().Error("channel data message is nil")
-		provider <- nil
-		return
-	}
-
-	handoverChannelData := fullChannelData.ProtoReflect().New().Interface()
-
-	collector, ok := handoverChannelData.(ChannelDataCollector)
-	if ok {
-		for _, handoverCtx := range msg.Context {
-			if handoverCtx.Obj == nil || handoverCtx.Obj.NetGUID == nil || *handoverCtx.Obj.NetGUID == 0 {
-				ctx.Connection.Logger().Error("corrupted handover context", zap.Uint32("netId", msg.NetId))
-				continue
-			}
-			// Make sure the object is fully exported, so the destination server can spawn it properly.
-			if handoverCtx.Obj.NetGUIDBunch == nil {
-				allSpawnedObjLock.RLock()
-				objRef, exists := allSpawnedObj[*handoverCtx.Obj.NetGUID]
-				allSpawnedObjLock.RLocker().Unlock()
-				if exists {
-					handoverCtx.Obj = objRef
-				} else {
-					ctx.Connection.Logger().Warn("handover obj is not fully exported yet", zap.Uint32("netId", msg.NetId))
-				}
-			}
-			// Should be goroutine-safe, as the handler is running in the source channel that owns fullChannelData.
-			collector.CollectStates(*handoverCtx.Obj.NetGUID, fullChannelData)
-		}
-	} else {
-		ctx.Connection.Logger().Warn("channel data message is not a ChannelDataCollector, the states of the context objects will not be included in the handover data", zap.Uint32("netId", msg.NetId))
-	}
-
-	anyData, err := anypb.New(handoverChannelData)
-	if err != nil {
-		ctx.Connection.Logger().Error("failed to marshal handover data", zap.Error(err), zap.Uint32("netId", msg.NetId))
-		provider <- nil
-		return
-	}
-
-	// Don't forget to merge the handover channel data to the dst channel, otherwise it may miss some states.
-	dstChannel := channeld.GetChannel(common.ChannelId(msg.DstChannelId))
-	if dstChannel != nil {
-		dstChannelDataMsg := dstChannel.GetDataMessage()
-		if dstChannelDataMsg == nil {
-			// Set the data directly
-			dstChannel.Data().OnUpdate(handoverChannelData, dstChannel.GetTime(), 0, nil)
-		} else {
-			/* Calling Merge() causes concurrent map read and map write as the handler is running in the source channel.
-			mergeable, ok := dstChannelDataMsg.(channeld.MergeableChannelData)
-			if ok {
-				// Should we let the dst channel fan out the update?
-				// For now we don't. It's easier for the UE servers to control the sequence of spawning and update.
-				mergeable.Merge(handoverChannelData, nil, nil)
-			} else {
-				proto.Merge(dstChannelDataMsg, handoverChannelData)
-			}
-			*/
-			updateMsg := &channeldpb.ChannelDataUpdateMessage{
-				Data: anyData,
-			}
-			dstChannel.PutMessageInternal(channeldpb.MessageType_CHANNEL_DATA_UPDATE, updateMsg)
-		}
-	}
-
-	handoverData := &unrealpb.HandoverData{
-		Context: msg.Context,
-	}
-
-	srcChannel := channeld.GetChannel(common.ChannelId(msg.SrcChannelId))
-	/* In order to spawn objects with full states in the client, we need to provider the channel data for all handover.
-	// Only provide channel data for cross-server handover
-	*/
-	if srcChannel != nil && dstChannel != nil /*&& !srcChannel.IsSameOwner(dstChannel)*/ {
-		handoverData.ChannelData = anyData
-	}
-
-	provider <- handoverData
 }

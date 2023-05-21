@@ -10,7 +10,6 @@ import (
 	"github.com/metaworking/channeld/pkg/channeldpb"
 	"github.com/metaworking/channeld/pkg/common"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -619,382 +618,217 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 		rootLogger.Error("channel doesn't have owner, failed to handover channel data", zap.Uint32("dstChannelId", uint32(dstChannelId)))
 	}
 
-	if GlobalSettings.UseHandoverV2 {
-		var handoverEntityId EntityId
-		handoverDataProvider(srcChannelId, dstChannelId, &handoverEntityId)
+	var handoverEntityId EntityId
+	handoverDataProvider(srcChannelId, dstChannelId, &handoverEntityId)
 
-		rootLogger.Debug("handover group", zap.Uint32("entityId", uint32(handoverEntityId)))
+	rootLogger.Debug("handover group", zap.Uint32("entityId", uint32(handoverEntityId)))
 
-		spatialDataMsg, err := ReflectChannelDataMessage(channeldpb.ChannelType_SPATIAL)
-		if err != nil {
-			rootLogger.Error("failed to create handover data message for spatial channel", zap.Error(err))
-			return
-		}
+	spatialDataMsg, err := ReflectChannelDataMessage(channeldpb.ChannelType_SPATIAL)
+	if err != nil {
+		rootLogger.Error("failed to create handover data message for spatial channel", zap.Error(err))
+		return
+	}
 
-		if initializer, ok := spatialDataMsg.(ChannelDataInitializer); ok {
+	if initializer, ok := spatialDataMsg.(ChannelDataInitializer); ok {
+		initializer.Init()
+	}
+
+	/*
+		// Has the entity data set for each SpatialEntityState.
+		spatialDataMsgFull := spatialDataMsg.ProtoReflect().New().Interface()
+		if initializer, ok := spatialDataMsgFull.(ChannelDataInitializer); ok {
 			initializer.Init()
 		}
+	*/
 
-		/*
-			// Has the entity data set for each SpatialEntityState.
-			spatialDataMsgFull := spatialDataMsg.ProtoReflect().New().Interface()
-			if initializer, ok := spatialDataMsgFull.(ChannelDataInitializer); ok {
-				initializer.Init()
+	entityChannel := GetChannel(common.ChannelId(handoverEntityId))
+	if entityChannel == nil {
+		rootLogger.Warn("failed to handover entity as the channel doesn't exist", zap.Uint32("entityId", uint32(handoverEntityId)))
+		return
+	}
+
+	handoverEntities := entityChannel.GetHandoverEntities(handoverEntityId)
+	// No handover happens
+	if len(handoverEntities) == 0 {
+		return
+	}
+
+	// Step 1: Handle the cross-server handover
+	// Should be done as soon as possible to prevent the src spatial server from sending the entity channel data update.
+	if !srcChannel.IsSameOwner(dstChannel) {
+		for entityId := range handoverEntities {
+			entityCh := GetChannel(common.ChannelId(entityId))
+			if entityCh == nil {
+				continue
 			}
-		*/
 
-		entityChannel := GetChannel(common.ChannelId(handoverEntityId))
-		if entityChannel == nil {
-			rootLogger.Warn("failed to handover entity as the channel doesn't exist", zap.Uint32("entityId", uint32(handoverEntityId)))
+			if srcChannel.HasOwner() && !srcChannel.ownerConnection.HasInterestIn(dstChannelId) {
+				// Unsub the src spatial server from the entity channel if the server has no interest in the dst spatial channel
+				srcChannel.ownerConnection.UnsubscribeFromChannel(entityCh)
+				srcChannel.ownerConnection.sendUnsubscribed(MessageContext{}, entityCh, nil, 0)
+			}
+
+			// Set the owner of the entity channel to the dst spatial server, so the src spatial server's residual update will be ignored.
+			// Otherwise repeating handover may happen!
+			entityCh.ownerConnection = dstChannel.ownerConnection
+		}
+	}
+
+	// Step 2-1: Remove the entities from the src spatial channel's data
+	srcChannel.Execute(func(ch *Channel) {
+		updater, ok := ch.GetDataMessage().(SpatialChannelEntityUpdater)
+		if !ok {
+			ch.Logger().Warn("spatial channel data doesn't implement SpatialChannelEntityUpdater")
 			return
 		}
+		for entityId := range handoverEntities {
+			if err := updater.RemoveEntity(entityId); err != nil {
+				ch.Logger().Warn("failed to remove entity from spatial channel data", zap.Error(err))
+			} else {
+				ch.Logger().Debug("removed entity from spatial channel data", zap.Uint32("entityId", uint32(entityId)))
+			}
+		}
+	})
 
-		handoverEntities := entityChannel.GetHandoverEntities(handoverEntityId)
-		// No handover happens
-		if len(handoverEntities) == 0 {
+	// Step 2-2: Add the entities to the dst spatial channel's data
+	dstChannel.Execute(func(ch *Channel) {
+		updater, ok := ch.GetDataMessage().(SpatialChannelEntityUpdater)
+		if !ok {
+			ch.Logger().Warn("spatial channel data doesn't implement SpatialChannelEntityUpdater")
 			return
 		}
-
-		// Step 1: Handle the cross-server handover
-		// Should be done as soon as possible to prevent the src spatial server from sending the entity channel data update.
-		if !srcChannel.IsSameOwner(dstChannel) {
-			for entityId := range handoverEntities {
-				entityCh := GetChannel(common.ChannelId(entityId))
-				if entityCh == nil {
-					continue
-				}
-
-				if srcChannel.HasOwner() && !srcChannel.ownerConnection.HasInterestIn(dstChannelId) {
-					// Unsub the src spatial server from the entity channel if the server has no interest in the dst spatial channel
-					srcChannel.ownerConnection.UnsubscribeFromChannel(entityCh)
-					srcChannel.ownerConnection.sendUnsubscribed(MessageContext{}, entityCh, nil, 0)
-				}
-
-				// Set the owner of the entity channel to the dst spatial server, so the src spatial server's residual update will be ignored.
-				// Otherwise repeating handover may happen!
-				entityCh.ownerConnection = dstChannel.ownerConnection
-			}
-		}
-
-		// Step 2-1: Remove the entities from the src spatial channel's data
-		srcChannel.Execute(func(ch *Channel) {
-			updater, ok := ch.GetDataMessage().(SpatialChannelEntityUpdater)
-			if !ok {
-				ch.Logger().Warn("spatial channel data doesn't implement SpatialChannelEntityUpdater")
-				return
-			}
-			for entityId := range handoverEntities {
-				if err := updater.RemoveEntity(entityId); err != nil {
-					ch.Logger().Warn("failed to remove entity from spatial channel data", zap.Error(err))
-				} else {
-					ch.Logger().Debug("removed entity from spatial channel data", zap.Uint32("entityId", uint32(entityId)))
-				}
-			}
-		})
-
-		// Step 2-2: Add the entities to the dst spatial channel's data
-		dstChannel.Execute(func(ch *Channel) {
-			updater, ok := ch.GetDataMessage().(SpatialChannelEntityUpdater)
-			if !ok {
-				ch.Logger().Warn("spatial channel data doesn't implement SpatialChannelEntityUpdater")
-				return
-			}
-			for entityId, entityData := range handoverEntities {
-				if entityData == nil {
-					ch.Logger().Warn("failed to add entity to spatial channel as it doesn't have data", zap.Uint32("entityId", uint32(entityId)))
-					continue
-				}
-				if err := updater.AddEntity(entityId, entityData); err != nil {
-					ch.Logger().Warn("failed to add entity to spatial channel data", zap.Error(err))
-				} else {
-					ch.Logger().Debug("added entity to spatial channel data", zap.Uint32("entityId", uint32(entityId)))
-				}
-			}
-		})
-
-		// Step 3-1: Merge the entities to the spatial data message
 		for entityId, entityData := range handoverEntities {
 			if entityData == nil {
-				rootLogger.Warn("failed to handover entity as its channel doesn't have data", zap.Uint32("entityId", uint32(entityId)))
+				ch.Logger().Warn("failed to add entity to spatial channel as it doesn't have data", zap.Uint32("entityId", uint32(entityId)))
 				continue
 			}
-
-			if handoverMerger, ok := entityData.(HandoverDataMerger); ok {
-				handoverMerger.MergeTo(spatialDataMsg, false)
+			if err := updater.AddEntity(entityId, entityData); err != nil {
+				ch.Logger().Warn("failed to add entity to spatial channel data", zap.Error(err))
 			} else {
-				rootLogger.Warn("entity data doesn't implement HandoverDataMerger",
-					zap.Uint32("entityId", uint32(entityId)),
-					zap.String("msgName", string(entityData.ProtoReflect().Descriptor().FullName())),
-				)
+				ch.Logger().Debug("added entity to spatial channel data", zap.Uint32("entityId", uint32(entityId)))
 			}
 		}
+	})
 
-		// Step 3-2: Prepare the handover message
-		handoverAnyData, err := anypb.New(spatialDataMsg)
-		if err != nil {
-			rootLogger.Error("failed to marshal spatial handover data", zap.Error(err))
-			return
+	// Step 3-1: Merge the entities to the spatial data message
+	for entityId, entityData := range handoverEntities {
+		if entityData == nil {
+			rootLogger.Warn("failed to handover entity as its channel doesn't have data", zap.Uint32("entityId", uint32(entityId)))
+			continue
 		}
 
-		handoverMsgCtx := MessageContext{
-			MsgType: channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
-			Msg: &channeldpb.ChannelDataHandoverMessage{
-				SrcChannelId:  uint32(srcChannelId),
-				DstChannelId:  uint32(dstChannelId),
-				Data:          handoverAnyData,
-				ContextConnId: uint32(srcChannel.latestDataUpdateConnId),
-			},
-			Broadcast: 0,
-			StubId:    0,
-			ChannelId: uint32(dstChannelId),
-		}
-
-		// Step 4: Send the handover message to all connections in the srcChannel and dstChannel
-		srcChannelSubConns := srcChannel.GetAllConnections()
-		dstChannelSubConns := dstChannel.GetAllConnections()
-
-		// Step 4-1: Send to the connections in the srcChannel. The handover message doesn't contain the entity data.
-		for conn := range srcChannelSubConns {
-			// Avoid duplicate sending
-			if _, exists := dstChannelSubConns[conn]; exists {
-				continue
-			}
-
-			conn.Send(handoverMsgCtx)
-		}
-
-		// Step 4-2: Send the connections in the dstChannel. The handover message contains the entity data if the connection hasn't subscribed to the entity channel yet.
-		// Also, subscribe the connection to the entity channel if it hasn't subscribed yet.
-		subOptions := &channeldpb.ChannelSubscriptionOptions{
-			SkipSelfUpdateFanOut: Pointer(true),
-			// Since we already wrap the entity data in the handover message, no need to fan out again.
-			SkipFirstFanOut: Pointer(true),
-		}
-
-		for conn := range dstChannelSubConns {
-			handoverDataMsg := spatialDataMsg.ProtoReflect().New().Interface()
-
-			for entityId, entityData := range handoverEntities {
-				entityCh := GetChannel(common.ChannelId(entityId))
-				if entityCh == nil {
-					rootLogger.Warn("failed to handover entity as its channel doesn't exist", zap.Uint32("entityId", uint32(entityId)))
-					continue
-				}
-
-				if entityData == nil {
-					rootLogger.Warn("failed to handover entity as its channel doesn't have data", zap.Uint32("entityId", uint32(entityId)))
-					continue
-				}
-
-				dataAccess := channeldpb.ChannelDataAccess_READ_ACCESS
-				// Only the owner can update the entity
-				if conn == entityCh.ownerConnection {
-					dataAccess = channeldpb.ChannelDataAccess_WRITE_ACCESS
-				}
-				// TODO: set subOptions from the entity's replication settings in the engine.
-
-				// Subscribe to the entity channel for every connection in the dst spatial channel
-				cs, alreadySubed := conn.SubscribeToChannel(entityCh, subOptions)
-				if cs == nil {
-					continue
-				}
-				// If the data access changes, the SubscribedToChannelResultMessage must be sent, otherwise the connection may have problem sending the ChannelDataUpdateMessage..
-				if !alreadySubed || *cs.options.DataAccess != dataAccess {
-					cs.options.DataAccess = &dataAccess
-					conn.sendSubscribed(MessageContext{}, entityCh, conn, 0, &cs.options)
-				}
-
-				handoverMerger, hasMerger := entityData.(HandoverDataMerger)
-				if hasMerger {
-					handoverMerger.MergeTo(handoverDataMsg, !alreadySubed)
-				} else {
-					rootLogger.Warn("entity data doesn't implement HandoverDataMerger",
-						zap.Uint32("entityId", uint32(handoverEntityId)),
-						zap.String("msgName", string(entityData.ProtoReflect().Descriptor().FullName())),
-					)
-				}
-			}
-
-			anyData, err := anypb.New(handoverDataMsg)
-			if err != nil {
-				rootLogger.Error("failed to marshal handover data message", zap.Error(err))
-				continue
-			}
-
-			handoverMsgCtx.Msg = &channeldpb.ChannelDataHandoverMessage{
-				SrcChannelId:  uint32(srcChannelId),
-				DstChannelId:  uint32(dstChannelId),
-				Data:          anyData,
-				ContextConnId: uint32(srcChannel.latestDataUpdateConnId),
-			}
-			conn.Send(handoverMsgCtx)
-		}
-
-		/* The following code sends the handover message without the entity full data, but the UE server's
-		 * handover process requires the full data in the message to initialize the PlayerController.
-
-		for _, entityId := range handoverEntities {
-			ch := GetChannel(common.ChannelId(entityId))
-			if ch == nil {
-				rootLogger.Warn("failed to handover entity as its channel doesn't exist", zap.Uint32("entityId", uint32(entityId)))
-				continue
-			}
-
-			entityData := ch.GetDataMessage()
-			if entityData == nil {
-				rootLogger.Warn("failed to handover entity as its channel doesn't have data", zap.Uint32("entityId", uint32(entityId)))
-				continue
-			}
-
-			if handoverMerger, ok := entityData.(HandoverDataMerger); ok {
-				handoverMerger.MergeTo(spatialDataMsg, false)
-			} else {
-				rootLogger.Warn("entity data doesn't implement HandoverDataMerger",
-					zap.Uint32("entityId", uint32(entityId)),
-					zap.String("msgName", string(entityData.ProtoReflect().Descriptor().FullName())),
-				)
-				continue
-			}
-
-			entityChannelSubConns := ch.GetAllConnections()
-
-			dstChannelSubConns := dstChannel.GetAllConnections()
-			for conn := range dstChannelSubConns {
-				if _, exists := entityChannelSubConns[conn]; !exists {
-					// TODO: set subOptions from the entity's replication settings in the engine.
-					conn.SubscribeToChannel(ch, nil)
-					conn.sendSubscribed(MessageContext{}, ch, conn, 0, nil)
-				}
-			}
-		}
-
-		handoverAnyData, err := anypb.New(spatialDataMsg)
-		if err != nil {
-			rootLogger.Error("failed to marshal spatial handover data", zap.Error(err))
-			return
-		}
-
-		// Don't forget to merge the handover channel data to the dst channel, otherwise it won't have the handover entities.
-		dstChannelDataMsg := dstChannel.GetDataMessage()
-		if dstChannelDataMsg == nil {
-			// Set the data directly
-			dstChannel.Data().OnUpdate(spatialDataMsg, dstChannel.GetTime(), 0, nil)
+		if handoverMerger, ok := entityData.(HandoverDataMerger); ok {
+			handoverMerger.MergeTo(spatialDataMsg, false)
 		} else {
-			updateMsg := &channeldpb.ChannelDataUpdateMessage{
-				Data: handoverAnyData,
-			}
-			dstChannel.PutMessageInternal(channeldpb.MessageType_CHANNEL_DATA_UPDATE, updateMsg)
+			rootLogger.Warn("entity data doesn't implement HandoverDataMerger",
+				zap.Uint32("entityId", uint32(entityId)),
+				zap.String("msgName", string(entityData.ProtoReflect().Descriptor().FullName())),
+			)
 		}
+	}
 
-		handoverMsg := &channeldpb.ChannelDataHandoverMessage{
+	// Step 3-2: Prepare the handover message
+	handoverAnyData, err := anypb.New(spatialDataMsg)
+	if err != nil {
+		rootLogger.Error("failed to marshal spatial handover data", zap.Error(err))
+		return
+	}
+
+	handoverMsgCtx := MessageContext{
+		MsgType: channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
+		Msg: &channeldpb.ChannelDataHandoverMessage{
 			SrcChannelId:  uint32(srcChannelId),
 			DstChannelId:  uint32(dstChannelId),
 			Data:          handoverAnyData,
 			ContextConnId: uint32(srcChannel.latestDataUpdateConnId),
-		}
-
-		broadcastHandoverMsg(srcChannel, dstChannel, handoverMsg, handoverMsg)
-
-		*/
-		return
+		},
+		Broadcast: 0,
+		StubId:    0,
+		ChannelId: uint32(dstChannelId),
 	}
 
-	// Handover data is provider by the Merger [channeld.MergeableChannelData]
-	c := make(chan common.Message)
+	// Step 4: Send the handover message to all connections in the srcChannel and dstChannel
+	srcChannelSubConns := srcChannel.GetAllConnections()
+	dstChannelSubConns := dstChannel.GetAllConnections()
 
-	go func() {
-		handoverData := <-c
-		if handoverData == nil {
-			rootLogger.Info("handover will not happen as no data is provided", zap.Uint32("srcChannelId", uint32(srcChannelId)), zap.Uint32("dstChannelId", uint32(dstChannelId)))
-			return
-		}
-		if rootLogger.Core().Enabled(zapcore.Level(VerboseLevel)) {
-			rootLogger.Verbose("handover data", zap.Uint32("srcChannelId", uint32(srcChannelId)), zap.Uint32("dstChannelId", uint32(dstChannelId)),
-				zap.String("data", dataMarshalOptions.Format(handoverData)))
+	// Step 4-1: Send to the connections in the srcChannel. The handover message doesn't contain the entity data.
+	for conn := range srcChannelSubConns {
+		// Avoid duplicate sending
+		if _, exists := dstChannelSubConns[conn]; exists {
+			continue
 		}
 
-		anyData, err := anypb.New(handoverData)
-		if err != nil {
-			rootLogger.Error("failed to marshall handover data", zap.Error(err))
-			return
-		}
+		conn.Send(handoverMsgCtx)
+	}
 
-		/*
-			newChannel.PutMessage(&channeldpb.ChannelDataUpdateMessage{
-				Data: anyData,
-			}, handleChannelDataUpdate, internalDummyConnection, &channeldpb.MessagePack{
-				MsgType:   uint32(channeldpb.MessageType_CHANNEL_DATA_UPDATE),
-				Broadcast: channeldpb.BroadcastType_NO_BROADCAST,
-				StubId:    0,
-				ChannelId: uint32(dstChannelId),
-			})
-		*/
+	// Step 4-2: Send the connections in the dstChannel. The handover message contains the entity data if the connection hasn't subscribed to the entity channel yet.
+	// Also, subscribe the connection to the entity channel if it hasn't subscribed yet.
+	subOptions := &channeldpb.ChannelSubscriptionOptions{
+		SkipSelfUpdateFanOut: Pointer(true),
+		// Since we already wrap the entity data in the handover message, no need to fan out again.
+		SkipFirstFanOut: Pointer(true),
+	}
 
-		handoverMsg := &channeldpb.ChannelDataHandoverMessage{
-			SrcChannelId:  uint32(srcChannelId),
-			DstChannelId:  uint32(dstChannelId),
-			Data:          anyData,
-			ContextConnId: uint32(srcChannel.latestDataUpdateConnId),
-		}
+	for conn := range dstChannelSubConns {
+		handoverDataMsg := spatialDataMsg.ProtoReflect().New().Interface()
 
-		handoverMsgNoPayload := &channeldpb.ChannelDataHandoverMessage{
-			SrcChannelId:  uint32(srcChannelId),
-			DstChannelId:  uint32(dstChannelId),
-			Data:          anyData,
-			ContextConnId: uint32(srcChannel.latestDataUpdateConnId),
-		}
-		if dataWithoutPayload, ok := handoverData.(HandoverDataWithPayload); ok {
-			dataWithoutPayload.ClearPayload()
-			if anyDataWithoutPayload, err := anypb.New(dataWithoutPayload.(common.Message)); err == nil {
-				handoverMsgNoPayload.Data = anyDataWithoutPayload
+		for entityId, entityData := range handoverEntities {
+			entityCh := GetChannel(common.ChannelId(entityId))
+			if entityCh == nil {
+				rootLogger.Warn("failed to handover entity as its channel doesn't exist", zap.Uint32("entityId", uint32(entityId)))
+				continue
+			}
+
+			if entityData == nil {
+				rootLogger.Warn("failed to handover entity as its channel doesn't have data", zap.Uint32("entityId", uint32(entityId)))
+				continue
+			}
+
+			dataAccess := channeldpb.ChannelDataAccess_READ_ACCESS
+			// Only the owner can update the entity
+			if conn == entityCh.ownerConnection {
+				dataAccess = channeldpb.ChannelDataAccess_WRITE_ACCESS
+			}
+			// TODO: set subOptions from the entity's replication settings in the engine.
+
+			// Subscribe to the entity channel for every connection in the dst spatial channel
+			cs, alreadySubed := conn.SubscribeToChannel(entityCh, subOptions)
+			if cs == nil {
+				continue
+			}
+			// If the data access changes, the SubscribedToChannelResultMessage must be sent, otherwise the connection may have problem sending the ChannelDataUpdateMessage..
+			if !alreadySubed || *cs.options.DataAccess != dataAccess {
+				cs.options.DataAccess = &dataAccess
+				conn.sendSubscribed(MessageContext{}, entityCh, conn, 0, &cs.options)
+			}
+
+			handoverMerger, hasMerger := entityData.(HandoverDataMerger)
+			if hasMerger {
+				// Send the handover data with full states to the new subscribers,
+				// in order to initialize the PlayerController properly.
+				handoverMerger.MergeTo(handoverDataMsg, !alreadySubed)
+			} else {
+				rootLogger.Warn("entity data doesn't implement HandoverDataMerger",
+					zap.Uint32("entityId", uint32(handoverEntityId)),
+					zap.String("msgName", string(entityData.ProtoReflect().Descriptor().FullName())),
+				)
 			}
 		}
 
-		broadcastHandoverMsg(srcChannel, dstChannel, handoverMsg, handoverMsgNoPayload)
-	}()
-
-	handoverDataProvider(srcChannelId, dstChannelId, c)
-}
-
-func broadcastHandoverMsg(srcChannel, dstChannel *Channel, handoverMsg common.Message, handoverMsgNoPayload common.Message) {
-	// Use GetAllConnections() to avoid race condition
-	srcChannelConns := srcChannel.GetAllConnections()
-	dstChannelConns := dstChannel.GetAllConnections()
-	// Send the handover message to all connections in the srcChannel
-	for conn := range srcChannelConns {
-		// Avoid duplicate sending
-		if _, exists := dstChannelConns[conn]; !exists {
-			sendHandoverMsg(conn, dstChannel.Id(), srcChannel.Id(), handoverMsg, handoverMsgNoPayload)
+		anyData, err := anypb.New(handoverDataMsg)
+		if err != nil {
+			rootLogger.Error("failed to marshal handover data message", zap.Error(err))
+			continue
 		}
-	}
 
-	// Send the handover message to all connections in the dstChannel
-	for conn := range dstChannelConns {
-		sendHandoverMsg(conn, dstChannel.Id(), dstChannel.Id(), handoverMsg, handoverMsgNoPayload)
-	}
-}
-
-func sendHandoverMsg(conn ConnectionInChannel, dstChannelId, sendChannelId common.ChannelId, handoverMsg common.Message, handoverMsgNoInterest common.Message) {
-	var msgToSend common.Message
-
-	if c, ok := conn.(*Connection); ok {
-		_, hasInterestInDstChannel := c.spatialSubscriptions.Load(dstChannelId)
-		if !hasInterestInDstChannel {
-			// This connection has not interest in the dstChannel, no need to send the handover data payload
-			msgToSend = handoverMsgNoInterest
-		} else {
-			msgToSend = handoverMsg
+		handoverMsgCtx.Msg = &channeldpb.ChannelDataHandoverMessage{
+			SrcChannelId:  uint32(srcChannelId),
+			DstChannelId:  uint32(dstChannelId),
+			Data:          anyData,
+			ContextConnId: uint32(srcChannel.latestDataUpdateConnId),
 		}
+		conn.Send(handoverMsgCtx)
 	}
-
-	conn.Send(MessageContext{
-		MsgType:   channeldpb.MessageType_CHANNEL_DATA_HANDOVER,
-		Msg:       msgToSend,
-		Broadcast: 0,
-		StubId:    0,
-		ChannelId: uint32(sendChannelId),
-	})
-
 }
 
 func (ctl *StaticGrid2DSpatialController) initServerConnections() {

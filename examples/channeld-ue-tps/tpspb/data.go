@@ -57,108 +57,11 @@ func (data *TestRepChannelData) Init() error {
 }
 */
 
-// Implement [channeld.ChannelDataCollector]
-func (to *TestRepChannelData) CollectStates(netId uint32, src common.Message) error {
-	from, ok := src.(*TestRepChannelData)
-	if !ok {
-		return errors.New("src is not a TestRepChannelData")
-	}
-
-	// to.Init()
-	actorState, exists := from.ActorStates[netId]
-	if exists {
-		if to.ActorStates == nil {
-			to.ActorStates = make(map[uint32]*unrealpb.ActorState)
-		}
-		to.ActorStates[netId] = actorState
-	}
-
-	pawnState, exists := from.PawnStates[netId]
-	if exists {
-		if to.PawnStates == nil {
-			to.PawnStates = make(map[uint32]*unrealpb.PawnState)
-		}
-		to.PawnStates[netId] = pawnState
-	}
-
-	characterState, exists := from.CharacterStates[netId]
-	if exists {
-		if to.CharacterStates == nil {
-			to.CharacterStates = make(map[uint32]*unrealpb.CharacterState)
-		}
-		to.CharacterStates[netId] = characterState
-	}
-
-	playerState, exists := from.PlayerStates[netId]
-	if exists {
-		if to.PlayerStates == nil {
-			to.PlayerStates = make(map[uint32]*unrealpb.PlayerState)
-		}
-		to.PlayerStates[netId] = playerState
-	}
-
-	controllerState, exists := from.ControllerStates[netId]
-	if exists {
-		if to.ControllerStates == nil {
-			to.ControllerStates = make(map[uint32]*unrealpb.ControllerState)
-		}
-		to.ControllerStates[netId] = controllerState
-	}
-
-	playerControllerStates, exists := from.PlayerControllerStates[netId]
-	if exists {
-		if to.PlayerControllerStates == nil {
-			to.PlayerControllerStates = make(map[uint32]*unrealpb.PlayerControllerState)
-		}
-		to.PlayerControllerStates[netId] = playerControllerStates
-	}
-
-	testRepPlayerControllerStates, exists := from.TestRepPlayerControllerStates[netId]
-	if exists {
-		if to.TestRepPlayerControllerStates == nil {
-			to.TestRepPlayerControllerStates = make(map[uint32]*TestRepPlayerControllerState)
-		}
-		to.TestRepPlayerControllerStates[netId] = testRepPlayerControllerStates
-	}
-
-	testNPCStates, exists := from.TestNPCStates[netId]
-	if exists {
-		if to.TestNPCStates == nil {
-			to.TestNPCStates = make(map[uint32]*TestNPCState)
-		}
-		to.TestNPCStates[netId] = testNPCStates
-	}
-
-	return nil
-}
-
 // Implement [channeld.MergeableChannelData]
 func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) error {
 	srcData, ok := src.(*TestRepChannelData)
 	if !ok {
 		return errors.New("src is not a TestRepChannelData")
-	}
-
-	if spatialNotifier != nil {
-		// src = the incoming update, dst = existing channel data
-		for netId, newActorState := range srcData.ActorStates {
-			oldActorState, exists := dst.ActorStates[netId]
-			if exists {
-				if newActorState.ReplicatedMovement != nil && newActorState.ReplicatedMovement.Location != nil &&
-					oldActorState.ReplicatedMovement != nil && oldActorState.ReplicatedMovement.Location != nil {
-					unreal.CheckSpatialInfoChange(netId, newActorState.ReplicatedMovement.Location, oldActorState.ReplicatedMovement.Location, spatialNotifier)
-				}
-			}
-		}
-
-		for netId, newSceneCompState := range srcData.SceneComponentStates {
-			oldSceneCompState, exists := dst.SceneComponentStates[netId]
-			if exists {
-				if newSceneCompState.RelativeLocation != nil && oldSceneCompState.RelativeLocation != nil {
-					unreal.CheckSpatialInfoChange(netId, newSceneCompState.RelativeLocation, oldSceneCompState.RelativeLocation, spatialNotifier)
-				}
-			}
-		}
 	}
 
 	if srcData.GameState != nil {

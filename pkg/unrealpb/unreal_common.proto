@@ -27,15 +27,6 @@ enum MessageType {
     // See @DestroyObjectMessage
     DESTROY = 104;
 
-    // Used by channeld/spatial server to request/respond the context of handover.
-    //See @GetHandoverContextMessage and @GetHandoverContextResultMessage
-    HANDOVER_CONTEXT = 105;
-
-    // Get the full-exported UnrealObjectRefs by the specific NetworkGUIDs.
-    // Used by UE clients to spawn objects from ChannelDataUpdate.
-    // See @GetUnrealObjectRefMessage and @GetUnrealObjectRefResultMessage
-    GET_UNREAL_OBJECT_REF = 106;
-
     // Used by the UE servers to sync the NetId of the static and well-known objects.
     SYNC_NET_ID = 107;
 
@@ -111,21 +102,6 @@ message HandoverContext {
     UnrealObjectRef obj = 1;
     // The client that owns the object. Only set for Pawns and PlayerControllers.
     optional uint32 clientConnId = 2;
-}
-
-// When a handover is potentially happening, channeld asks the spatial server about the context of a handover.
-message GetHandoverContextMessage {
-    uint32 netId = 1;
-    uint32 srcChannelId = 2;
-    uint32 dstChannelId = 3;
-}
-
-// The spatial server answers channeld about which objects should be contained in the handover data.
-message GetHandoverContextResultMessage {
-    uint32 netId = 1;
-    uint32 srcChannelId = 2;
-    uint32 dstChannelId = 3;
-    repeated HandoverContext context = 4;
 }
 
 // Wrapped in ChannelDataHandoverMessage.data

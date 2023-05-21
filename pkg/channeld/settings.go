@@ -44,8 +44,6 @@ type GlobalSettingsType struct {
 	SpatialControllerConfig NullableString
 	SpatialChannelIdStart   common.ChannelId
 	EntityChannelIdStart    common.ChannelId
-	// Use group-based handover
-	UseHandoverV2 bool
 
 	ChannelSettings map[channeldpb.ChannelType]ChannelSettingsType
 
@@ -87,7 +85,6 @@ var GlobalSettings = GlobalSettingsType{
 	MaxFsmDisallowed:        10,
 	SpatialChannelIdStart:   0x00010000,
 	EntityChannelIdStart:    0x00080000,
-	UseHandoverV2:           true,
 	ChannelSettings: map[channeldpb.ChannelType]ChannelSettingsType{
 		channeldpb.ChannelType_GLOBAL: {
 			TickIntervalMs:                 10,
