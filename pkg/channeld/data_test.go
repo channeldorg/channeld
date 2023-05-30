@@ -67,6 +67,32 @@ func testChannelDataMessageProcessor(msg common.Message) (common.Message, error)
 	return updateMsg, err
 }
 
+// Reproduce the issue that the message dequeued is not in the same order as the message is queued
+func TestMessageReceiveOrder(t *testing.T) {
+	NUM := 100
+	inMsgQueue := make(chan struct {
+		order int
+		time  ChannelTime
+	}, NUM)
+	startTime := time.Now()
+
+	for i := 0; i < NUM; i++ {
+		go func(order int) {
+			inMsgQueue <- struct {
+				order int
+				time  ChannelTime
+			}{order: order, time: ChannelTime(time.Since(startTime))}
+		}(i)
+	}
+
+	time.Sleep(10 * time.Millisecond)
+
+	for len(inMsgQueue) > 0 {
+		msg := <-inMsgQueue
+		fmt.Printf("%d: %v\n", msg.order, msg.time)
+	}
+}
+
 // See the test case in [the design doc](doc/design.md#fan-out)
 // TODO: add test cases with FieldMasks (no fan-out if no property is updated)
 func TestFanOutChannelData(t *testing.T) {
@@ -89,11 +115,13 @@ func TestFanOutChannelData(t *testing.T) {
 	// We need to manually tick the channel. Set the interval to a very large value.
 	testChannel.tickInterval = time.Hour
 
-	c0.SubscribeToChannel(testChannel, nil)
+	cs, _ := c0.SubscribeToChannel(testChannel, nil)
+	assert.NotNil(t, cs)
 	subOptions1 := &channeldpb.ChannelSubscriptionOptions{
 		FanOutIntervalMs: proto.Uint32(50),
 	}
-	c1.SubscribeToChannel(testChannel, subOptions1)
+	cs, _ = c1.SubscribeToChannel(testChannel, subOptions1)
+	assert.NotNil(t, cs)
 
 	channelStartTime := ChannelTime(100 * int64(time.Millisecond))
 	// F0 = the whole data
@@ -105,7 +133,8 @@ func TestFanOutChannelData(t *testing.T) {
 	subOptions2 := &channeldpb.ChannelSubscriptionOptions{
 		FanOutIntervalMs: proto.Uint32(100),
 	}
-	c2.SubscribeToChannel(testChannel, subOptions2)
+	cs, _ = c2.SubscribeToChannel(testChannel, subOptions2)
+	assert.NotNil(t, cs)
 	// F1 = no data, F7 = the whole data
 	testChannel.tickData(channelStartTime.AddMs(50))
 	assert.Equal(t, 1, len(c1.testQueue()))
@@ -114,20 +143,20 @@ func TestFanOutChannelData(t *testing.T) {
 
 	// U1 arrives
 	u1 := &testpb.TestChannelDataMessage{Text: "b"}
-	testChannel.Data().OnUpdate(u1, channelStartTime.AddMs(60), c1.Id(), nil)
+	testChannel.Data().OnUpdate(u1, channelStartTime.AddMs(60), c0.Id(), nil)
 
 	// F2 = U1
 	testChannel.tickData(channelStartTime.AddMs(100))
 	assert.Equal(t, 2, len(c1.testQueue()))
 	assert.Equal(t, 1, len(c2.testQueue()))
-	// U1 doesn't have "ClientConnNum" property
+	// U1 doesn't have "Num" property
 	assert.NotEqualValues(t, dataMsg.Num, c1.latestMsg().(*testpb.TestChannelDataMessage).Num)
 	assert.EqualValues(t, "b", c1.latestMsg().(*testpb.TestChannelDataMessage).Text)
 	assert.EqualValues(t, "a", c2.latestMsg().(*testpb.TestChannelDataMessage).Text)
 
 	// U2 arrives
 	u2 := &testpb.TestChannelDataMessage{Text: "c"}
-	testChannel.Data().OnUpdate(u2, channelStartTime.AddMs(120), c2.Id(), nil)
+	testChannel.Data().OnUpdate(u2, channelStartTime.AddMs(120), c0.Id(), nil)
 
 	// F8=U1+U2; F3 = U2
 	testChannel.tickData(channelStartTime.AddMs(150))
@@ -311,7 +340,7 @@ func TestDataMergeOptions(t *testing.T) {
 
 func TestReflectChannelData(t *testing.T) {
 	RegisterChannelDataType(channeldpb.ChannelType_TEST, &testpb.TestChannelDataMessage{})
-	globalDataMsg, err := ReflectChannelDataMessage(channeldpb.ChannelType_TEST, nil)
+	globalDataMsg, err := ReflectChannelDataMessage(channeldpb.ChannelType_TEST)
 	assert.NoError(t, err)
 	assert.NotNil(t, globalDataMsg)
 	assert.IsType(t, &testpb.TestChannelDataMessage{}, globalDataMsg)

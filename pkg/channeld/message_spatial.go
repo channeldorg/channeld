@@ -51,7 +51,7 @@ func handleUpdateSpatialInterest(ctx MessageContext) {
 
 	clientConn := GetConnection(ConnectionId(msg.ConnId))
 	if clientConn == nil {
-		ctx.Connection.Logger().Error("cannot find client connection to update spatial interest", zap.Uint32("connId", msg.ConnId))
+		ctx.Connection.Logger().Error("cannot find client connection to update spatial interest", zap.Uint32("clientConnId", msg.ConnId))
 		return
 	}
 
@@ -66,10 +66,12 @@ func handleUpdateSpatialInterest(ctx MessageContext) {
 		dampSettings := getSpatialDampingSettings(dist)
 		if dampSettings == nil {
 			channelsToSub[chId] = &channeldpb.ChannelSubscriptionOptions{
+				// DataAccess:       Pointer(channeldpb.ChannelDataAccess_NO_ACCESS),
 				FanOutIntervalMs: proto.Uint32(GlobalSettings.GetChannelSettings(channeldpb.ChannelType_SPATIAL).DefaultFanOutIntervalMs),
 			}
 		} else {
 			channelsToSub[chId] = &channeldpb.ChannelSubscriptionOptions{
+				// DataAccess:       Pointer(channeldpb.ChannelDataAccess_NO_ACCESS),
 				FanOutIntervalMs: proto.Uint32(dampSettings.FanOutIntervalMs),
 				DataFieldMasks:   dampSettings.DataFieldMasks,
 			}
@@ -77,9 +79,7 @@ func handleUpdateSpatialInterest(ctx MessageContext) {
 	}
 
 	existingsSubs := make(map[common.ChannelId]*channeldpb.ChannelSubscriptionOptions)
-	clientConn.spatialSubscriptions.Range(func(key, value interface{}) bool {
-		chId := key.(common.ChannelId)
-		subOptions := value.(*channeldpb.ChannelSubscriptionOptions)
+	clientConn.spatialSubscriptions.Range(func(chId common.ChannelId, subOptions *channeldpb.ChannelSubscriptionOptions) bool {
 		existingsSubs[chId] = subOptions
 		return true
 	})

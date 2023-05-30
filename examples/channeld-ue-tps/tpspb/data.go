@@ -10,6 +10,7 @@ import (
 	"github.com/metaworking/channeld/pkg/unrealpb"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 /*
@@ -56,108 +57,11 @@ func (data *TestRepChannelData) Init() error {
 }
 */
 
-// Implement [channeld.ChannelDataCollector]
-func (to *TestRepChannelData) CollectStates(netId uint32, src common.Message) error {
-	from, ok := src.(*TestRepChannelData)
-	if !ok {
-		return errors.New("src is not a TestRepChannelData")
-	}
-
-	// to.Init()
-	actorState, exists := from.ActorStates[netId]
-	if exists {
-		if to.ActorStates == nil {
-			to.ActorStates = make(map[uint32]*unrealpb.ActorState)
-		}
-		to.ActorStates[netId] = actorState
-	}
-
-	pawnState, exists := from.PawnStates[netId]
-	if exists {
-		if to.PawnStates == nil {
-			to.PawnStates = make(map[uint32]*unrealpb.PawnState)
-		}
-		to.PawnStates[netId] = pawnState
-	}
-
-	characterState, exists := from.CharacterStates[netId]
-	if exists {
-		if to.CharacterStates == nil {
-			to.CharacterStates = make(map[uint32]*unrealpb.CharacterState)
-		}
-		to.CharacterStates[netId] = characterState
-	}
-
-	playerState, exists := from.PlayerStates[netId]
-	if exists {
-		if to.PlayerStates == nil {
-			to.PlayerStates = make(map[uint32]*unrealpb.PlayerState)
-		}
-		to.PlayerStates[netId] = playerState
-	}
-
-	controllerState, exists := from.ControllerStates[netId]
-	if exists {
-		if to.ControllerStates == nil {
-			to.ControllerStates = make(map[uint32]*unrealpb.ControllerState)
-		}
-		to.ControllerStates[netId] = controllerState
-	}
-
-	playerControllerStates, exists := from.PlayerControllerStates[netId]
-	if exists {
-		if to.PlayerControllerStates == nil {
-			to.PlayerControllerStates = make(map[uint32]*unrealpb.PlayerControllerState)
-		}
-		to.PlayerControllerStates[netId] = playerControllerStates
-	}
-
-	testRepPlayerControllerStates, exists := from.TestRepPlayerControllerStates[netId]
-	if exists {
-		if to.TestRepPlayerControllerStates == nil {
-			to.TestRepPlayerControllerStates = make(map[uint32]*TestRepPlayerControllerState)
-		}
-		to.TestRepPlayerControllerStates[netId] = testRepPlayerControllerStates
-	}
-
-	testNPCStates, exists := from.TestNPCStates[netId]
-	if exists {
-		if to.TestNPCStates == nil {
-			to.TestNPCStates = make(map[uint32]*TestNPCState)
-		}
-		to.TestNPCStates[netId] = testNPCStates
-	}
-
-	return nil
-}
-
 // Implement [channeld.MergeableChannelData]
 func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) error {
 	srcData, ok := src.(*TestRepChannelData)
 	if !ok {
 		return errors.New("src is not a TestRepChannelData")
-	}
-
-	if spatialNotifier != nil {
-		// src = the incoming update, dst = existing channel data
-		for netId, newActorState := range srcData.ActorStates {
-			oldActorState, exists := dst.ActorStates[netId]
-			if exists {
-				if newActorState.ReplicatedMovement != nil && newActorState.ReplicatedMovement.Location != nil &&
-					oldActorState.ReplicatedMovement != nil && oldActorState.ReplicatedMovement.Location != nil {
-					unreal.CheckSpatialInfoChange(netId, newActorState.ReplicatedMovement.Location, oldActorState.ReplicatedMovement.Location, spatialNotifier)
-				}
-			}
-		}
-
-		for netId, newSceneCompState := range srcData.SceneComponentStates {
-			oldSceneCompState, exists := dst.SceneComponentStates[netId]
-			if exists {
-				if newSceneCompState.RelativeLocation != nil && oldSceneCompState.RelativeLocation != nil {
-					unreal.CheckSpatialInfoChange(netId, newSceneCompState.RelativeLocation, oldSceneCompState.RelativeLocation, spatialNotifier)
-				}
-			}
-		}
 	}
 
 	if srcData.GameState != nil {
@@ -317,4 +221,132 @@ func (dst *TestRepChannelData) Merge(src common.ChannelDataMessage, options *cha
 	}
 
 	return nil
+}
+
+// Implement [channeld.MergeableChannelData]
+func (dstData *EntityChannelData) Merge(src common.ChannelDataMessage, options *channeldpb.ChannelDataMergeOptions, spatialNotifier common.SpatialInfoChangedNotifier) error {
+	srcData, ok := src.(*EntityChannelData)
+	if !ok {
+		return errors.New("src is not a EntityChannelData")
+	}
+
+	hasHandover := false
+	var oldInfo, newInfo *common.SpatialInfo
+	if spatialNotifier != nil && dstData.ObjRef != nil {
+		// src = the incoming update, dst = existing channel data
+		if srcData.ActorState != nil && srcData.ActorState.ReplicatedMovement != nil && srcData.ActorState.ReplicatedMovement.Location != nil &&
+			dstData.ActorState != nil && dstData.ActorState.ReplicatedMovement != nil && dstData.ActorState.ReplicatedMovement.Location != nil {
+			hasHandover, oldInfo, newInfo = unreal.CheckEntityHandover(*dstData.ObjRef.NetGUID, srcData.ActorState.ReplicatedMovement.Location, dstData.ActorState.ReplicatedMovement.Location)
+		}
+
+		if !hasHandover && srcData.SceneComponentState != nil && srcData.SceneComponentState.RelativeLocation != nil &&
+			dstData.SceneComponentState != nil && dstData.SceneComponentState.RelativeLocation != nil {
+			hasHandover, oldInfo, newInfo = unreal.CheckEntityHandover(*dstData.ObjRef.NetGUID, srcData.SceneComponentState.RelativeLocation, dstData.SceneComponentState.RelativeLocation)
+		}
+	}
+
+	/* Merging EntityChannelData directly may cause the accumulation of objRef.context,
+	 * so we should remove the objRef from source first.
+	 */
+	srcData.ObjRef = nil
+	proto.Merge(dstData, srcData)
+
+	if hasHandover {
+		spatialNotifier.Notify(*oldInfo, *newInfo,
+			func(srcChannelId common.ChannelId, dstChannelId common.ChannelId, handoverData interface{}) {
+				entityId, ok := handoverData.(*channeld.EntityId)
+				if !ok {
+					channeld.RootLogger().Error("handover data is not an entityId",
+						zap.Uint32("srcChannelId", uint32(srcChannelId)),
+						zap.Uint32("dstChannelId", uint32(dstChannelId)),
+					)
+					return
+				}
+				*entityId = channeld.EntityId(*dstData.ObjRef.NetGUID)
+
+				/* We can't afford to wait in the message queue to send the handover message!
+				// Back to the source spatial channel's goroutine
+				srcChannel.Execute(func(ch *channeld.Channel) {
+
+				})
+				*/
+
+				/*
+					// Read the UnrealObjectRef in the source spatial channel (from the entity channel's goroutine)
+					srcChannel := channeld.GetChannel(srcChannelId)
+					if srcChannel == nil {
+						handoverData <- nil
+						return
+					}
+
+					if srcChannel.GetDataMessage() == nil {
+						handoverData <- nil
+						return
+					}
+
+					spatialChData, ok := srcChannel.GetDataMessage().(*unrealpb.SpatialChannelData)
+					if !ok {
+						handoverData <- nil
+						return
+					}
+
+					entities := spatialChData.GetEntities()
+					if entities == nil {
+						handoverData <- nil
+						return
+					}
+
+					// CAUTION: running outside the source spatial channel's goroutine may cause concurrent map read/write error!
+					entity, exists := entities[netId]
+					if !exists {
+						handoverData <- nil
+						return
+					}
+
+					handoverData <- &unrealpb.HandoverData{
+						Context: []*unrealpb.HandoverContext{
+							{
+								Obj: entity.ObjRef,
+								// ClientConnId: oldActorState.OwningConnId,
+							},
+						},
+					}
+				*/
+			},
+		)
+	}
+
+	return nil
+}
+
+// Implement [channeld.HandoverDataMerger]
+func (entityData *EntityChannelData) MergeTo(msg common.Message, fullData bool) error {
+	handoverData, ok := msg.(*unrealpb.SpatialChannelData)
+	if !ok {
+		return errors.New("msg is not a SpatialChannelData")
+	}
+
+	entityState := &unrealpb.SpatialEntityState{
+		ObjRef: entityData.ObjRef,
+	}
+
+	if fullData {
+		anyData, err := anypb.New(entityData)
+		if err != nil {
+			return err
+		}
+		entityState.EntityData = anyData
+	}
+
+	if handoverData.Entities == nil {
+		handoverData.Entities = make(map[uint32]*unrealpb.SpatialEntityState)
+	}
+	handoverData.Entities[*entityData.ObjRef.NetGUID] = entityState
+
+	return nil
+}
+
+// Implement [unreal.UnrealObjectEntityData]
+func (entityData *EntityChannelData) SetObjRef(objRef *unrealpb.UnrealObjectRef) {
+	entityData.ObjRef = objRef
 }

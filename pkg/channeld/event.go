@@ -10,15 +10,16 @@ import (
 var Event_GlobalChannelPossessed = &Event[*Channel]{}
 var Event_GlobalChannelUnpossessed = &Event[struct{}]{}
 var Event_ChannelCreated = &Event[*Channel]{}
+var Event_ChannelRemoving = &Event[*Channel]{}
 var Event_ChannelRemoved = &Event[common.ChannelId]{}
 
-type AuthFailedEventData struct {
+type AuthEventData struct {
 	AuthResult            channeldpb.AuthResultMessage_AuthResult
 	Connection            ConnectionInChannel
 	PlayerIdentifierToken string
 }
 
-var Event_AuthFailed = &Event[AuthFailedEventData]{}
+var Event_AuthComplete = &Event[AuthEventData]{}
 
 var Event_FsmDisallowed = &Event[*Connection]{}
 
@@ -26,6 +27,7 @@ type EventData interface {
 }
 
 type eventHandler[T EventData] struct {
+	owner       interface{}
 	handlerFunc func(data T)
 	triggerOnce bool
 }
@@ -36,12 +38,7 @@ type Event[T EventData] struct {
 }
 
 func (e *Event[T]) Listen(handlerFunc func(data T)) {
-	e.handlersLock.Lock()
-	defer e.handlersLock.Unlock()
-	if e.handlers == nil {
-		e.handlers = make([]*eventHandler[T], 0)
-	}
-	e.handlers = append(e.handlers, &eventHandler[T]{handlerFunc, false})
+	e.ListenFor(nil, handlerFunc)
 }
 
 func (e *Event[T]) ListenOnce(handlerFunc func(data T)) {
@@ -50,7 +47,26 @@ func (e *Event[T]) ListenOnce(handlerFunc func(data T)) {
 	if e.handlers == nil {
 		e.handlers = make([]*eventHandler[T], 0)
 	}
-	e.handlers = append(e.handlers, &eventHandler[T]{handlerFunc, true})
+	e.handlers = append(e.handlers, &eventHandler[T]{nil, handlerFunc, true})
+}
+
+func (e *Event[T]) ListenFor(owner interface{}, handlerFunc func(data T)) {
+	e.handlersLock.Lock()
+	defer e.handlersLock.Unlock()
+	if e.handlers == nil {
+		e.handlers = make([]*eventHandler[T], 0)
+	}
+	e.handlers = append(e.handlers, &eventHandler[T]{owner, handlerFunc, false})
+}
+
+func (e *Event[T]) UnlistenFor(owner interface{}) {
+	e.handlersLock.Lock()
+	defer e.handlersLock.Unlock()
+	for i, handler := range e.handlers {
+		if handler.owner == owner {
+			e.handlers = append(e.handlers[:i], e.handlers[i+1:]...)
+		}
+	}
 }
 
 func (e *Event[T]) Wait() chan T {

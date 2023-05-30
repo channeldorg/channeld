@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/metaworking/channeld/pkg/channeldpb"
+	"github.com/metaworking/channeld/pkg/common"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
@@ -19,27 +20,39 @@ type ChannelSubscription struct {
 
 func defaultSubOptions(t channeldpb.ChannelType) *channeldpb.ChannelSubscriptionOptions {
 	options := &channeldpb.ChannelSubscriptionOptions{
-		DataAccess:           Pointer(channeldpb.ChannelDataAccess_WRITE_ACCESS),
+		DataAccess:           Pointer(channeldpb.ChannelDataAccess_READ_ACCESS),
 		DataFieldMasks:       make([]string, 0),
 		FanOutDelayMs:        proto.Int32(GlobalSettings.GetChannelSettings(t).DefaultFanOutDelayMs),
 		FanOutIntervalMs:     proto.Uint32(GlobalSettings.GetChannelSettings(t).DefaultFanOutIntervalMs),
-		SkipSelfUpdateFanOut: proto.Bool(false),
+		SkipSelfUpdateFanOut: proto.Bool(true),
+		SkipFirstFanOut:      proto.Bool(false),
 	}
 	return options
 }
 
-func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) *ChannelSubscription {
+func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) (*ChannelSubscription, bool) {
+	if c.IsClosing() {
+		return nil, false
+	}
+
 	defer func() {
 		ch.connectionsLock.Unlock()
 	}()
 	ch.connectionsLock.Lock()
 
-	if ch.subscribedConnections[c] != nil {
-		c.Logger().Info("already subscribed", zap.String("channel", ch.String()))
-		return nil
+	cs, exists := ch.subscribedConnections[c]
+	if exists {
+		if options != nil {
+			c.Logger().Debug("already subed to channel, the sub options will be merged",
+				zap.String("channelType", ch.channelType.String()),
+				zap.Uint32("channelId", uint32(ch.id)),
+			)
+			proto.Merge(&cs.options, options)
+		}
+		return cs, exists
 	}
 
-	cs := &ChannelSubscription{
+	cs = &ChannelSubscription{
 		options: *defaultSubOptions(ch.channelType),
 		// Send the whole data to the connection when subscribed
 		//fanOutDataMsg: ch.Data().msg,
@@ -52,7 +65,7 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.Channel
 
 	cs.fanOutElement = ch.fanOutQueue.PushFront(&fanOutConnection{
 		conn:           c,
-		hadFirstFanOut: false,
+		hadFirstFanOut: *cs.options.SkipFirstFanOut,
 		// Delay the first fanout, to solve the spawn & update order issue in Mirror & UE.
 		lastFanOutTime: ch.GetTime().OffsetMs(*cs.options.FanOutDelayMs),
 	})
@@ -79,8 +92,9 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.Channel
 		zap.Uint32("fanOutIntervalMs", *cs.options.FanOutIntervalMs),
 		zap.Int32("fanOutDelayMs", *cs.options.FanOutDelayMs),
 		zap.Bool("skipSelfUpdateFanOut", *cs.options.SkipSelfUpdateFanOut),
+		zap.Bool("skipFirstFanOut", *cs.options.SkipFirstFanOut),
 	)
-	return cs
+	return cs, false
 }
 
 func (c *Connection) UnsubscribeFromChannel(ch *Channel) (*channeldpb.ChannelSubscriptionOptions, error) {
@@ -146,6 +160,9 @@ func (c *Connection) sendSubscribed(ctx MessageContext, ch *Channel, connToSub C
 }
 
 func (c *Connection) sendUnsubscribed(ctx MessageContext, ch *Channel, connToUnsub *Connection, stubId uint32) {
+	if connToUnsub == nil {
+		connToUnsub = c
+	}
 	ctx.ChannelId = uint32(ch.id)
 	ctx.StubId = stubId
 	ctx.MsgType = channeldpb.MessageType_UNSUB_FROM_CHANNEL
@@ -157,6 +174,10 @@ func (c *Connection) sendUnsubscribed(ctx MessageContext, ch *Channel, connToUns
 	c.Send(ctx)
 }
 
-func (ch *Channel) AddConnectionSubscribedNotification(connId ConnectionId) {
-
+func (c *Connection) HasInterestIn(spatialChId common.ChannelId) bool {
+	if c.spatialSubscriptions == nil {
+		return false
+	}
+	_, exists := c.spatialSubscriptions.Load(spatialChId)
+	return exists
 }

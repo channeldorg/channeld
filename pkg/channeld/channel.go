@@ -4,7 +4,6 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
-	"math"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/metaworking/channeld/pkg/channeldpb"
 	"github.com/metaworking/channeld/pkg/common"
+	"github.com/puzpuzpuz/xsync/v2"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
@@ -50,10 +50,12 @@ type ConnectionInChannel interface {
 	Close()
 	IsClosing() bool
 	Send(ctx MessageContext)
-	SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) *ChannelSubscription
+	// Returns the subscription instance if successfully subscribed, and true if the subscription already exists.
+	SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) (*ChannelSubscription, bool)
 	UnsubscribeFromChannel(ch *Channel) (*channeldpb.ChannelSubscriptionOptions, error)
 	sendSubscribed(ctx MessageContext, ch *Channel, connToSub ConnectionInChannel, stubId uint32, subOptions *channeldpb.ChannelSubscriptionOptions)
 	sendUnsubscribed(ctx MessageContext, ch *Channel, connToUnsub *Connection, stubId uint32)
+	HasInterestIn(spatialChId common.ChannelId) bool
 	Logger() *Logger
 	RemoteAddr() net.Addr
 }
@@ -72,6 +74,7 @@ type Channel struct {
 	// The ID of the client connection that causes the latest ChannelDataUpdate
 	latestDataUpdateConnId ConnectionId
 	spatialNotifier        common.SpatialInfoChangedNotifier
+	entityController       EntityGroupController
 	inMsgQueue             chan channelMessage
 	fanOutQueue            *list.List
 	// Time since channel created
@@ -91,19 +94,25 @@ var nextChannelId common.ChannelId
 var nextSpatialChannelId common.ChannelId
 
 // Cache the status so we don't have to check all the index in the sync map, until a channel is removed.
-var nonSpatialchannelFull bool = false
+var nonSpatialChannelFull bool = false
 var spatialChannelFull bool = false
 
-var allChannels sync.Map //map[ChannelId]*Channel
+var allChannels *xsync.MapOf[common.ChannelId, *Channel]
 var globalChannel *Channel
 
 func InitChannels() {
+	if allChannels != nil {
+		return
+	}
+
+	allChannels = xsync.NewTypedMapOf[common.ChannelId, *Channel](UintIdHasher[common.ChannelId]())
+
 	nextChannelId = 0
 	nextSpatialChannelId = GlobalSettings.SpatialChannelIdStart
 	var err error
 	globalChannel, err = CreateChannel(channeldpb.ChannelType_GLOBAL, nil)
 	if err != nil {
-		rootLogger.Panic("Failed to create global channel", zap.Error(err))
+		rootLogger.Panic("failed to create global channel", zap.Error(err))
 	}
 
 	for chType, settings := range GlobalSettings.ChannelSettings {
@@ -128,7 +137,7 @@ func InitChannels() {
 func GetChannel(id common.ChannelId) *Channel {
 	ch, ok := allChannels.Load(id)
 	if ok {
-		return ch.(*Channel)
+		return ch
 	} else {
 		return nil
 	}
@@ -136,6 +145,7 @@ func GetChannel(id common.ChannelId) *Channel {
 
 var ErrNonSpatialChannelFull = errors.New("non-spatial channels are full")
 var ErrSpatialChannelFull = errors.New("spatial channels are full")
+var ErrEntityChannelFull = errors.New("entity channels are full")
 
 func createChannelWithId(channelId common.ChannelId, t channeldpb.ChannelType, owner ConnectionInChannel) *Channel {
 	ch := &Channel{
@@ -159,8 +169,10 @@ func createChannelWithId(channelId common.ChannelId, t channeldpb.ChannelType, o
 		removing: 0,
 	}
 
-	if ch.channelType == channeldpb.ChannelType_SPATIAL {
-		ch.spatialNotifier = spatialController
+	if ch.channelType == channeldpb.ChannelType_ENTITY {
+		ch.spatialNotifier = GetSpatialController()
+		ch.entityController = &FlatEntityGroupController{}
+		ch.entityController.Initialize(ch)
 	}
 
 	if ch.HasOwner() {
@@ -178,6 +190,7 @@ func createChannelWithId(channelId common.ChannelId, t channeldpb.ChannelType, o
 	return ch
 }
 
+// Go-routine safe - should only be called in the GLOBAL channel
 func CreateChannel(t channeldpb.ChannelType, owner ConnectionInChannel) (*Channel, error) {
 	if t == channeldpb.ChannelType_GLOBAL && globalChannel != nil {
 		return nil, errors.New("failed to create GLOBAL channel as it already exists")
@@ -185,27 +198,40 @@ func CreateChannel(t channeldpb.ChannelType, owner ConnectionInChannel) (*Channe
 
 	var channelId common.ChannelId
 	var ok bool
-	if t != channeldpb.ChannelType_SPATIAL {
-		if nonSpatialchannelFull {
-			return nil, ErrNonSpatialChannelFull
-		}
-		channelId, ok = GetNextIdSync(&allChannels, nextChannelId, 1, GlobalSettings.SpatialChannelIdStart-1)
-		if ok {
-			nextChannelId = channelId
-		} else {
-			nonSpatialchannelFull = true
-			return nil, ErrNonSpatialChannelFull
-		}
-	} else {
+	if t == channeldpb.ChannelType_SPATIAL {
 		if spatialChannelFull {
 			return nil, ErrSpatialChannelFull
 		}
-		channelId, ok = GetNextIdSync(&allChannels, nextSpatialChannelId, GlobalSettings.SpatialChannelIdStart, math.MaxUint32)
+		channelId, ok = GetNextIdTyped[common.ChannelId, *Channel](allChannels, nextSpatialChannelId, GlobalSettings.SpatialChannelIdStart, GlobalSettings.EntityChannelIdStart-1)
 		if ok {
 			nextSpatialChannelId = channelId
 		} else {
 			spatialChannelFull = true
 			return nil, ErrSpatialChannelFull
+		}
+		/* Entity channels use fixed channelId (= netId)
+		} else if t == channeldpb.ChannelType_ENTITY {
+			if entityChannelFull {
+				return nil, ErrEntityChannelFull
+			}
+			channelId, ok = GetNextIdTyped[common.ChannelId, *Channel](allChannels, nextEntityChannelId, GlobalSettings.EntityChannelIdStart, math.MaxUint32)
+			if ok {
+				nextEntityChannelId = channelId
+			} else {
+				entityChannelFull = true
+				return nil, ErrEntityChannelFull
+			}
+		*/
+	} else {
+		if nonSpatialChannelFull {
+			return nil, ErrNonSpatialChannelFull
+		}
+		channelId, ok = GetNextIdTyped[common.ChannelId, *Channel](allChannels, nextChannelId, 1, GlobalSettings.SpatialChannelIdStart-1)
+		if ok {
+			nextChannelId = channelId
+		} else {
+			nonSpatialChannelFull = true
+			return nil, ErrNonSpatialChannelFull
 		}
 	}
 
@@ -213,6 +239,13 @@ func CreateChannel(t channeldpb.ChannelType, owner ConnectionInChannel) (*Channe
 }
 
 func RemoveChannel(ch *Channel) {
+	Event_ChannelRemoving.Broadcast(ch)
+
+	if ch.channelType == channeldpb.ChannelType_ENTITY {
+		ch.entityController.Uninitialize(ch)
+		Event_AuthComplete.UnlistenFor(ch)
+	}
+
 	atomic.AddInt32(&ch.removing, 1)
 	close(ch.inMsgQueue)
 	allChannels.Delete(ch.id)
@@ -220,14 +253,23 @@ func RemoveChannel(ch *Channel) {
 	if ch.channelType == channeldpb.ChannelType_SPATIAL {
 		spatialChannelFull = false
 		nextSpatialChannelId = ch.id
+	} else if ch.channelType == channeldpb.ChannelType_ENTITY {
 	} else {
-		nonSpatialchannelFull = false
+		nonSpatialChannelFull = false
 		nextChannelId = ch.id
 	}
 
 	channelNum.WithLabelValues(ch.channelType.String()).Dec()
 
 	Event_ChannelRemoved.Broadcast(ch.id)
+}
+
+func (ch *Channel) Id() common.ChannelId {
+	return ch.id
+}
+
+func (ch *Channel) Type() channeldpb.ChannelType {
+	return ch.channelType
 }
 
 func (ch *Channel) IsRemoving() bool {
@@ -283,6 +325,14 @@ func (ch *Channel) PutMessageInternal(msgType channeldpb.MessageType, msg common
 	}, handler: entry.handler}
 }
 
+// Runs a function in the channel's go-routine.
+// Any code that modifies the channel's data outside the the channel's go-routine should be run in this way.
+func (ch *Channel) Execute(callback func(ch *Channel)) {
+	ch.inMsgQueue <- channelMessage{handler: func(_ MessageContext) {
+		callback(ch)
+	}}
+}
+
 func (ch *Channel) GetTime() ChannelTime {
 	return ChannelTime(time.Since(ch.startTime))
 }
@@ -318,6 +368,13 @@ func (ch *Channel) Tick() {
 func (ch *Channel) tickMessages(tickStart time.Time) {
 	for len(ch.inMsgQueue) > 0 {
 		cm := <-ch.inMsgQueue
+
+		// No message in the context, just execute the handler.
+		if cm.ctx.Msg == nil {
+			cm.handler(cm.ctx)
+			continue
+		}
+
 		if cm.ctx.Connection == nil {
 			ch.Logger().Warn("drops message as the sender is lost", zap.Uint32("msgType", uint32(cm.ctx.MsgType)))
 			continue

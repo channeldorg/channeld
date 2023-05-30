@@ -6,7 +6,6 @@ import (
 	"github.com/metaworking/channeld/pkg/channeldpb"
 	"github.com/metaworking/channeld/pkg/common"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 )
 
 // The context of a message for both sending and receiving
@@ -17,6 +16,7 @@ type MessageContext struct {
 	Broadcast uint32 //channeldpb.BroadcastType
 	StubId    uint32
 	// The original channelId in the Packet, could be different from Channel.id.
+	// Used for both send and receive.
 	ChannelId uint32
 
 	// The connection that received the message. Required for BroadcastType_ALL_BUT_SENDER but not for sending.
@@ -52,6 +52,9 @@ var MessageMap = map[channeldpb.MessageType]*messageMapEntry{
 	channeldpb.MessageType_QUERY_SPATIAL_CHANNEL:     {&channeldpb.QuerySpatialChannelMessage{}, handleQuerySpatialChannel},
 	channeldpb.MessageType_DEBUG_GET_SPATIAL_REGIONS: {&channeldpb.DebugGetSpatialRegionsMessage{}, handleGetSpatialRegionsMessage},
 	channeldpb.MessageType_UPDATE_SPATIAL_INTEREST:   {&channeldpb.UpdateSpatialInterestMessage{}, handleUpdateSpatialInterest},
+	channeldpb.MessageType_CREATE_ENTITY_CHANNEL:     {&channeldpb.CreateEntityChannelMessage{}, handleCreateEntityChannel},
+	channeldpb.MessageType_ENTITY_GROUP_ADD:          {&channeldpb.AddEntityGroupMessage{}, handleAddEntityGroup},
+	channeldpb.MessageType_ENTITY_GROUP_REMOVE:       {&channeldpb.RemoveEntityGroupMessage{}, handleRemoveEntityGroup},
 }
 
 func RegisterMessageHandler(msgType uint32, msg common.Message, handler MessageHandlerFunc) {
@@ -267,15 +270,6 @@ func handleAuth(ctx MessageContext) {
 				ctx.Connection.Logger().Error("failed to do auth", zap.Error(err))
 				ctx.Connection.Close()
 			} else {
-
-				if authResult != channeldpb.AuthResultMessage_SUCCESSFUL {
-					Event_AuthFailed.Broadcast(AuthFailedEventData{
-						AuthResult:            authResult,
-						Connection:            ctx.Connection,
-						PlayerIdentifierToken: msg.PlayerIdentifierToken,
-					})
-				}
-
 				onAuthComplete(ctx, authResult, msg.PlayerIdentifierToken)
 			}
 		}()
@@ -305,6 +299,12 @@ func onAuthComplete(ctx MessageContext, authResult channeldpb.AuthResultMessage_
 		ctx.StubId = 0
 		globalChannel.ownerConnection.Send(ctx)
 	}
+
+	Event_AuthComplete.Broadcast(AuthEventData{
+		AuthResult:            authResult,
+		Connection:            ctx.Connection,
+		PlayerIdentifierToken: pit,
+	})
 }
 
 func handleCreateChannel(ctx MessageContext) {
@@ -379,7 +379,7 @@ func handleCreateChannel(ctx MessageContext) {
 	}
 
 	// Subscribe to channel after creation
-	cs := ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
+	cs, _ := ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
 	if cs != nil {
 		ctx.Connection.sendSubscribed(ctx, newChannel, ctx.Connection, 0, &cs.options)
 	}
@@ -423,7 +423,7 @@ func handleCreateSpatialChannel(ctx MessageContext, msg *channeldpb.CreateChanne
 
 	for _, newChannel := range channels {
 		// Subscribe to channel after creation
-		cs := ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
+		cs, _ := ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
 		if cs != nil {
 			ctx.Connection.sendSubscribed(ctx, newChannel, ctx.Connection, 0, &cs.options)
 		}
@@ -443,6 +443,98 @@ func handleCreateSpatialChannel(ctx MessageContext, msg *channeldpb.CreateChanne
 		Regions: regions,
 	}
 	ctx.Connection.Send(ctx)
+}
+
+func handleCreateEntityChannel(ctx MessageContext) {
+	// Only the global and spatial channels can create the entity channels
+	if ctx.Channel != globalChannel && ctx.Channel.Type() != channeldpb.ChannelType_SPATIAL {
+		ctx.Connection.Logger().Error("illegal attemp to create entity channel outside the GLOBAL or SPATIAL channels")
+		return
+	}
+
+	msg, ok := ctx.Msg.(*channeldpb.CreateEntityChannelMessage)
+	if !ok {
+		ctx.Connection.Logger().Error("message is not a CreateEntityChannelMessage, will not be handled.")
+		return
+	}
+
+	newChannel := createChannelWithId(common.ChannelId(msg.EntityId), channeldpb.ChannelType_ENTITY, ctx.Connection)
+	newChannel.Logger().Info("created entity channel",
+		zap.Uint32("ownerConnId", uint32(newChannel.ownerConnection.Id())),
+	)
+
+	newChannel.metadata = msg.Metadata
+	if msg.Data != nil {
+		dataMsg, err := msg.Data.UnmarshalNew()
+		if err != nil {
+			newChannel.Logger().Error("failed to unmarshal data message for the new channel", zap.Error(err))
+		} else {
+			newChannel.InitData(dataMsg, msg.MergeOptions)
+		}
+	} else {
+		// Channel data should always be initialized
+		newChannel.InitData(nil, msg.MergeOptions)
+	}
+
+	ctx.Msg = &channeldpb.CreateChannelResultMessage{
+		ChannelType: newChannel.channelType,
+		Metadata:    newChannel.metadata,
+		OwnerConnId: uint32(ctx.Connection.Id()),
+		ChannelId:   uint32(newChannel.id),
+	}
+	ctx.Connection.Send(ctx)
+
+	// Should we also send the result to the GLOBAL channel owner?
+
+	if msg.IsWellKnown {
+		// Subscribe ALL the connections to the entity channel
+		allConnections.Range(func(_ ConnectionId, conn *Connection) bool {
+			// Ignore the well-known entity for server
+			if conn.GetConnectionType() == channeldpb.ConnectionType_SERVER {
+				return true
+			}
+			/*
+			 */
+
+			// FIXME: different subOptions for different connection?
+			cs, alreadySubed := conn.SubscribeToChannel(newChannel, nil)
+			if cs != nil && !alreadySubed {
+				conn.sendSubscribed(MessageContext{}, newChannel, conn, 0, &cs.options)
+				newChannel.Logger().Debug("subscribed existing connection for the well-known entity", zap.Uint32("connId", uint32(conn.Id())))
+			}
+			return true
+		})
+
+		// Add hook to subscribe the new connection to the entity channel
+		Event_AuthComplete.ListenFor(newChannel, func(data AuthEventData) {
+			// Ignore the well-known entity for server
+			if data.Connection.GetConnectionType() == channeldpb.ConnectionType_SERVER {
+				return
+			}
+
+			if data.AuthResult == channeldpb.AuthResultMessage_SUCCESSFUL {
+				// FIXME: different subOptions for different connection?
+				// Add some delay so the client won't have to spawn the entity immediately after the auth.
+				subOptions := &channeldpb.ChannelSubscriptionOptions{FanOutDelayMs: Pointer(int32(1000))}
+				cs, _ := data.Connection.SubscribeToChannel(newChannel, subOptions)
+				if cs != nil {
+					data.Connection.sendSubscribed(MessageContext{}, newChannel, data.Connection, 0, &cs.options)
+					newChannel.Logger().Debug("subscribed new connection for the well-known entity", zap.Uint32("connId", uint32(data.Connection.Id())))
+				}
+			}
+		})
+	}
+
+	// Subscribe the owner to channel after creation
+	cs, _ := ctx.Connection.SubscribeToChannel(newChannel, msg.SubOptions)
+	if cs != nil {
+		ctx.Connection.sendSubscribed(ctx, newChannel, ctx.Connection, 0, &cs.options)
+	}
+
+	/* We could sub all the connections in the spatial channel to the entity channel here,
+	 * but channeld doesn't know the sub options for each connection. So each connection
+	 * should subscribe to the entity channel by itself after received the Spawn message.
+	 */
 }
 
 func handleRemoveChannel(ctx MessageContext) {
@@ -511,8 +603,7 @@ func handleListChannel(ctx MessageContext) {
 	}
 
 	result := make([]*channeldpb.ListChannelResultMessage_ChannelInfo, 0)
-	allChannels.Range(func(_, v interface{}) bool {
-		channel := v.(*Channel)
+	allChannels.Range(func(_ common.ChannelId, channel *Channel) bool {
 		if msg.TypeFilter != channeldpb.ChannelType_UNKNOWN && msg.TypeFilter != channel.channelType {
 			return true
 		}
@@ -570,33 +661,37 @@ func handleSubToChannel(ctx MessageContext) {
 		return
 	}
 
-	cs, exists := ctx.Channel.subscribedConnections[connToSub]
-	if exists {
-		ctx.Connection.Logger().Debug("already subscribed to channel, the subscription options will be merged",
-			zap.String("channelType", ctx.Channel.channelType.String()),
-			zap.Uint32("channelId", uint32(ctx.Channel.id)),
-		)
-		if msg.SubOptions != nil {
-			proto.Merge(&cs.options, msg.SubOptions)
+	/*
+		cs, exists := ctx.Channel.subscribedConnections[connToSub]
+		if exists {
+			ctx.Connection.Logger().Debug("already subscribed to channel, the subscription options will be merged",
+				zap.String("channelType", ctx.Channel.channelType.String()),
+				zap.Uint32("channelId", uint32(ctx.Channel.id)),
+			)
+			if msg.SubOptions != nil {
+				proto.Merge(&cs.options, msg.SubOptions)
+			}
+			connToSub.sendSubscribed(ctx, ctx.Channel, connToSub, 0, &cs.options)
+			// Do not send the SubscribedToChannelResultMessage to the sender or channel owner if already subed.
+			return
 		}
-		connToSub.sendSubscribed(ctx, ctx.Channel, connToSub, 0, &cs.options)
-		// Do not send the SubscribedToChannelResultMessage to the sender or channel owner if already subed.
-		return
-	}
+	*/
 
-	cs = connToSub.SubscribeToChannel(ctx.Channel, msg.SubOptions)
+	cs, alreadySubed := connToSub.SubscribeToChannel(ctx.Channel, msg.SubOptions)
 	if cs == nil {
 		return
 	}
-	// Notify the sender.
+
+	// Always notify the sender - may need to update the sub options.
 	ctx.Connection.sendSubscribed(ctx, ctx.Channel, connToSub, ctx.StubId, &cs.options)
 
-	// Notify the subscribed (if not the sender).
+	// Notify the subscribed if it's not the sender.
 	if connToSub != ctx.Connection {
 		connToSub.sendSubscribed(ctx, ctx.Channel, connToSub, 0, &cs.options)
 	}
-	// Notify the channel owner.
-	if ctx.Channel.HasOwner() && ctx.Channel.ownerConnection != ctx.Connection {
+
+	// Notify the channel owner if not already subed and it's not the sender.
+	if !alreadySubed && ctx.Channel.HasOwner() && ctx.Channel.ownerConnection != ctx.Connection {
 		ctx.Channel.ownerConnection.sendSubscribed(ctx, ctx.Channel, connToSub, 0, &cs.options)
 	}
 }
@@ -628,7 +723,7 @@ func handleUnsubFromChannel(ctx MessageContext) {
 
 	_, err := connToUnsub.UnsubscribeFromChannel(ctx.Channel)
 	if err != nil {
-		ctx.Connection.Logger().Error("failed to unsub from channel",
+		ctx.Connection.Logger().Warn("failed to unsub from channel",
 			zap.String("channelType", ctx.Channel.channelType.String()),
 			zap.Uint32("channelId", uint32(ctx.Channel.id)),
 			zap.Error(err),

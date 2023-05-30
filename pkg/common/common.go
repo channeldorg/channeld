@@ -23,12 +23,18 @@ type SpatialInfo struct {
 	Z float64
 }
 
+// Notifies the spatial/entity channel from the ChannelDataUpdate that the spatial info of an entity has changed,
+// so the channel's SpatialController will check the handover. If the handover happpens, `handoverDataProvider`
+// will be called to provide the data for the ChannelDataHandoverMessage.
 type SpatialInfoChangedNotifier interface {
 	// The handover data provider has three parameters:
-	// srcChannelId: the channel that an object is handed over from.
-	// dstChannelId: the channel that an object is handed over to.
-	// handoverData: the data wrapped in ChannelDataHandoverMessage to be sent to the interested parties. If the chan signals nil, no handover will happen.
-	Notify(oldInfo SpatialInfo, newInfo SpatialInfo, handoverDataProvider func(ChannelId, ChannelId, chan Message))
+	// 	- srcChannelId: the channel that an object is handed over from.
+	// 	- dstChannelId: the channel that an object is handed over to.
+	// 	- handoverData:
+	//		if use group-based handover, the data should be the id of the migrating entity;
+	//		if use the query-context handover, the data should be the message wrapped in ChannelDataHandoverMessage;
+	//		if nil, no handover will happend.
+	Notify(oldInfo SpatialInfo, newInfo SpatialInfo, handoverDataProvider func(ChannelId, ChannelId, interface{}))
 }
 
 func (s *SpatialInfo) String() string {

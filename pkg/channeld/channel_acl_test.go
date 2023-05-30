@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/metaworking/channeld/pkg/channeldpb"
+	"github.com/metaworking/channeld/pkg/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -39,10 +40,10 @@ func (c *aclTestConnection) Send(ctx MessageContext) {
 
 }
 
-func (c *aclTestConnection) SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) *ChannelSubscription {
+func (c *aclTestConnection) SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) (*ChannelSubscription, bool) {
 	return &ChannelSubscription{
 		options: *defaultSubOptions(ch.channelType),
-	}
+	}, false
 }
 
 func (c *aclTestConnection) UnsubscribeFromChannel(ch *Channel) (*channeldpb.ChannelSubscriptionOptions, error) {
@@ -55,6 +56,10 @@ func (c *aclTestConnection) sendSubscribed(ctx MessageContext, ch *Channel, conn
 
 func (c *aclTestConnection) sendUnsubscribed(ctx MessageContext, ch *Channel, connToUnsub *Connection, stubId uint32) {
 
+}
+
+func (c *aclTestConnection) HasInterestIn(spatialChId common.ChannelId) bool {
+	return false
 }
 
 func (c *aclTestConnection) Logger() *Logger {
@@ -104,6 +109,7 @@ func setChannelACLSettings(chTypes []channeldpb.ChannelType, acl ChannelAccessLe
 
 func TestCheckACL(t *testing.T) {
 	InitLogs()
+	InitChannels()
 
 	accessTypes := []ChannelAccessType{ChannelAccessType_Sub, ChannelAccessType_Unsub, ChannelAccessType_Remove}
 

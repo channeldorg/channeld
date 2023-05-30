@@ -15,7 +15,7 @@ var ipBlacklist = make(map[string]time.Time)
 var pitBlacklist = make(map[string]time.Time)
 
 func InitAntiDDoS() {
-	Event_AuthFailed.Listen(func(data AuthFailedEventData) {
+	Event_AuthComplete.Listen(func(data AuthEventData) {
 		if data.Connection.GetConnectionType() == channeldpb.ConnectionType_SERVER {
 			return
 		}
@@ -28,9 +28,13 @@ func InitAntiDDoS() {
 				securityLogger.Info("blacklisted PIT due to too many failed auth attempts", zap.String("pit", data.PlayerIdentifierToken))
 				data.Connection.Close()
 			}
-		} else {
+		} else if data.AuthResult == channeldpb.AuthResultMessage_INVALID_PIT {
 			// Invalid username token - record the IP
-			ip := GetIP(data.Connection.RemoteAddr())
+			addr := data.Connection.RemoteAddr()
+			if addr == nil {
+				return
+			}
+			ip := GetIP(addr)
 			failedAuthCounters[ip]++
 			if GlobalSettings.MaxFailedAuthAttempts > 0 && failedAuthCounters[ip] >= GlobalSettings.MaxFailedAuthAttempts {
 				ipBlacklist[ip] = time.Now()

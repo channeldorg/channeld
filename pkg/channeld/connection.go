@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/metaworking/channeld/pkg/common"
 	"github.com/metaworking/channeld/pkg/fsm"
 	"github.com/metaworking/channeld/pkg/replaypb"
+	"github.com/puzpuzpuz/xsync/v2"
 	"github.com/xtaci/kcp-go"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -40,12 +40,34 @@ type MessageSender interface {
 	Send(c *Connection, ctx MessageContext) //(c *Connection, channelId ChannelId, msgType channeldpb.MessageType, msg Message)
 }
 
-type queuedMessageSender struct {
+/*
+type queuedMessageCtxSender struct {
 	MessageSender
 }
 
-func (s *queuedMessageSender) Send(c *Connection, ctx MessageContext) {
+func (s *queuedMessageCtxSender) Send(c *Connection, ctx MessageContext) {
 	c.sendQueue <- ctx
+}
+*/
+
+type queuedMessagePackSender struct {
+	MessageSender
+}
+
+func (s *queuedMessagePackSender) Send(c *Connection, ctx MessageContext) {
+	msgBody, err := proto.Marshal(ctx.Msg)
+	if err != nil {
+		c.logger.Error("failed to marshal message", zap.Error(err), zap.Uint32("msgType", uint32(ctx.MsgType)))
+		return
+	}
+
+	c.sendQueue <- &channeldpb.MessagePack{
+		ChannelId: ctx.ChannelId,
+		Broadcast: ctx.Broadcast,
+		StubId:    ctx.StubId,
+		MsgType:   uint32(ctx.MsgType),
+		MsgBody:   msgBody,
+	}
 }
 
 type Connection struct {
@@ -59,7 +81,7 @@ type Connection struct {
 	// reader          *bufio.Reader
 	// writer          *bufio.Writer
 	sender               MessageSender
-	sendQueue            chan MessageContext
+	sendQueue            chan *channeldpb.MessagePack //MessageContext
 	pit                  string
 	fsm                  *fsm.FiniteStateMachine
 	fsmDisallowedCounter int
@@ -68,15 +90,21 @@ type Connection struct {
 	connTime             time.Time
 	closeHandlers        []func()
 	replaySession        *replaypb.ReplaySession
-	spatialSubscriptions sync.Map //map[common.ChannelId]*channeldpb.ChannelSubscriptionOptions
+	spatialSubscriptions *xsync.MapOf[common.ChannelId, *channeldpb.ChannelSubscriptionOptions]
 }
 
-var allConnections sync.Map // map[ConnectionId]*Connection
+var allConnections *xsync.MapOf[ConnectionId, *Connection]
 var nextConnectionId uint32 = 0
 var serverFsm *fsm.FiniteStateMachine
 var clientFsm *fsm.FiniteStateMachine
 
 func InitConnections(serverFsmPath string, clientFsmPath string) {
+	if allConnections != nil {
+		return
+	}
+
+	allConnections = xsync.NewTypedMapOf[ConnectionId, *Connection](UintIdHasher[ConnectionId]())
+
 	bytes, err := os.ReadFile(serverFsmPath)
 	if err == nil {
 		serverFsm, err = fsm.Load(bytes)
@@ -107,9 +135,8 @@ func InitConnections(serverFsmPath string, clientFsmPath string) {
 }
 
 func GetConnection(id ConnectionId) *Connection {
-	v, ok := allConnections.Load(id)
+	c, ok := allConnections.Load(id)
 	if ok {
-		c := v.(*Connection)
 		if c.IsClosing() {
 			return nil
 		}
@@ -167,6 +194,16 @@ func StartListening(t channeldpb.ConnectionType, network string, address string)
 		if err != nil {
 			rootLogger.Error("failed to accept connection", zap.Error(err))
 		} else {
+			if network == "tcp" {
+				tcpConn := conn.(*net.TCPConn)
+				if err := tcpConn.SetReadBuffer(0x0fffff); err != nil {
+					rootLogger.Error("failed to set read buffer size", zap.Error(err))
+				}
+				if err := tcpConn.SetWriteBuffer(0x0fffff); err != nil {
+					rootLogger.Error("failed to set write buffer size", zap.Error(err))
+				}
+				tcpConn.SetNoDelay(true)
+			}
 
 			// Check if the IP address is banned.
 			ip := GetIP(conn.RemoteAddr())
@@ -219,7 +256,7 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 
 	for tries := 0; ; tries++ {
 		generateNextConnId(c, maxConnId)
-		if _, exists := allConnections.Load(nextConnectionId); !exists {
+		if _, exists := allConnections.Load(ConnectionId(nextConnectionId)); !exists {
 			break
 		}
 
@@ -238,8 +275,8 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 		readPos:         0,
 		// reader:    bufio.NewReaderSize(c, readerSize),
 		// writer:    bufio.NewWriterSize(c, writerSize),
-		sender:               &queuedMessageSender{},
-		sendQueue:            make(chan MessageContext, 128),
+		sender:               &queuedMessagePackSender{},
+		sendQueue:            make(chan *channeldpb.MessagePack, 128),
 		fsmDisallowedCounter: 0,
 		logger: &Logger{rootLogger.With(
 			zap.String("connType", t.String()),
@@ -248,7 +285,7 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 		state:                ConnectionState_UNAUTHENTICATED,
 		connTime:             time.Now(),
 		closeHandlers:        make([]func(), 0),
-		spatialSubscriptions: sync.Map{}, //make(map[common.ChannelId]*channeldpb.ChannelSubscriptionOptions),
+		spatialSubscriptions: xsync.NewTypedMapOf[common.ChannelId, *channeldpb.ChannelSubscriptionOptions](UintIdHasher[common.ChannelId]()),
 	}
 
 	if connection.isPacketRecordingEnabled() {
@@ -355,76 +392,6 @@ func (c *Connection) receive() {
 		return
 	}
 
-	/*
-		tag := c.readBuffer[:PacketHeaderSize]
-		if tag[0] != 67 {
-			c.readPos = 0
-			c.Logger().Warn("invalid tag, the packet will be dropped",
-				zap.ByteString("tag", tag),
-			)
-			return
-		}
-
-		packetSize := int(tag[3])
-		if tag[1] != 72 {
-			packetSize = packetSize | int(tag[1])<<16 | int(tag[2])<<8
-		} else if tag[2] != 78 {
-			packetSize = packetSize | int(tag[2])<<8
-		}
-
-		if packetSize > int(MaxPacketSize) {
-			c.readPos = 0
-			c.Logger().Warn("packet size exceeds the limit, the packet will be dropped", zap.Int("packetSize", packetSize))
-			return
-		}
-
-		fullSize := PacketHeaderSize + packetSize
-		if c.readPos < fullSize {
-			// Unfinished packet
-			return
-		}
-
-		bytes := c.readBuffer[PacketHeaderSize:fullSize]
-
-		bytesReceived.WithLabelValues(c.connectionType.String()).Add(float64(fullSize))
-
-		// Apply the decompression from the 5th byte in the header
-		ct := tag[4]
-		_, valid := channeldpb.CompressionType_name[int32(ct)]
-		if valid && ct != 0 {
-			c.compressionType = channeldpb.CompressionType(ct)
-			if c.compressionType == channeldpb.CompressionType_SNAPPY {
-				len, err := snappy.DecodedLen(bytes)
-				if err != nil {
-					c.Logger().Error("snappy.DecodedLen", zap.Error(err))
-					return
-				}
-				dst := make([]byte, len)
-				bytes, err = snappy.Decode(dst, bytes)
-				if err != nil {
-					c.Logger().Error("snappy.Decode", zap.Error(err))
-					return
-				}
-			}
-		}
-
-		var p channeldpb.Packet
-		if err := proto.Unmarshal(bytes, &p); err != nil {
-			c.Logger().Error("unmarshalling packet", zap.Error(err))
-			return
-		}
-
-		if c.isPacketRecordingEnabled() {
-			c.recordPacket(&p)
-		}
-
-		for _, mp := range p.Messages {
-			c.receiveMessage(mp)
-		}
-
-		packetReceived.WithLabelValues(c.connectionType.String()).Inc()
-
-	*/
 	bufPos := 0
 	for bufPos = 0; bufPos < c.readPos; {
 		packet, err := c.readPacket(&bufPos)
@@ -442,34 +409,42 @@ func (c *Connection) receive() {
 		combinedPacketCount.WithLabelValues(c.connectionType.String()).Inc()
 	}
 
-	//move unhandled content to the front
 	if bufPos < c.readPos {
+		// Move unhandled content to the front
 		copy(c.readBuffer, c.readBuffer[bufPos:c.readPos])
 	}
 
-	// Reset read position
-	c.readPos = c.readPos - bufPos
+	// Move read position
+	c.readPos -= bufPos
+}
+
+func readSize(tag []byte) int {
+	if tag[0] != 67 || tag[1] != 72 {
+		return 0
+	}
+
+	size := int(tag[3]) | int(tag[2])<<8
+
+	return size
 }
 
 func (c *Connection) readPacket(bufPos *int) (*channeldpb.Packet, error) {
 	tag := c.readBuffer[*bufPos : *bufPos+PacketHeaderSize]
-	if tag[0] != 67 {
+
+	packetSize := readSize(tag)
+	if packetSize == 0 {
+		c.readPos = 0
 		connectionClosed.WithLabelValues(c.connectionType.String()).Inc()
 		c.Logger().Warn("invalid tag, the connection will be closed",
-			zap.ByteString("tag", tag),
+			zap.Binary("tag", tag),
 		)
 		return nil, errors.New("invlaid tag")
 	}
 
-	packetSize := int(tag[3])
-	if tag[1] != 72 {
-		packetSize = packetSize | int(tag[1])<<16 | int(tag[2])<<8
-	} else if tag[2] != 78 {
-		packetSize = packetSize | int(tag[2])<<8
-	}
-	if packetSize > int(MaxPacketSize) {
+	if packetSize > MaxPacketSize {
+		c.readPos = 0
 		connectionClosed.WithLabelValues(c.connectionType.String()).Inc()
-		c.Logger().Warn("packet size exceeds the read buffer, the connection will be closed", zap.Int("packetSize", packetSize), zap.Int("bufferSize", len(c.readBuffer)))
+		c.Logger().Warn("packet size exceeds the limit, the connection will be closed", zap.Int("packetSize", packetSize), zap.Int("bufferSize", len(c.readBuffer)))
 		return nil, errors.New("packetSize too large")
 	}
 
@@ -512,7 +487,12 @@ func (c *Connection) readPacket(bufPos *int) (*channeldpb.Packet, error) {
 
 	var p channeldpb.Packet
 	if err := proto.Unmarshal(bytes, &p); err != nil {
-		c.Logger().Error("unmarshalling packet", zap.Error(err))
+		c.Logger().Error("failed to unmarshall packet, the connection will be closed", zap.Error(err),
+			zap.Uint32("size", uint32(packetSize)),
+			zap.Binary("tag", tag),
+		)
+		//if c.connectionType == channeldpb.ConnectionType_CLIENT {
+		connectionClosed.WithLabelValues(c.connectionType.String()).Inc()
 		return nil, nil
 	}
 
@@ -620,27 +600,28 @@ func (c *Connection) flush() {
 
 	// For now we don't limit the message numbers per packet
 	for len(c.sendQueue) > 0 {
-		mc := <-c.sendQueue
-		// The packet size should not exceed the capacity of 3 bytes
-		if size+proto.Size(mc.Msg) >= 0xfffff0 {
-			c.Logger().Warn("packet is going to be oversized")
+		mp := <-c.sendQueue
+		p.Messages = append(p.Messages, mp)
+		size = proto.Size(&p)
+		if size > MaxPacketSize {
+			c.Logger().Info("packet is going to be oversized",
+				zap.Int("packetSize", size),
+				zap.Uint32("msgType", uint32(mp.MsgType)),
+				zap.Int("msgSize", len(mp.MsgBody)),
+				zap.Int("msgNum", len(p.Messages)),
+				zap.Int("msgInQueue", len(c.sendQueue)),
+			)
+
+			// Revert adding the message that causes the oversize
+			p.Messages = p.Messages[:len(p.Messages)-1]
+
+			// Put the message back to the queue
+			// FIXME: order may matter
+			c.sendQueue <- mp
 			break
 		}
-		msgBody, err := proto.Marshal(mc.Msg)
-		if err != nil {
-			c.Logger().Error("error marshalling message", zap.Error(err))
-			continue
-		}
-		p.Messages = append(p.Messages, &channeldpb.MessagePack{
-			ChannelId: mc.ChannelId,
-			Broadcast: mc.Broadcast,
-			StubId:    mc.StubId,
-			MsgType:   uint32(mc.MsgType),
-			MsgBody:   msgBody,
-		})
-		size = proto.Size(&p)
 
-		c.Logger().VeryVerbose("sent message", zap.Uint32("msgType", uint32(mc.MsgType)), zap.Int("size", len(msgBody)))
+		c.Logger().VeryVerbose("sent message", zap.Uint32("msgType", uint32(mp.MsgType)), zap.Int("size", len(mp.MsgBody)))
 
 		msgSent.WithLabelValues(c.connectionType.String()).Inc() /*.WithLabelValues(
 			strconv.FormatUint(uint64(e.Channel.id), 10),
@@ -650,7 +631,7 @@ func (c *Connection) flush() {
 
 	bytes, err := proto.Marshal(&p)
 	if err != nil {
-		c.Logger().Error("error marshalling packet", zap.Error(err))
+		c.Logger().Error("failed to marshal packet", zap.Error(err))
 		return
 	}
 
@@ -664,11 +645,11 @@ func (c *Connection) flush() {
 	tag := []byte{67, 72, 78, 76, byte(c.compressionType)}
 	len := len(bytes)
 	tag[3] = byte(len & 0xff)
-	if len > 0xff {
-		tag[2] = byte((len >> 8) & 0xff)
-	}
-	if len > 0xffff {
-		tag[1] = byte((len >> 16) & 0xff)
+	tag[2] = byte((len >> 8) & 0xff)
+	if len > MaxPacketSize {
+		// Should never happen, but log it just in case
+		c.Logger().Error("packet is oversized", zap.Int("size", len))
+		return
 	}
 
 	/* Avoid writing multple times. With WebSocket, every Write() sends a message.
@@ -730,9 +711,12 @@ func (c *Connection) Logger() *Logger {
 }
 
 func (c *Connection) RemoteAddr() net.Addr {
+	/* The address should still be available even after the connection is closed.
+	 * In this way, the anit-DDoS can save the address to the blacklist.
 	if c.IsClosing() {
 		return nil
 	}
+	*/
 	return c.conn.RemoteAddr()
 }
 

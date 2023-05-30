@@ -5,5 +5,5 @@
 _data
 /vendor
 .devcontainer/devcontainer.json
-cmd/gen_proto.*
+*.gen.go
 channeldgenpb

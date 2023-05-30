@@ -1,56 +1,17 @@
 package unreal
 
 import (
-	"sync"
-
 	"github.com/metaworking/channeld/pkg/channeld"
 	"github.com/metaworking/channeld/pkg/channeldpb"
 	"github.com/metaworking/channeld/pkg/common"
 	"github.com/metaworking/channeld/pkg/unrealpb"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 )
-
-// Stores all UObjects ever spawned in server and sent to client.
-// Only in this way we can send the UnrealObjectRef as the handover data.
-var allSpawnedObj map[uint32]*unrealpb.UnrealObjectRef = make(map[uint32]*unrealpb.UnrealObjectRef)
-var allSpawnedObjLock sync.RWMutex
 
 func InitMessageHandlers() {
 	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_SPAWN), &channeldpb.ServerForwardMessage{}, handleUnrealSpawnObject)
-	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_HANDOVER_CONTEXT), &unrealpb.GetHandoverContextResultMessage{}, handleHandoverContextResult)
-	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_GET_UNREAL_OBJECT_REF), &unrealpb.GetUnrealObjectRefMessage{}, handleGetUnrealObjectRef)
-
-	channeld.Event_GlobalChannelUnpossessed.Listen(func(struct{}) {
-		// Global server exits. Clear up all the cache.
-		allSpawnedObjLock.Lock()
-		defer allSpawnedObjLock.Unlock()
-		allSpawnedObj = make(map[uint32]*unrealpb.UnrealObjectRef)
-		resetHandoverDataProviders()
-	})
-}
-
-func handleGetUnrealObjectRef(ctx channeld.MessageContext) {
-	msg, ok := ctx.Msg.(*unrealpb.GetUnrealObjectRefMessage)
-	if !ok {
-		ctx.Connection.Logger().Error("message is not a GetUnrealObjectRefMessage, will not be handled.")
-		return
-	}
-
-	resultMsg := &unrealpb.GetUnrealObjectRefResultMessage{}
-	resultMsg.ObjRef = make([]*unrealpb.UnrealObjectRef, 0)
-
-	defer allSpawnedObjLock.RLocker().Unlock()
-	allSpawnedObjLock.RLock()
-	for _, netId := range msg.NetGUID {
-		objRef, exists := allSpawnedObj[netId]
-		if exists {
-			resultMsg.ObjRef = append(resultMsg.ObjRef, objRef)
-		}
-	}
-	ctx.Msg = resultMsg
-	ctx.Connection.Send(ctx)
+	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_DESTROY), &channeldpb.ServerForwardMessage{}, handleUnrealDestroyObject)
 }
 
 func handleUnrealSpawnObject(ctx channeld.MessageContext) {
@@ -102,6 +63,9 @@ func handleUnrealSpawnObject(ctx channeld.MessageContext) {
 				// Update the channel and let the new channel handle the message. Otherwise race conditions may happen.
 				ctx.Channel = channeld.GetChannel(spatialChId)
 				if ctx.Channel != nil {
+					ctx.Channel.Execute(func(ch *channeld.Channel) {
+						addSpatialEntity(ch, spawnMsg.Obj)
+					})
 					ctx.Channel.PutMessageContext(ctx, channeld.HandleServerToClientUserMessage)
 				} else {
 					ctx.Connection.Logger().Error("failed to handle the ServerForwardMessage as the new spatial channel doesn't exist", zap.Uint32("newChId", *spawnMsg.ChannelId))
@@ -111,122 +75,109 @@ func handleUnrealSpawnObject(ctx channeld.MessageContext) {
 			}
 		} else {
 			// ChannelId is not updated; handle the forward message in current channel.
+			addSpatialEntity(ctx.Channel, spawnMsg.Obj)
 			channeld.HandleServerToClientUserMessage(ctx)
 		}
 	} else {
+		addSpatialEntity(ctx.Channel, spawnMsg.Obj)
 		channeld.HandleServerToClientUserMessage(ctx)
 	}
 
-	defer allSpawnedObjLock.Unlock()
-	allSpawnedObjLock.Lock()
-	allSpawnedObj[*spawnMsg.Obj.NetGUID] = spawnMsg.Obj
-	channeld.RootLogger().Debug("stored UnrealObjectRef from spawn message",
-		zap.Uint32("netId", *spawnMsg.Obj.NetGUID),
-		zap.Uint32("oldChId", oldChId),
-		zap.Uint32("newChId", *spawnMsg.ChannelId),
-	)
+	/*
+		defer allSpawnedObjLock.Unlock()
+		allSpawnedObjLock.Lock()
+		allSpawnedObj[*spawnMsg.Obj.NetGUID] = spawnMsg.Obj
+		channeld.RootLogger().Debug("stored UnrealObjectRef from spawn message",
+			zap.Uint32("netId", *spawnMsg.Obj.NetGUID),
+			zap.Uint32("oldChId", oldChId),
+			zap.Uint32("newChId", *spawnMsg.ChannelId),
+		)
+	*/
+
+	// Entity channel should already be created by the spatial server.
+	entityChannel := channeld.GetChannel(common.ChannelId(*spawnMsg.Obj.NetGUID))
+	if entityChannel == nil {
+		return
+	}
+
+	// Set the objRef of the entity channel's data
+	entityChannel.Execute(func(ch *channeld.Channel) {
+		if entityData, ok := ch.GetDataMessage().(UnrealObjectEntityData); ok {
+			entityData.SetObjRef(spawnMsg.Obj)
+			ch.Logger().Debug("set entity data's objRef")
+		}
+	})
 }
 
-// Runs in the source spatial channel
-func handleHandoverContextResult(ctx channeld.MessageContext) {
-	msg, ok := ctx.Msg.(*unrealpb.GetHandoverContextResultMessage)
+// Entity channel data that contains an UnrealObjectRef should implement this interface.
+type UnrealObjectEntityData interface {
+	SetObjRef(objRef *unrealpb.UnrealObjectRef)
+}
+
+func addSpatialEntity(ch *channeld.Channel, objRef *unrealpb.UnrealObjectRef) {
+	if ch.Type() != channeldpb.ChannelType_SPATIAL {
+		return
+	}
+
+	if ch.GetDataMessage() == nil {
+		return
+	}
+
+	spatialChannelData, ok := ch.GetDataMessage().(*unrealpb.SpatialChannelData)
 	if !ok {
-		ctx.Connection.Logger().Error("message is not a GetHandoverContextResultMessage, will not be handled.")
+		ch.Logger().Warn("channel data is not a SpatialChannelData",
+			zap.String("dataType", string(ch.GetDataMessage().ProtoReflect().Descriptor().FullName())))
 		return
 	}
 
-	provider, exists := getHandoverDataProvider(msg.NetId, msg.SrcChannelId)
-	if !exists {
-		ctx.Connection.Logger().Error("could not find the handover data provider", zap.Uint32("netId", msg.NetId))
+	entityState := &unrealpb.SpatialEntityState{ObjRef: &unrealpb.UnrealObjectRef{}}
+	proto.Merge(entityState.ObjRef, objRef)
+	spatialChannelData.Entities[*objRef.NetGUID] = entityState
+	ch.Logger().Debug("added spatial entity", zap.Uint32("netId", *objRef.NetGUID))
+}
+
+func removeSpatialEntity(ch *channeld.Channel, netId uint32) {
+	if ch.Type() != channeldpb.ChannelType_SPATIAL {
 		return
 	}
 
-	defer removeHandoverDataProvider(msg.NetId, msg.SrcChannelId)
-
-	// No context - no handover will happen
-	if len(msg.Context) == 0 {
-		provider <- nil
+	if ch.GetDataMessage() == nil {
 		return
 	}
 
-	fullChannelData := ctx.Channel.GetDataMessage()
-
-	if fullChannelData == nil {
-		ctx.Channel.Logger().Error("channel data message is nil")
-		provider <- nil
+	spatialChannelData, ok := ch.GetDataMessage().(*unrealpb.SpatialChannelData)
+	if !ok {
+		ch.Logger().Warn("channel data is not a SpatialChannelData",
+			zap.String("dataType", string(ch.GetDataMessage().ProtoReflect().Descriptor().FullName())))
 		return
 	}
 
-	handoverChannelData := fullChannelData.ProtoReflect().New().Interface()
+	delete(spatialChannelData.Entities, netId)
+	ch.Logger().Debug("removed spatial entity", zap.Uint32("netId", netId))
+}
 
-	collector, ok := handoverChannelData.(ChannelDataCollector)
-	if ok {
-		for _, handoverCtx := range msg.Context {
-			if handoverCtx.Obj == nil || handoverCtx.Obj.NetGUID == nil || *handoverCtx.Obj.NetGUID == 0 {
-				ctx.Connection.Logger().Error("corrupted handover context", zap.Uint32("netId", msg.NetId))
-				continue
-			}
-			// Make sure the object is fully exported, so the destination server can spawn it properly.
-			if handoverCtx.Obj.NetGUIDBunch == nil {
-				allSpawnedObjLock.RLock()
-				objRef, exists := allSpawnedObj[*handoverCtx.Obj.NetGUID]
-				allSpawnedObjLock.RLocker().Unlock()
-				if exists {
-					handoverCtx.Obj = objRef
-				} else {
-					ctx.Connection.Logger().Warn("handover obj is not fully exported yet", zap.Uint32("netId", msg.NetId))
-				}
-			}
-			// Should be goroutine-safe, as the handler is running in the source channel that owns fullChannelData.
-			collector.CollectStates(*handoverCtx.Obj.NetGUID, fullChannelData)
-		}
-	} else {
-		ctx.Connection.Logger().Warn("channel data message is not a ChannelDataCollector, the states of the context objects will not be included in the handover data", zap.Uint32("netId", msg.NetId))
+func handleUnrealDestroyObject(ctx channeld.MessageContext) {
+	// server -> channeld -> client
+	msg, ok := ctx.Msg.(*channeldpb.ServerForwardMessage)
+	if !ok {
+		ctx.Connection.Logger().Error("message is not a ServerForwardMessage, will not be handled.")
+		return
 	}
 
-	anyData, err := anypb.New(handoverChannelData)
+	destroyMsg := &unrealpb.DestroyObjectMessage{}
+	err := proto.Unmarshal(msg.Payload, destroyMsg)
 	if err != nil {
-		ctx.Connection.Logger().Error("failed to marshal handover data", zap.Error(err), zap.Uint32("netId", msg.NetId))
-		provider <- nil
+		ctx.Connection.Logger().Error("failed to unmarshal DestroyObjectMessage")
 		return
 	}
 
-	// Don't forget to merge the handover channel data to the dst channel, otherwise it may miss some states.
-	dstChannel := channeld.GetChannel(common.ChannelId(msg.DstChannelId))
-	if dstChannel != nil {
-		dstChannelDataMsg := dstChannel.GetDataMessage()
-		if dstChannelDataMsg == nil {
-			// Set the data directly
-			dstChannel.Data().OnUpdate(handoverChannelData, dstChannel.GetTime(), 0, nil)
-		} else {
-			/* Calling Merge() causes concurrent map read and map write as the handler is running in the source channel.
-			mergeable, ok := dstChannelDataMsg.(channeld.MergeableChannelData)
-			if ok {
-				// Should we let the dst channel fan out the update?
-				// For now we don't. It's easier for the UE servers to control the sequence of spawning and update.
-				mergeable.Merge(handoverChannelData, nil, nil)
-			} else {
-				proto.Merge(dstChannelDataMsg, handoverChannelData)
-			}
-			*/
-			updateMsg := &channeldpb.ChannelDataUpdateMessage{
-				Data: anyData,
-			}
-			dstChannel.PutMessageInternal(channeldpb.MessageType_CHANNEL_DATA_UPDATE, updateMsg)
-		}
-	}
+	removeSpatialEntity(ctx.Channel, destroyMsg.NetId)
+	// Send/broadcast the message
+	channeld.HandleServerToClientUserMessage(ctx)
 
-	handoverData := &unrealpb.HandoverData{
-		Context: msg.Context,
+	entityCh := channeld.GetChannel(common.ChannelId(destroyMsg.NetId))
+	if entityCh != nil {
+		entityCh.Logger().Info("removing entity channel from unrealpb.DestroyObjectMessage")
+		channeld.RemoveChannel(entityCh)
 	}
-
-	srcChannel := channeld.GetChannel(common.ChannelId(msg.SrcChannelId))
-	/* In order to spawn objects with full states in the client, we need to provider the channel data for all handover.
-	// Only provide channel data for cross-server handover
-	*/
-	if srcChannel != nil && dstChannel != nil /*&& !srcChannel.IsSameOwner(dstChannel)*/ {
-		handoverData.ChannelData = anyData
-	}
-
-	provider <- handoverData
 }

@@ -85,6 +85,9 @@ enum ChannelType {
     // Spatial channels are spatailly connected. Using this type of channel to implement a seamless open world which consists of servers, and each server simulates a part of the world. 
     // Only server connections can create the spatial channel.
     SPATIAL = 4;
+
+    ENTITY = 5;
+
     // The following are for tests.
     TEST = 100;
     TEST1 = 101;
@@ -134,6 +137,15 @@ enum MessageType {
 
     // Used by @UpdateSpatialInterestMessage
     UPDATE_SPATIAL_INTEREST = 14;
+
+    // Used by @CreateEntityChannelMessage
+    CREATE_ENTITY_CHANNEL = 15;
+
+    // Used by @AddEntityGroupMessage
+    ENTITY_GROUP_ADD = 16;
+
+    // Used by @RemoveEntityGroupMessage
+    ENTITY_GROUP_REMOVE = 17;
     
     // Used by @DebugGetSpatialRegionsMessage
     DEBUG_GET_SPATIAL_REGIONS = 99;
@@ -205,8 +217,11 @@ message ChannelSubscriptionOptions {
     // In Mirror, it can take up to 100ms to wait.
     optional int32 fanOutDelayMs = 4;
 
-    // Whether the subscriber should skip the fan-out of its own ChannelDataUpdate. Default is false.
+    // Whether the subscriber should skip the fan-out of its own ChannelDataUpdate. Default is true.
     optional bool skipSelfUpdateFanOut = 5;
+
+    // Whether the subscriber should skip the first fan-out that contains the full states. Default is false.
+    optional bool skipFirstFanOut = 6;
 }
 
 // Defines how two @ChannelDataUpdateMessage.data are merged.
@@ -278,7 +293,7 @@ message SubscribedToChannelMessage {
 }
 
 message SubscribedToChannelResultMessage {
-    // The connection that subsribed.
+    // The connection that subscribed.
     uint32 connId = 1;
     ChannelSubscriptionOptions subOptions = 2;
     ConnectionType connType = 3;
@@ -404,6 +419,32 @@ message SpatialInterestQuery {
 message UpdateSpatialInterestMessage {
     uint32 connId = 1;
     SpatialInterestQuery query = 2;
+}
+
+message CreateEntityChannelMessage {
+    uint32 entityId = 1;
+    string metadata = 2;
+    ChannelSubscriptionOptions subOptions = 3;
+    google.protobuf.Any data = 4;
+    ChannelDataMergeOptions mergeOptions = 5;
+    bool isWellKnown = 6;
+}
+
+enum EntityGroupType {
+    HANDOVER = 0;
+    LOCK = 1;
+}
+
+// Add specified entities to the handover/lock group of the entity channel. Should sent by the entity channel owner.
+message AddEntityGroupMessage {
+    EntityGroupType type = 1;
+    repeated uint32 EntitiesToAdd = 2;
+}
+
+// Remove specified entities from the handover/lock group of the entity channel. Should sent by the entity channel owner.
+message RemoveEntityGroupMessage {
+    EntityGroupType type = 1;
+    repeated uint32 EntitiesToRemove = 2;
 }
 
 // ------------------ DEBUG messages start ---------------------//
