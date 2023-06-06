@@ -1,7 +1,6 @@
 package channeld
 
 import (
-	"context"
 	"net/http"
 	"sync"
 	"testing"
@@ -10,8 +9,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/metaworking/channeld/internal/testpb"
 	"google.golang.org/protobuf/proto"
-
-	nws "nhooyr.io/websocket"
 )
 
 func getBenchmarkBytes() []byte {
@@ -79,6 +76,7 @@ func TestGorillaWebSocket(t *testing.T) {
 	// write 100,000 times: 24-25ms; read in 24-25ms
 }
 
+/*
 func TestNhooyrWebSocket(t *testing.T) {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := nws.Accept(w, r, nil)
@@ -125,3 +123,4 @@ func TestNhooyrWebSocket(t *testing.T) {
 	// write 10,000 times: 19-22ms; read in 28-32ms
 	// write 100,000 times: 197-215ms; read in 290-317ms
 }
+*/
