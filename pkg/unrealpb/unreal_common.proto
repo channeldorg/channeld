@@ -86,6 +86,7 @@ message RemoteFunctionMessage {
     string functionName = 2;
     bytes paramsPayload = 3;
     int32 redirectionCounter = 4;
+    string subObjectPath = 5;
 }
 
 message SpawnObjectMessage {
@@ -183,6 +184,11 @@ message ActorComponentState {
     bool removed = 1;
     optional bool bIsActive = 2;
     optional bool bReplicated = 3;
+    optional string compName = 4;
+}
+
+message ActorComponentStates {
+    map<string, ActorComponentState> states = 1;
 }
 
 message SceneComponentState {
