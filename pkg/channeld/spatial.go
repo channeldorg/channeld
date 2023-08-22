@@ -99,7 +99,7 @@ type StaticGrid2DSpatialController struct {
 	// How many grids the world has in Z axis. The height of the world = GridHeight x GridRows.
 	GridRows uint32
 
-	// In the left-handed coordinate system, the difference between the world origin and the top-right corner of the first grid, in the simulation/engine units.
+	// In the left-handed coordinate system, the difference between the world origin and the bottom-left corner of the first grid, in the simulation/engine units.
 	// This is how we uses the offset value to calculate which grid a (x,z) point is in: gridX = Floor((x - OffsetX) / GridWidth), gridY = Floor((y - OffsetY) / GridHeight)
 	// If the world origin is exactly in the middle of the world, the offset should be (-WorldWidth*0.5, -WorldHeight*0.5).
 	WorldOffsetX float64
@@ -761,7 +761,7 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 		conn.Send(handoverMsgCtx)
 	}
 
-	// Step 4-2: Send the connections in the dstChannel. The handover message contains the entity data if the connection hasn't subscribed to the entity channel yet.
+	// Step 4-2: Send to the connections in the dstChannel. The handover message contains the entity data if the connection hasn't subscribed to the entity channel yet.
 	// Also, subscribe the connection to the entity channel if it hasn't subscribed yet.
 	subOptions := &channeldpb.ChannelSubscriptionOptions{
 		SkipSelfUpdateFanOut: Pointer(true),

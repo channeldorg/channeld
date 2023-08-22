@@ -44,9 +44,10 @@ message TestRepChannelData {
     map<uint32, unrealpb.PlayerControllerState> playerControllerStates = 7;
     map<uint32, unrealpb.ActorComponentState> actorComponentStates = 8;
     map<uint32, unrealpb.SceneComponentState> sceneComponentStates = 9;
-    TestRepGameState testGameState = 10;
-    map<uint32, TestRepPlayerControllerState> testRepPlayerControllerStates = 11;
-    map<uint32, TestNPCState> testNPCStates = 12;
+    map<uint32, unrealpb.StaticMeshComponentState> staticMeshComponentStates = 10;
+    TestRepGameState testGameState = 20;
+    map<uint32, TestRepPlayerControllerState> testRepPlayerControllerStates = 21;
+    map<uint32, TestNPCState> testNPCStates = 22;
 }
 
 /* No need to create a new ChannelData that contains the subset of fields of TestRepChannelData.

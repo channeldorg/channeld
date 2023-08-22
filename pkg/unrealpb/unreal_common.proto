@@ -77,6 +77,9 @@ message ActorComponentRef {
     optional string compName = 2;
 }
 
+message AssetRef {
+    string objectPath = 1;
+}
 
 message RemoteFunctionMessage {
     UnrealObjectRef targetObj = 1;
@@ -398,4 +401,9 @@ message FClientAdjustment {
     optional FRootMotionSourceGroup rootMotionSourceCorrection = 9;
     optional FVector rootMotionRotation = 10;
     optional uint32 movementMode = 11;
+}
+
+message StaticMeshComponentState {
+    bool removed = 1;
+    AssetRef staticMesh = 2;
 }
