@@ -61,13 +61,22 @@ func (s *queuedMessagePackSender) Send(c *Connection, ctx MessageContext) {
 		return
 	}
 
-	c.sendQueue <- &channeldpb.MessagePack{
+	mp := &channeldpb.MessagePack{
 		ChannelId: ctx.ChannelId,
 		Broadcast: ctx.Broadcast,
 		StubId:    ctx.StubId,
 		MsgType:   uint32(ctx.MsgType),
 		MsgBody:   msgBody,
 	}
+
+	// Check the message pack size before adding to the queue
+	size := proto.Size(mp)
+	if size >= MaxPacketSize-PacketHeaderSize {
+		c.logger.Warn("failed to send the message and its size exceeds the limit", zap.Int("size", size))
+		return
+	}
+
+	c.sendQueue <- mp
 }
 
 type Connection struct {
@@ -82,6 +91,7 @@ type Connection struct {
 	// writer          *bufio.Writer
 	sender               MessageSender
 	sendQueue            chan *channeldpb.MessagePack //MessageContext
+	oversizedMsgPack     *channeldpb.MessagePack
 	pit                  string
 	fsm                  *fsm.FiniteStateMachine
 	fsmDisallowedCounter int
@@ -598,6 +608,13 @@ func (c *Connection) flush() {
 	p := channeldpb.Packet{Messages: make([]*channeldpb.MessagePack, 0, len(c.sendQueue))}
 	size := 0
 
+	// Add the oversided message pack first if any
+	if c.oversizedMsgPack != nil {
+		p.Messages = append(p.Messages, c.oversizedMsgPack)
+		c.oversizedMsgPack = nil
+		// No need to check the packet size now, as each message pack is already checked before adding to the queue.
+	}
+
 	// For now we don't limit the message numbers per packet
 	for len(c.sendQueue) > 0 {
 		mp := <-c.sendQueue
@@ -615,9 +632,8 @@ func (c *Connection) flush() {
 			// Revert adding the message that causes the oversize
 			p.Messages = p.Messages[:len(p.Messages)-1]
 
-			// Put the message back to the queue
-			// FIXME: order may matter
-			c.sendQueue <- mp
+			// Store the message pack that causes the overside
+			c.oversizedMsgPack = mp
 			break
 		}
 
