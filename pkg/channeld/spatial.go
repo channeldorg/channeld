@@ -21,11 +21,11 @@ type SpatialController interface {
 	common.SpatialInfoChangedNotifier
 	// Called in GLOBAL and spatial channels
 	GetChannelId(info common.SpatialInfo) (common.ChannelId, error)
-	// Called in the spatials channel
+	// Called in the spatial channels
 	QueryChannelIds(query *channeldpb.SpatialInterestQuery) (map[common.ChannelId]uint, error)
 	// Called in GLOBAL channel
 	GetRegions() ([]*channeldpb.SpatialRegion, error)
-	// Called in the spatials channel
+	// Called in the spatial channels
 	GetAdjacentChannels(spatialChannelId common.ChannelId) ([]common.ChannelId, error)
 	// Create spatial channels for a spatial server.
 	// Called in GLOBAL channel

@@ -14,6 +14,7 @@ func InitMessageHandlers() {
 	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_DESTROY), &channeldpb.ServerForwardMessage{}, handleUnrealDestroyObject)
 }
 
+// Executed in the spatial channels or the GLOBAL channel (no-spatial scenario)
 func handleUnrealSpawnObject(ctx channeld.MessageContext) {
 	// server -> channeld -> client
 	msg, ok := ctx.Msg.(*channeldpb.ServerForwardMessage)

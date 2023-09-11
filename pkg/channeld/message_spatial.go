@@ -37,6 +37,7 @@ func getSpatialDampingSettings(dist uint) *SpatialDampingSettings {
 	return nil
 }
 
+// Executed in the spatial channels
 func handleUpdateSpatialInterest(ctx MessageContext) {
 	msg, ok := ctx.Msg.(*channeldpb.UpdateSpatialInterestMessage)
 	if !ok {
@@ -87,33 +88,42 @@ func handleUpdateSpatialInterest(ctx MessageContext) {
 	channelsToUnsub := Difference(existingsSubs, channelsToSub)
 
 	for chId := range channelsToUnsub {
-		if ctx.Channel = GetChannel(chId); ctx.Channel == nil {
+		ctxUnsub := MessageContext{ChannelId: ctx.ChannelId}
+		if ctxUnsub.Channel = GetChannel(chId); ctxUnsub.Channel == nil {
 			continue
 		}
-		ctx.MsgType = channeldpb.MessageType_UNSUB_FROM_CHANNEL
-		ctx.Msg = &channeldpb.UnsubscribedFromChannelMessage{
+		ctxUnsub.MsgType = channeldpb.MessageType_UNSUB_FROM_CHANNEL
+		ctxUnsub.Msg = &channeldpb.UnsubscribedFromChannelMessage{
 			ConnId: msg.ConnId,
 		}
-		ctx.Connection = clientConn
-		/* Make sure the unsub message is handled in the channel's goroutine
-		handleUnsubFromChannel(ctx)
-		*/
-		ctx.Channel.PutMessageContext(ctx, handleUnsubFromChannel)
+		ctxUnsub.Connection = clientConn
+		ctxUnsub.StubId = ctx.StubId
+
+		// Make sure the unsub message is handled in the channel's goroutine
+		if ctxUnsub.Channel == ctx.Channel {
+			handleUnsubFromChannel(ctxUnsub)
+		} else {
+			ctxUnsub.Channel.PutMessageContext(ctxUnsub, handleUnsubFromChannel)
+		}
 	}
 
 	for chId, subOptions := range channelsToSub {
-		if ctx.Channel = GetChannel(chId); ctx.Channel == nil {
+		ctxSub := MessageContext{ChannelId: ctx.ChannelId}
+		if ctxSub.Channel = GetChannel(chId); ctxSub.Channel == nil {
 			continue
 		}
-		ctx.MsgType = channeldpb.MessageType_SUB_TO_CHANNEL
-		ctx.Msg = &channeldpb.SubscribedToChannelMessage{
+		ctxSub.MsgType = channeldpb.MessageType_SUB_TO_CHANNEL
+		ctxSub.Msg = &channeldpb.SubscribedToChannelMessage{
 			ConnId:     msg.ConnId,
 			SubOptions: subOptions,
 		}
-		ctx.Connection = clientConn
-		/* Make sure the sub message is handled in the channel's goroutine
-		handleSubToChannel(ctx)
-		*/
-		ctx.Channel.PutMessageContext(ctx, handleSubToChannel)
+		ctxSub.Connection = clientConn
+
+		// Make sure the sub message is handled in the channel's goroutine
+		if ctxSub.Channel == ctx.Channel {
+			handleSubToChannel(ctxSub)
+		} else {
+			ctxSub.Channel.PutMessageContext(ctxSub, handleSubToChannel)
+		}
 	}
 }
