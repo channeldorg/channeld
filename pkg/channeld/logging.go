@@ -16,6 +16,7 @@ type Logger struct {
 }
 
 var rootLogger *Logger //*zap.Logger
+var zapConfig zap.Config
 var securityLogger *Logger
 
 func RootLogger() *Logger {
@@ -68,24 +69,23 @@ func InitLogs() {
 		return
 	}
 
-	var cfg zap.Config
 	if GlobalSettings.Development {
-		cfg = zap.NewDevelopmentConfig()
+		zapConfig = zap.NewDevelopmentConfig()
 	} else {
-		cfg = zap.NewProductionConfig()
+		zapConfig = zap.NewProductionConfig()
 	}
 	if GlobalSettings.LogLevel.HasValue {
-		cfg.Level = zap.NewAtomicLevelAt(zapcore.Level(GlobalSettings.LogLevel.Value))
+		zapConfig.Level = zap.NewAtomicLevelAt(zapcore.Level(GlobalSettings.LogLevel.Value))
 	}
 	if GlobalSettings.LogFile.HasValue {
-		cfg.OutputPaths = append(cfg.OutputPaths, strings.ReplaceAll(GlobalSettings.LogFile.Value, "{time}", time.Now().Format("20060102150405")))
+		zapConfig.OutputPaths = append(zapConfig.OutputPaths, strings.ReplaceAll(GlobalSettings.LogFile.Value, "{time}", time.Now().Format("20060102150405")))
 	}
 
-	zapLogger, _ := cfg.Build()
+	zapLogger, _ := zapConfig.Build()
 	rootLogger = &Logger{zapLogger}
 
-	cfg.OutputPaths = append(cfg.OutputPaths, filepath.Dir(GlobalSettings.LogFile.Value)+"/security.log")
-	zapLogger, _ = cfg.Build()
+	zapConfig.OutputPaths = append(zapConfig.OutputPaths, filepath.Dir(GlobalSettings.LogFile.Value)+"/security.log")
+	zapLogger, _ = zapConfig.Build()
 	securityLogger = &Logger{zapLogger}
 
 	zap.Hooks(func(e zapcore.Entry) error {
@@ -96,4 +96,9 @@ func InitLogs() {
 	})
 
 	defer rootLogger.Sync()
+}
+
+func SetLogLevel(level zapcore.Level) {
+	// atomicLevel.SetLevel(level)
+	zapConfig.Level.SetLevel(level)
 }
