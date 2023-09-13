@@ -1,8 +1,8 @@
 package channeld
 
 import (
+	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/metaworking/channeld/pkg/channeldpb"
 	"github.com/metaworking/channeld/pkg/common"
@@ -30,12 +30,11 @@ func TestSubscribeToChannel(t *testing.T) {
 	globalChannel.ownerConnection = c1
 	c1.SubscribeToChannel(globalChannel, nil)
 	assert.Contains(t, globalChannel.subscribedConnections, c1)
-
 }
 
 func randomChannelId(maxChId int) common.ChannelId {
 	// [0, 999]
-	chId := time.Now().Nanosecond() % (maxChId - 1)
+	chId := rand.Intn(maxChId) //time.Now().Nanosecond() % (maxChId - 1)
 	// [1, 1000]
 	return common.ChannelId(chId + 1)
 }
@@ -75,6 +74,6 @@ func BenchmarkHandoverEntitySub(b *testing.B) {
 }
 
 // Result:
-// BenchmarkHandoverEntitySub-20    	     645	   2498163 ns/op	  985149 B/op	   22501 allocs/op
-// 1000 clients handing over at the same time takes 2.5ms - Acceptable
-// 985KB / 22K allocs - A bit too much
+// BenchmarkHandoverEntitySub-20    	      81	  12666246 ns/op	 7495425 B/op	  100522 allocs/op
+// 1000 clients handing over at the same time takes 13ms - Acceptable
+// 7.5MB / 100K allocs - A bit too much
