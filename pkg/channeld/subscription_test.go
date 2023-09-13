@@ -2,6 +2,7 @@ package channeld
 
 import (
 	"math/rand"
+	"sync"
 	"testing"
 
 	"github.com/metaworking/channeld/pkg/channeldpb"
@@ -73,7 +74,60 @@ func BenchmarkHandoverEntitySub(b *testing.B) {
 	}
 }
 
+/*
+Result:
+BenchmarkHandoverEntitySub-20    	      81	  12666246 ns/op	 7495425 B/op	  100522 allocs/op
+1000 clients handing over at the same time takes 13ms - Acceptable
+7.5MB / 100K allocs - A bit too much
+*/
+
+func BenchmarkHandoverEntitySubAsync(b *testing.B) {
+	// Disable logging
+	SetLogLevel(zap.FatalLevel)
+
+	CONN_NUM := 1000
+	ENTITY_CHANNEL_NUM := 1000
+	SPATIAL_CHANNEL_NUM := 15 * 15
+	CONN_PER_GRID := CONN_NUM / SPATIAL_CHANNEL_NUM
+
+	conns := make([]*Connection, CONN_NUM)
+	for i := 0; i < CONN_NUM; i++ {
+		conns[i] = addTestConnection(channeldpb.ConnectionType_CLIENT) //&Connection{id: ConnectionId(i), connectionType: channeldpb.ConnectionType_CLIENT}
+
+	}
+
+	for i := 0; i < ENTITY_CHANNEL_NUM; i++ {
+		CreateChannel(channeldpb.ChannelType_ENTITY, conns[i])
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		wg := sync.WaitGroup{}
+		for s := 0; s < SPATIAL_CHANNEL_NUM; s++ {
+			gridIndex := s
+			wg.Add(1)
+			go func() {
+				for nConn := 0; nConn < CONN_PER_GRID; nConn++ {
+					conn := conns[gridIndex*CONN_PER_GRID+nConn]
+					// Every client subscribes to 3 spatial channels and unsubscribes from 3 spatial channels
+					for nSub := 0; nSub < 3*CONN_PER_GRID; nSub++ {
+						conn.SubscribeToChannel(GetChannel(randomChannelId(ENTITY_CHANNEL_NUM)), nil)
+					}
+					for nUnsub := 0; nUnsub < 3*CONN_PER_GRID; nUnsub++ {
+						conn.UnsubscribeFromChannel(GetChannel(randomChannelId(ENTITY_CHANNEL_NUM)))
+					}
+				}
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+	}
+}
+
+/*
 // Result:
-// BenchmarkHandoverEntitySub-20    	      81	  12666246 ns/op	 7495425 B/op	  100522 allocs/op
-// 1000 clients handing over at the same time takes 13ms - Acceptable
-// 7.5MB / 100K allocs - A bit too much
+BenchmarkHandoverEntitySubAsync-20    	     147	   9056136 ns/op	 5960059 B/op	   82705 allocs/op
+1000 clients handing over at the same time takes 9ms - Acceptable
+6MB / 82K allocs - A bit too much
+*/
