@@ -432,7 +432,9 @@ func (ch *Channel) tickConnections() {
 					return
 				}
 			} else if conn != nil {
-				ch.GetOwner().sendUnsubscribed(MessageContext{}, ch, conn.(*Connection), 0)
+				if ownerConn := ch.GetOwner(); ownerConn != nil {
+					ownerConn.sendUnsubscribed(MessageContext{}, ch, conn.(*Connection), 0)
+				}
 			}
 		}
 	}

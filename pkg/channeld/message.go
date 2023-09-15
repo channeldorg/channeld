@@ -154,10 +154,10 @@ func HandleServerToClientUserMessage(ctx MessageContext) {
 				ctx.Channel.Broadcast(ctx)
 		*/
 	case channeldpb.BroadcastType_SINGLE_CONNECTION:
-		var conn ConnectionInChannel = nil
+		var conn *Connection = nil
 		if msg.ClientConnId == 0 {
 			// server to server
-			conn = ctx.Channel.GetOwner()
+			conn = ctx.Channel.GetOwner().(*Connection)
 		} else {
 			// server to client
 			conn = GetConnection(ConnectionId(msg.ClientConnId))
