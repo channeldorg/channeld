@@ -63,6 +63,7 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.Channel
 		proto.Merge(&cs.options, options)
 	}
 
+	// FIXME: race condition!
 	cs.fanOutElement = ch.fanOutQueue.PushFront(&fanOutConnection{
 		conn:           c,
 		hadFirstFanOut: *cs.options.SkipFirstFanOut,

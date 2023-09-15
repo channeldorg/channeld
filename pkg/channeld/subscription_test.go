@@ -28,7 +28,7 @@ func TestSubscribeToChannel(t *testing.T) {
 	// By default, the GLOBAL channel has no owner
 	assert.True(t, !globalChannel.HasOwner())
 
-	globalChannel.ownerConnection = c1
+	globalChannel.SetOwner(c1)
 	c1.SubscribeToChannel(globalChannel, nil)
 	assert.Contains(t, globalChannel.subscribedConnections, c1)
 }

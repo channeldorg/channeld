@@ -662,15 +662,15 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 				continue
 			}
 
-			if srcChannel.HasOwner() && !srcChannel.ownerConnection.HasInterestIn(dstChannelId) {
+			if ownerConn := srcChannel.GetOwner(); ownerConn != nil && !ownerConn.IsClosing() && !ownerConn.HasInterestIn(dstChannelId) {
 				// Unsub the src spatial server from the entity channel if the server has no interest in the dst spatial channel
-				srcChannel.ownerConnection.UnsubscribeFromChannel(entityCh)
-				srcChannel.ownerConnection.sendUnsubscribed(MessageContext{}, entityCh, nil, 0)
+				ownerConn.UnsubscribeFromChannel(entityCh)
+				ownerConn.sendUnsubscribed(MessageContext{}, entityCh, nil, 0)
 			}
 
 			// Set the owner of the entity channel to the dst spatial server, so the src spatial server's residual update will be ignored.
 			// Otherwise repeating handover may happen!
-			entityCh.ownerConnection = dstChannel.ownerConnection
+			entityCh.SetOwner(dstChannel.GetOwner())
 		}
 	}
 
@@ -786,12 +786,13 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 
 			dataAccess := channeldpb.ChannelDataAccess_READ_ACCESS
 			// Only the owner can update the entity
-			if conn == entityCh.ownerConnection {
+			if conn == entityCh.GetOwner() {
 				dataAccess = channeldpb.ChannelDataAccess_WRITE_ACCESS
 			}
 			// TODO: set subOptions from the entity's replication settings in the engine.
 
 			// Subscribe to the entity channel for every connection in the dst spatial channel
+			// FIXME: Do not subscribe UE client to the PlayerController or PlayerState entity channel
 			cs, alreadySubed := conn.SubscribeToChannel(entityCh, subOptions)
 			if cs == nil {
 				continue

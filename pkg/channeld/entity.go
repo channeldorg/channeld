@@ -244,7 +244,7 @@ func (ch *Channel) GetHandoverEntities(notifyingEntityId EntityId) map[EntityId]
 }
 
 func handleAddEntityGroup(ctx MessageContext) {
-	if ctx.Connection != ctx.Channel.ownerConnection {
+	if ctx.Connection != ctx.Channel.GetOwner() {
 		ctx.Connection.Logger().Error("AddEntityGroupMessage should only handled for the owner connection of the entity channel")
 		return
 	}
@@ -269,7 +269,7 @@ func handleAddEntityGroup(ctx MessageContext) {
 }
 
 func handleRemoveEntityGroup(ctx MessageContext) {
-	if ctx.Connection != ctx.Channel.ownerConnection {
+	if ctx.Connection != ctx.Channel.GetOwner() {
 		ctx.Connection.Logger().Error("RemoveEntityGroupMessage should only handled for the owner connection of the entity channel")
 		return
 	}

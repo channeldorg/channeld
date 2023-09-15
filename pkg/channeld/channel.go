@@ -61,10 +61,12 @@ type ConnectionInChannel interface {
 }
 
 type Channel struct {
-	id                    common.ChannelId
-	channelType           channeldpb.ChannelType
-	state                 ChannelState
+	id          common.ChannelId
+	channelType channeldpb.ChannelType
+	state       ChannelState
+	// DO NOT use this field directly, use GetOwner() and SetOwner() instead.
 	ownerConnection       ConnectionInChannel
+	ownerLock             sync.RWMutex
 	subscribedConnections map[ConnectionInChannel]*ChannelSubscription
 	// Lock for reading all the subscribed connection outside the channel
 	connectionsLock sync.RWMutex
@@ -152,6 +154,7 @@ func createChannelWithId(channelId common.ChannelId, t channeldpb.ChannelType, o
 		id:                    channelId,
 		channelType:           t,
 		ownerConnection:       owner,
+		ownerLock:             sync.RWMutex{},
 		subscribedConnections: make(map[ConnectionInChannel]*ChannelSubscription),
 		connectionsLock:       sync.RWMutex{},
 		/* Channel data is not created by default. See handleCreateChannel().
@@ -317,7 +320,7 @@ func (ch *Channel) PutMessageInternal(msgType channeldpb.MessageType, msg common
 	ch.inMsgQueue <- channelMessage{ctx: MessageContext{
 		MsgType:     msgType,
 		Msg:         msg,
-		Connection:  ch.ownerConnection,
+		Connection:  ch.GetOwner(),
 		Channel:     ch,
 		Broadcast:   0,
 		StubId:      0,
@@ -402,35 +405,33 @@ func (ch *Channel) tickConnections() {
 			// Unsub the connection from the channel
 			delete(ch.subscribedConnections, conn)
 			conn.Logger().Info("removed subscription of a disconnected endpoint", zap.Uint32("channelId", uint32(ch.id)))
-			if ownerConn, ok := ch.ownerConnection.(*Connection); ok && conn != nil {
-				if ownerConn == conn {
-					// Reset the owner if it's removed
-					ch.ownerConnection = nil
-					if ch.channelType == channeldpb.ChannelType_GLOBAL {
-						Event_GlobalChannelUnpossessed.Broadcast(struct{}{})
-					}
-					conn.Logger().Info("found removed ownner connection of channel", zap.Uint32("channelId", uint32(ch.id)))
-					if GlobalSettings.GetChannelSettings(ch.channelType).RemoveChannelAfterOwnerRemoved {
-						atomic.AddInt32(&ch.removing, 1)
-
-						// DO NOT remove the GLOBAL channel!
-						if ch != globalChannel {
-							// Only the GLOBAL channel can handle the channel removal
-							globalChannel.PutMessage(&channeldpb.RemoveChannelMessage{
-								ChannelId: uint32(ch.id),
-							}, handleRemoveChannel, nil, &channeldpb.MessagePack{
-								Broadcast: 0,
-								StubId:    0,
-								ChannelId: uint32(GlobalChannelId),
-							})
-						}
-
-						ch.Logger().Info("removing channel after the owner is removed")
-						return
-					}
-				} else if conn != nil {
-					ch.ownerConnection.sendUnsubscribed(MessageContext{}, ch, conn.(*Connection), 0)
+			if ch.GetOwner() == conn {
+				// Reset the owner if it's removed
+				ch.SetOwner(nil)
+				if ch.channelType == channeldpb.ChannelType_GLOBAL {
+					Event_GlobalChannelUnpossessed.Broadcast(struct{}{})
 				}
+				conn.Logger().Info("found removed ownner connection of channel", zap.Uint32("channelId", uint32(ch.id)))
+				if GlobalSettings.GetChannelSettings(ch.channelType).RemoveChannelAfterOwnerRemoved {
+					atomic.AddInt32(&ch.removing, 1)
+
+					// DO NOT remove the GLOBAL channel!
+					if ch != globalChannel {
+						// Only the GLOBAL channel can handle the channel removal
+						globalChannel.PutMessage(&channeldpb.RemoveChannelMessage{
+							ChannelId: uint32(ch.id),
+						}, handleRemoveChannel, nil, &channeldpb.MessagePack{
+							Broadcast: 0,
+							StubId:    0,
+							ChannelId: uint32(GlobalChannelId),
+						})
+					}
+
+					ch.Logger().Info("removing channel after the owner is removed")
+					return
+				}
+			} else if conn != nil {
+				ch.GetOwner().sendUnsubscribed(MessageContext{}, ch, conn.(*Connection), 0)
 			}
 		}
 	}
@@ -450,7 +451,7 @@ func (ch *Channel) Broadcast(ctx MessageContext) {
 		if channeldpb.BroadcastType_ALL_BUT_SENDER.Check(ctx.Broadcast) && conn == ctx.Connection {
 			continue
 		}
-		if channeldpb.BroadcastType_ALL_BUT_OWNER.Check(ctx.Broadcast) && conn == ch.ownerConnection {
+		if channeldpb.BroadcastType_ALL_BUT_OWNER.Check(ctx.Broadcast) && conn == ch.GetOwner() {
 			continue
 		}
 		if channeldpb.BroadcastType_ALL_BUT_CLIENT.Check(ctx.Broadcast) && conn.GetConnectionType() == channeldpb.ConnectionType_CLIENT {
@@ -480,10 +481,10 @@ func (ch *Channel) GetAllConnections() map[ConnectionInChannel]struct{} {
 // Return true if the connection can 1)remove; 2)sub/unsub another connection to/from; the channel.
 func (c *Connection) HasAuthorityOver(ch *Channel) bool {
 	// The global owner has authority over everything.
-	if globalChannel.ownerConnection == c {
+	if globalChannel.GetOwner() == c {
 		return true
 	}
-	if ch.ownerConnection == c {
+	if ch.GetOwner() == c {
 		return true
 	}
 	return false
@@ -498,29 +499,59 @@ func (ch *Channel) Logger() *Logger {
 }
 
 func (ch *Channel) HasOwner() bool {
-	conn, ok := ch.ownerConnection.(*Connection)
-	return ok && conn != nil && !conn.IsClosing()
+	conn := ch.GetOwner()
+	return conn != nil && !conn.IsClosing()
 }
 
 func (chA *Channel) IsSameOwner(chB *Channel) bool {
-	return chA.HasOwner() && chB.HasOwner() && chA.ownerConnection == chB.ownerConnection
+	connA := chA.GetOwner()
+	return connA != nil && !connA.IsClosing() && connA == chB.GetOwner()
 }
 
-func (ch *Channel) SendToOwner(msgType uint32, msg common.Message) {
-	if !ch.HasOwner() {
-		ch.Logger().Warn("channel has no owner to send message", zap.Uint32("msgType", msgType))
-		return
+func (ch *Channel) SendMessageToOwner(msgType uint32, msg common.Message) bool {
+	conn := ch.GetOwner()
+	if conn != nil && !conn.IsClosing() {
+		conn.Send(MessageContext{
+			MsgType:   channeldpb.MessageType(msgType),
+			Msg:       msg,
+			ChannelId: uint32(ch.id),
+			Broadcast: 0,
+			StubId:    0,
+		})
+		return true
 	}
-	ch.ownerConnection.Send(MessageContext{
-		MsgType:   channeldpb.MessageType(msgType),
-		Msg:       msg,
-		ChannelId: uint32(ch.id),
-		Broadcast: 0,
-		StubId:    0,
-	})
+
+	return false
+}
+
+func (ch *Channel) SendToOwner(ctx MessageContext) bool {
+	conn := ch.GetOwner()
+	if conn != nil && !conn.IsClosing() {
+		conn.Send(ctx)
+		return true
+	}
+
+	return false
 }
 
 // Implementation for ConnectionInChannel interface
 func (c *Connection) IsNil() bool {
 	return c == nil
+}
+
+func (c *Channel) GetOwner() ConnectionInChannel {
+	c.ownerLock.RLock()
+	defer c.ownerLock.RUnlock()
+
+	return c.ownerConnection
+}
+
+func (c *Channel) SetOwner(conn ConnectionInChannel) {
+	c.ownerLock.Lock()
+	defer c.ownerLock.Unlock()
+
+	// Race condition:
+	// 1. set to nil when the owner unsubscribes from the entity channel.
+	// 2. set to dst server conn when the entity of the channel is handed over to the dst server.
+	c.ownerConnection = conn
 }

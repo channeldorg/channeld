@@ -51,13 +51,13 @@ func (ch *Channel) CheckACL(c ConnectionInChannel, accessType ChannelAccessType)
 		return false, ErrNoneAccess
 
 	case ChannelAccessLevel_OwnerOnly:
-		if ch.ownerConnection == c {
+		if ch.GetOwner() == c {
 			return true, nil
 		} else {
 			return false, ErrOwnerOnlyAccess
 		}
 	case ChannelAccessLevel_OwnerAndGlobalOwner:
-		if ch.ownerConnection == c || globalChannel.ownerConnection == c {
+		if ch.GetOwner() == c || globalChannel.GetOwner() == c {
 			return true, nil
 		} else {
 			return false, ErrOwnerAndGlobalOwnerAccess
