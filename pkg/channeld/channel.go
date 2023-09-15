@@ -68,8 +68,8 @@ type Channel struct {
 	ownerConnection       ConnectionInChannel
 	ownerLock             sync.RWMutex
 	subscribedConnections map[ConnectionInChannel]*ChannelSubscription
-	// Lock for reading all the subscribed connection outside the channel
-	connectionsLock sync.RWMutex
+	// Lock for sub/unsub outside the channel. Read lock: tickConnections, tickData(fan-out), Broadcast, GetAllConnections.
+	subLock sync.RWMutex
 	// Read-only property, e.g. name
 	metadata string
 	data     *ChannelData
@@ -156,7 +156,7 @@ func createChannelWithId(channelId common.ChannelId, t channeldpb.ChannelType, o
 		ownerConnection:       owner,
 		ownerLock:             sync.RWMutex{},
 		subscribedConnections: make(map[ConnectionInChannel]*ChannelSubscription),
-		connectionsLock:       sync.RWMutex{},
+		subLock:               sync.RWMutex{},
 		/* Channel data is not created by default. See handleCreateChannel().
 		data:                  ReflectChannelData(t, nil),
 		*/
@@ -358,9 +358,10 @@ func (ch *Channel) Tick() {
 
 		ch.tickMessages(tickStart)
 
+		ch.subLock.RLock()
 		ch.tickData(ch.GetTime())
-
 		ch.tickConnections()
+		ch.subLock.RUnlock()
 
 		tickDuration := time.Since(tickStart)
 		channelTickDuration.WithLabelValues(ch.channelType.String()).Set(float64(tickDuration) / float64(time.Millisecond))
@@ -395,10 +396,10 @@ func (ch *Channel) tickMessages(tickStart time.Time) {
 }
 
 func (ch *Channel) tickConnections() {
-	defer func() {
-		ch.connectionsLock.RUnlock()
-	}()
-	ch.connectionsLock.RLock()
+	// defer func() {
+	// 	ch.subLock.RUnlock()
+	// }()
+	// ch.subLock.RLock()
 
 	for conn := range ch.subscribedConnections {
 		if conn.IsClosing() {
@@ -439,9 +440,9 @@ func (ch *Channel) tickConnections() {
 
 func (ch *Channel) Broadcast(ctx MessageContext) {
 	defer func() {
-		ch.connectionsLock.RUnlock()
+		ch.subLock.RUnlock()
 	}()
-	ch.connectionsLock.RLock()
+	ch.subLock.RLock()
 
 	for conn := range ch.subscribedConnections {
 		//c := GetConnection(connId)
@@ -467,9 +468,9 @@ func (ch *Channel) Broadcast(ctx MessageContext) {
 // Goroutine-safe read of the subscribed connections
 func (ch *Channel) GetAllConnections() map[ConnectionInChannel]struct{} {
 	defer func() {
-		ch.connectionsLock.RUnlock()
+		ch.subLock.RUnlock()
 	}()
-	ch.connectionsLock.RLock()
+	ch.subLock.RLock()
 
 	conns := make(map[ConnectionInChannel]struct{})
 	for conn := range ch.subscribedConnections {
