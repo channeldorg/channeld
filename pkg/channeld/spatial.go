@@ -489,8 +489,8 @@ func (ctl *StaticGrid2DSpatialController) subToAdjacentChannels(serverIndex uint
 				if channelToSub == nil {
 					return fmt.Errorf("failed to subscribe border channel %d as it doesn't exist", channelId)
 				}
-				cs, _ := serverConn.SubscribeToChannel(channelToSub, subOptions)
-				if cs != nil {
+				cs, shouldSend := serverConn.SubscribeToChannel(channelToSub, subOptions)
+				if shouldSend {
 					serverConn.sendSubscribed(MessageContext{}, channelToSub, serverConn, 0, &cs.options)
 				}
 			}
@@ -511,8 +511,8 @@ func (ctl *StaticGrid2DSpatialController) subToAdjacentChannels(serverIndex uint
 				if channelToSub == nil {
 					return fmt.Errorf("failed to subscribe border channel %d as it doesn't exist", channelId)
 				}
-				cs, _ := serverConn.SubscribeToChannel(channelToSub, subOptions)
-				if cs != nil {
+				cs, shouldSend := serverConn.SubscribeToChannel(channelToSub, subOptions)
+				if shouldSend {
 					serverConn.sendSubscribed(MessageContext{}, channelToSub, serverConn, 0, &cs.options)
 				}
 			}
@@ -533,8 +533,8 @@ func (ctl *StaticGrid2DSpatialController) subToAdjacentChannels(serverIndex uint
 				if channelToSub == nil {
 					return fmt.Errorf("failed to subscribe border channel %d as it doesn't exist", channelId)
 				}
-				cs, _ := serverConn.SubscribeToChannel(channelToSub, subOptions)
-				if cs != nil {
+				cs, shouldSend := serverConn.SubscribeToChannel(channelToSub, subOptions)
+				if shouldSend {
 					serverConn.sendSubscribed(MessageContext{}, channelToSub, serverConn, 0, &cs.options)
 				}
 			}
@@ -555,8 +555,8 @@ func (ctl *StaticGrid2DSpatialController) subToAdjacentChannels(serverIndex uint
 				if channelToSub == nil {
 					return fmt.Errorf("failed to subscribe border channel %d as it doesn't exist", channelId)
 				}
-				cs, _ := serverConn.SubscribeToChannel(channelToSub, subOptions)
-				if cs != nil {
+				cs, shouldSend := serverConn.SubscribeToChannel(channelToSub, subOptions)
+				if shouldSend {
 					serverConn.sendSubscribed(MessageContext{}, channelToSub, serverConn, 0, &cs.options)
 				}
 			}
@@ -573,8 +573,9 @@ type HandoverDataWithPayload interface {
 }
 
 type HandoverDataMerger interface {
-	// Entity channel data merges itself to the spatial channel data for handover
-	MergeTo(common.Message, bool) error
+	// Entity channel data merges itself to the spatial channel data for handover.
+	// If fullData is true, merge the full entity data into the spatial channel data; otherwise, merge the entity identifier only.
+	MergeTo(spatialChannelData common.Message, fullData bool) error
 }
 
 // Spatial channel data shoud implement this interface to support entity spawn, destory, and handover
@@ -784,22 +785,22 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 				continue
 			}
 
-			dataAccess := channeldpb.ChannelDataAccess_READ_ACCESS
 			// Only the owner can update the entity
 			if conn == entityCh.GetOwner() {
-				dataAccess = channeldpb.ChannelDataAccess_WRITE_ACCESS
+				subOptions.DataAccess = Pointer(channeldpb.ChannelDataAccess_WRITE_ACCESS)
+			} else {
+				subOptions.DataAccess = Pointer(channeldpb.ChannelDataAccess_READ_ACCESS)
 			}
 			// TODO: set subOptions from the entity's replication settings in the engine.
 
 			// Subscribe to the entity channel for every connection in the dst spatial channel
 			// FIXME: Do not subscribe UE client to the PlayerController or PlayerState entity channel
-			cs, alreadySubed := conn.SubscribeToChannel(entityCh, subOptions)
+			cs, shouldSend := conn.SubscribeToChannel(entityCh, subOptions)
 			if cs == nil {
 				continue
 			}
 			// If the data access changes, the SubscribedToChannelResultMessage must be sent, otherwise the connection may have problem sending the ChannelDataUpdateMessage..
-			if !alreadySubed || *cs.options.DataAccess != dataAccess {
-				cs.options.DataAccess = &dataAccess
+			if shouldSend {
 				conn.sendSubscribed(MessageContext{}, entityCh, conn, 0, &cs.options)
 			}
 
@@ -807,7 +808,7 @@ func (ctl *StaticGrid2DSpatialController) Notify(oldInfo common.SpatialInfo, new
 			if hasMerger {
 				// Send the handover data with full states to the new subscribers,
 				// in order to initialize the PlayerController properly.
-				handoverMerger.MergeTo(handoverDataMsg, !alreadySubed)
+				handoverMerger.MergeTo(handoverDataMsg, shouldSend)
 			} else {
 				rootLogger.Warn("entity data doesn't implement HandoverDataMerger",
 					zap.Uint32("entityId", uint32(handoverEntityId)),

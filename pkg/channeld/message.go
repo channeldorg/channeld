@@ -505,8 +505,8 @@ func handleCreateEntityChannel(ctx MessageContext) {
 			 */
 
 			// FIXME: different subOptions for different connection?
-			cs, alreadySubed := conn.SubscribeToChannel(newChannel, nil)
-			if cs != nil && !alreadySubed {
+			cs, shouldSend := conn.SubscribeToChannel(newChannel, nil)
+			if shouldSend {
 				conn.sendSubscribed(MessageContext{}, newChannel, conn, 0, &cs.options)
 				newChannel.Logger().Debug("subscribed existing connection for the well-known entity", zap.Uint32("connId", uint32(conn.Id())))
 			}
@@ -524,8 +524,8 @@ func handleCreateEntityChannel(ctx MessageContext) {
 				// FIXME: different subOptions for different connection?
 				// Add some delay so the client won't have to spawn the entity immediately after the auth.
 				subOptions := &channeldpb.ChannelSubscriptionOptions{FanOutDelayMs: Pointer(int32(1000))}
-				cs, _ := data.Connection.SubscribeToChannel(newChannel, subOptions)
-				if cs != nil {
+				cs, shouldSend := data.Connection.SubscribeToChannel(newChannel, subOptions)
+				if shouldSend {
 					data.Connection.sendSubscribed(MessageContext{}, newChannel, data.Connection, 0, &cs.options)
 					newChannel.Logger().Debug("subscribed new connection for the well-known entity", zap.Uint32("connId", uint32(data.Connection.Id())))
 				}
@@ -685,8 +685,8 @@ func handleSubToChannel(ctx MessageContext) {
 		}
 	*/
 
-	cs, alreadySubed := connToSub.SubscribeToChannel(ctx.Channel, msg.SubOptions)
-	if cs == nil {
+	cs, shouldSend := connToSub.SubscribeToChannel(ctx.Channel, msg.SubOptions)
+	if !shouldSend {
 		return
 	}
 
@@ -699,7 +699,7 @@ func handleSubToChannel(ctx MessageContext) {
 	}
 
 	// Notify the channel owner if not already subed and it's not the sender.
-	if ownerConn := ctx.Channel.GetOwner(); !alreadySubed && ownerConn != nil && ownerConn != ctx.Connection && !ownerConn.IsClosing() {
+	if ownerConn := ctx.Channel.GetOwner(); ownerConn != nil && ownerConn != ctx.Connection && !ownerConn.IsClosing() {
 		ownerConn.sendSubscribed(ctx, ctx.Channel, connToSub, 0, &cs.options)
 	}
 }

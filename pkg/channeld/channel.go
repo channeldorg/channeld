@@ -50,7 +50,7 @@ type ConnectionInChannel interface {
 	Close()
 	IsClosing() bool
 	Send(ctx MessageContext)
-	// Returns the subscription instance if successfully subscribed, and true if the subscription already exists.
+	// Returns the subscription instance if successfully subscribed, and true if subscription message should be sent.
 	SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) (*ChannelSubscription, bool)
 	UnsubscribeFromChannel(ch *Channel) (*channeldpb.ChannelSubscriptionOptions, error)
 	sendSubscribed(ctx MessageContext, ch *Channel, connToSub ConnectionInChannel, stubId uint32, subOptions *channeldpb.ChannelSubscriptionOptions)

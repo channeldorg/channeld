@@ -17,9 +17,7 @@ func init() {
 }
 
 func TestSubscribeToChannel(t *testing.T) {
-	c1 := &Connection{id: 1, connectionType: channeldpb.ConnectionType_SERVER}
-	//c2 := &Connection{id: 2, connectionType: SERVER}
-	//c3 := &Connection{id: 3, connectionType: CLIENT}
+	c1 := addTestConnection(channeldpb.ConnectionType_SERVER)
 
 	assert.NotNil(t, globalChannel)
 	// Can't create the GLOBAL channel
@@ -29,8 +27,21 @@ func TestSubscribeToChannel(t *testing.T) {
 	assert.True(t, !globalChannel.HasOwner())
 
 	globalChannel.SetOwner(c1)
-	c1.SubscribeToChannel(globalChannel, nil)
+	shouldSend := false
+	_, shouldSend = c1.SubscribeToChannel(globalChannel, nil)
 	assert.Contains(t, globalChannel.subscribedConnections, c1)
+	assert.True(t, shouldSend)
+
+	// Subscribe again
+	_, shouldSend = c1.SubscribeToChannel(globalChannel, nil)
+	assert.Contains(t, globalChannel.subscribedConnections, c1)
+	assert.False(t, shouldSend)
+
+	// Subscribe with different DataAccess
+	_, shouldSend = c1.SubscribeToChannel(globalChannel, &channeldpb.ChannelSubscriptionOptions{
+		DataAccess: Pointer(channeldpb.ChannelDataAccess_WRITE_ACCESS),
+	})
+	assert.True(t, shouldSend)
 }
 
 func randomChannelId(maxChId int) common.ChannelId {
