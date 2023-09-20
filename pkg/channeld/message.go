@@ -166,7 +166,7 @@ func HandleServerToClientUserMessage(ctx MessageContext) {
 		if conn != nil && !conn.IsClosing() {
 			conn.Send(ctx)
 		} else {
-			ctx.Connection.Logger().Warn("cannot forward the message as the target connection does not exist",
+			ctx.Connection.Logger().Info("drop the forward message as the target connection does not exist",
 				zap.Uint32("msgType", uint32(ctx.MsgType)),
 				zap.Uint32("targetConnId", msg.ClientConnId),
 			)
@@ -454,7 +454,19 @@ func handleCreateEntityChannel(ctx MessageContext) {
 		return
 	}
 
-	newChannel := createChannelWithId(common.ChannelId(msg.EntityId), channeldpb.ChannelType_ENTITY, ctx.Connection)
+	entityChId := common.ChannelId(msg.EntityId)
+	if entityChId < GlobalSettings.EntityChannelIdStart {
+		ctx.Connection.Logger().Error("illegal attemp to create entity channel with invalid entityId", zap.Uint32("entityId", uint32(entityChId)))
+		return
+	}
+
+	if entityCh := GetChannel(entityChId); entityCh != nil && !entityCh.IsRemoving() {
+		// This could happen when the UE server is restarted but the channeld is not.
+		ctx.Connection.Logger().Warn("illegal attemp to create entity channel with duplicated entityId", zap.Uint32("entityId", uint32(entityChId)))
+		return
+	}
+
+	newChannel := createChannelWithId(entityChId, channeldpb.ChannelType_ENTITY, ctx.Connection)
 	newChannel.Logger().Info("created entity channel",
 		zap.Uint32("ownerConnId", uint32(newChannel.GetOwner().Id())),
 	)
@@ -747,14 +759,19 @@ func handleUnsubFromChannel(ctx MessageContext) {
 
 func handleChannelDataUpdate(ctx MessageContext) {
 	// Only channel owner or writable subsciptors can update the data
-	if ctx.Channel.GetOwner() != ctx.Connection {
+	if ownerConn := ctx.Channel.GetOwner(); ownerConn != ctx.Connection {
 		cs := ctx.Channel.subscribedConnections[ctx.Connection]
 		if cs == nil || *cs.options.DataAccess != channeldpb.ChannelDataAccess_WRITE_ACCESS {
-			ctx.Connection.Logger().Warn("attempt to update channel data but has no access",
-				zap.String("channelType", ctx.Channel.channelType.String()),
-				zap.Uint32("channelId", uint32(ctx.Channel.id)),
-			)
-			return
+			if ctx.Connection.GetConnectionType() == channeldpb.ConnectionType_SERVER && ownerConn != nil && !ownerConn.IsClosing() {
+				// Quick fix: set the sender to the channel owner if it's a server connection
+				ctx.Connection = ownerConn
+			} else {
+				ctx.Connection.Logger().Warn("attempt to update channel data but has no access",
+					zap.String("channelType", ctx.Channel.channelType.String()),
+					zap.Uint32("channelId", uint32(ctx.Channel.id)),
+				)
+				return
+			}
 		}
 	}
 

@@ -81,7 +81,10 @@ func InitLogs() {
 		zapConfig.OutputPaths = append(zapConfig.OutputPaths, strings.ReplaceAll(GlobalSettings.LogFile.Value, "{time}", time.Now().Format("20060102150405")))
 	}
 
-	zapLogger, _ := zapConfig.Build()
+	zapLogger, err := zapConfig.Build()
+	if err != nil {
+		panic(err)
+	}
 	rootLogger = &Logger{zapLogger}
 
 	zapConfig.OutputPaths = append(zapConfig.OutputPaths, filepath.Dir(GlobalSettings.LogFile.Value)+"/security.log")
@@ -95,7 +98,7 @@ func InitLogs() {
 		return nil
 	})
 
-	defer rootLogger.Sync()
+	// defer rootLogger.Sync()
 }
 
 func SetLogLevel(level zapcore.Level) {

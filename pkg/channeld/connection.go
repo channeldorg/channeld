@@ -76,7 +76,10 @@ func (s *queuedMessagePackSender) Send(c *Connection, ctx MessageContext) {
 		return
 	}
 
-	c.sendQueue <- mp
+	// Double check
+	if !c.IsClosing() {
+		c.sendQueue <- mp
+	}
 }
 
 type Connection struct {
@@ -376,7 +379,7 @@ func (c *Connection) receive() {
 	if err != nil {
 		switch err := err.(type) {
 		case *net.OpError:
-			c.Logger().Warn("read bytes",
+			c.Logger().Info("net op error",
 				zap.String("op", err.Op),
 				zap.String("remoteAddr", c.conn.RemoteAddr().String()),
 				zap.Error(err),
@@ -439,6 +442,12 @@ func readSize(tag []byte) int {
 }
 
 func (c *Connection) readPacket(bufPos *int) (*channeldpb.Packet, error) {
+	if c.readPos-*bufPos < PacketHeaderSize {
+		// Unfinished header
+		fragmentedPacketCount.WithLabelValues(c.connectionType.String()).Inc()
+		return nil, nil
+	}
+
 	tag := c.readBuffer[*bufPos : *bufPos+PacketHeaderSize]
 
 	packetSize := readSize(tag)
@@ -527,10 +536,13 @@ func (c *Connection) isPacketRecordingEnabled() bool {
 func (c *Connection) receiveMessage(mp *channeldpb.MessagePack) {
 	channel := GetChannel(common.ChannelId(mp.ChannelId))
 	if channel == nil {
-		c.Logger().Warn("can't find channel",
-			zap.Uint32("channelId", mp.ChannelId),
-			zap.Uint32("msgType", mp.MsgType),
-		)
+		// Sub to/unsub from a removed channel is allowed
+		if mp.MsgType != uint32(channeldpb.MessageType_SUB_TO_CHANNEL) && mp.MsgType != uint32(channeldpb.MessageType_UNSUB_FROM_CHANNEL) {
+			c.Logger().Warn("can't find channel",
+				zap.Uint32("channelId", mp.ChannelId),
+				zap.Uint32("msgType", mp.MsgType),
+			)
+		}
 		return
 	}
 

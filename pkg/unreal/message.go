@@ -40,6 +40,10 @@ func handleUnrealSpawnObject(ctx channeld.MessageContext) {
 		return
 	}
 
+	if len(spawnMsg.Obj.Context) == 0 {
+		ctx.Connection.Logger().Warn("empty context in SpawnObjectMessage", zap.Uint32("netId", *spawnMsg.Obj.NetGUID))
+	}
+
 	// Update the message's spatial channelId based on the actor's location
 	oldChId := *spawnMsg.ChannelId
 	if spawnMsg.Location != nil {
