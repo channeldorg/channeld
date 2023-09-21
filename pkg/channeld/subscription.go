@@ -30,26 +30,30 @@ func defaultSubOptions(t channeldpb.ChannelType) *channeldpb.ChannelSubscription
 	return options
 }
 
+// Returns the subscription instance if successfully subscribed, and true if subscription message should be sent.
 func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.ChannelSubscriptionOptions) (*ChannelSubscription, bool) {
 	if c.IsClosing() {
 		return nil, false
 	}
 
 	defer func() {
-		ch.connectionsLock.Unlock()
+		ch.subLock.Unlock()
 	}()
-	ch.connectionsLock.Lock()
+	ch.subLock.Lock()
 
 	cs, exists := ch.subscribedConnections[c]
 	if exists {
+		dataAccessChanged := false
 		if options != nil {
-			c.Logger().Debug("already subed to channel, the sub options will be merged",
+			dataAcess := cs.options.DataAccess
+			c.Logger().Verbose("already subed to channel, the sub options will be merged",
 				zap.String("channelType", ch.channelType.String()),
 				zap.Uint32("channelId", uint32(ch.id)),
 			)
 			proto.Merge(&cs.options, options)
+			dataAccessChanged = *dataAcess != *cs.options.DataAccess
 		}
-		return cs, exists
+		return cs, dataAccessChanged
 	}
 
 	cs = &ChannelSubscription{
@@ -94,14 +98,14 @@ func (c *Connection) SubscribeToChannel(ch *Channel, options *channeldpb.Channel
 		zap.Bool("skipSelfUpdateFanOut", *cs.options.SkipSelfUpdateFanOut),
 		zap.Bool("skipFirstFanOut", *cs.options.SkipFirstFanOut),
 	)
-	return cs, false
+	return cs, true
 }
 
 func (c *Connection) UnsubscribeFromChannel(ch *Channel) (*channeldpb.ChannelSubscriptionOptions, error) {
 	defer func() {
-		ch.connectionsLock.Unlock()
+		ch.subLock.Unlock()
 	}()
-	ch.connectionsLock.Lock()
+	ch.subLock.Lock()
 
 	cs, exists := ch.subscribedConnections[c]
 	if !exists {

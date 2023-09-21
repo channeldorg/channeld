@@ -183,9 +183,9 @@ func (ch *Channel) tickData(t ChannelTime) {
 			focp = tmp
 			continue
 		}
-		ch.connectionsLock.RLock()
+		// ch.subLock.RLock()
 		cs := ch.subscribedConnections[conn]
-		ch.connectionsLock.RUnlock()
+		// ch.subLock.RUnlock()
 		if cs == nil || *cs.options.DataAccess == channeldpb.ChannelDataAccess_NO_ACCESS {
 			focp = focp.Next()
 			continue

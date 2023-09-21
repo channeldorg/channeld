@@ -14,6 +14,7 @@ func InitMessageHandlers() {
 	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_DESTROY), &channeldpb.ServerForwardMessage{}, handleUnrealDestroyObject)
 }
 
+// Executed in the spatial channels or the GLOBAL channel (no-spatial scenario)
 func handleUnrealSpawnObject(ctx channeld.MessageContext) {
 	// server -> channeld -> client
 	msg, ok := ctx.Msg.(*channeldpb.ServerForwardMessage)
@@ -37,6 +38,10 @@ func handleUnrealSpawnObject(ctx channeld.MessageContext) {
 	if spawnMsg.Obj.NetGUID == nil || *spawnMsg.Obj.NetGUID == 0 {
 		ctx.Connection.Logger().Error("invalid NetGUID in SpawnObjectMessage")
 		return
+	}
+
+	if len(spawnMsg.Obj.Context) == 0 {
+		ctx.Connection.Logger().Warn("empty context in SpawnObjectMessage", zap.Uint32("netId", *spawnMsg.Obj.NetGUID))
 	}
 
 	// Update the message's spatial channelId based on the actor's location

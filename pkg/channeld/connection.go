@@ -61,12 +61,24 @@ func (s *queuedMessagePackSender) Send(c *Connection, ctx MessageContext) {
 		return
 	}
 
-	c.sendQueue <- &channeldpb.MessagePack{
+	mp := &channeldpb.MessagePack{
 		ChannelId: ctx.ChannelId,
 		Broadcast: ctx.Broadcast,
 		StubId:    ctx.StubId,
 		MsgType:   uint32(ctx.MsgType),
 		MsgBody:   msgBody,
+	}
+
+	// Check the message pack size before adding to the queue
+	size := proto.Size(mp)
+	if size >= MaxPacketSize-PacketHeaderSize {
+		c.logger.Warn("failed to send the message and its size exceeds the limit", zap.Int("size", size))
+		return
+	}
+
+	// Double check
+	if !c.IsClosing() {
+		c.sendQueue <- mp
 	}
 }
 
@@ -82,6 +94,7 @@ type Connection struct {
 	// writer          *bufio.Writer
 	sender               MessageSender
 	sendQueue            chan *channeldpb.MessagePack //MessageContext
+	oversizedMsgPack     *channeldpb.MessagePack
 	pit                  string
 	fsm                  *fsm.FiniteStateMachine
 	fsmDisallowedCounter int
@@ -366,7 +379,7 @@ func (c *Connection) receive() {
 	if err != nil {
 		switch err := err.(type) {
 		case *net.OpError:
-			c.Logger().Warn("read bytes",
+			c.Logger().Info("net op error",
 				zap.String("op", err.Op),
 				zap.String("remoteAddr", c.conn.RemoteAddr().String()),
 				zap.Error(err),
@@ -429,6 +442,12 @@ func readSize(tag []byte) int {
 }
 
 func (c *Connection) readPacket(bufPos *int) (*channeldpb.Packet, error) {
+	if c.readPos-*bufPos < PacketHeaderSize {
+		// Unfinished header
+		fragmentedPacketCount.WithLabelValues(c.connectionType.String()).Inc()
+		return nil, nil
+	}
+
 	tag := c.readBuffer[*bufPos : *bufPos+PacketHeaderSize]
 
 	packetSize := readSize(tag)
@@ -517,10 +536,13 @@ func (c *Connection) isPacketRecordingEnabled() bool {
 func (c *Connection) receiveMessage(mp *channeldpb.MessagePack) {
 	channel := GetChannel(common.ChannelId(mp.ChannelId))
 	if channel == nil {
-		c.Logger().Warn("can't find channel",
-			zap.Uint32("channelId", mp.ChannelId),
-			zap.Uint32("msgType", mp.MsgType),
-		)
+		// Sub to/unsub from a removed channel is allowed
+		if mp.MsgType != uint32(channeldpb.MessageType_SUB_TO_CHANNEL) && mp.MsgType != uint32(channeldpb.MessageType_UNSUB_FROM_CHANNEL) {
+			c.Logger().Warn("can't find channel",
+				zap.Uint32("channelId", mp.ChannelId),
+				zap.Uint32("msgType", mp.MsgType),
+			)
+		}
 		return
 	}
 
@@ -598,6 +620,13 @@ func (c *Connection) flush() {
 	p := channeldpb.Packet{Messages: make([]*channeldpb.MessagePack, 0, len(c.sendQueue))}
 	size := 0
 
+	// Add the oversided message pack first if any
+	if c.oversizedMsgPack != nil {
+		p.Messages = append(p.Messages, c.oversizedMsgPack)
+		c.oversizedMsgPack = nil
+		// No need to check the packet size now, as each message pack is already checked before adding to the queue.
+	}
+
 	// For now we don't limit the message numbers per packet
 	for len(c.sendQueue) > 0 {
 		mp := <-c.sendQueue
@@ -615,9 +644,8 @@ func (c *Connection) flush() {
 			// Revert adding the message that causes the oversize
 			p.Messages = p.Messages[:len(p.Messages)-1]
 
-			// Put the message back to the queue
-			// FIXME: order may matter
-			c.sendQueue <- mp
+			// Store the message pack that causes the overside
+			c.oversizedMsgPack = mp
 			break
 		}
 
