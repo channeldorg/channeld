@@ -441,13 +441,25 @@ func (ctl *StaticGrid2DSpatialController) CreateChannels(ctx MessageContext) ([]
 	ctl.serverConnections[serverIndex] = ctx.Connection
 	//ctl.serverIndex++
 	serverIndex = ctl.nextServerIndex()
-	// When all spatial channels are created, subscribe each server to its adjacent grids(channels)
+	// When all spatial channels are created, subscribe each server to its adjacent grids(channels) if exists.
 	if serverIndex == ctl.ServerCols*ctl.ServerRows {
 		for i := uint32(0); i < serverIndex; i++ {
 			err := ctl.subToAdjacentChannels(i, serverGridCols, serverGridRows, msg.SubOptions)
 			if err != nil {
 				return channels, fmt.Errorf("failed to sub to adjacent channels of server connection %d, err: %v", ctl.serverConnections[i].Id(), err)
 			}
+		}
+
+		// ...and send the SpatialChannelsReadyMessage to all the spatial servers.
+		readyMsg := &channeldpb.SpatialChannelsReadyMessage{
+			ServerIndex: serverIndex,
+			ServerCount: ctl.ServerCols * ctl.ServerRows,
+		}
+		for _, serverConn := range ctl.serverConnections {
+			serverConn.Send(MessageContext{
+				MsgType: channeldpb.MessageType_SPATIAL_CHANNELS_READY,
+				Msg:     readyMsg,
+			})
 		}
 	}
 
