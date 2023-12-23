@@ -146,6 +146,9 @@ enum MessageType {
 
     // Used by @RemoveEntityGroupMessage
     ENTITY_GROUP_REMOVE = 17;
+
+    // Used by @SpatialChannelsReadyMessage
+    SPATIAL_CHANNELS_READY = 18;
     
     // Used by @DebugGetSpatialRegionsMessage
     DEBUG_GET_SPATIAL_REGIONS = 99;
@@ -355,6 +358,12 @@ message QuerySpatialChannelMessage {
 
 message QuerySpatialChannelResultMessage {
     repeated uint32 channelId = 1;
+}
+
+// Indicates that all the spatial channels are created by the spatial servers, so the servers can continue further initialization.
+message SpatialChannelsReadyMessage {
+    uint32 serverIndex = 1;
+    uint32 serverCount = 2;
 }
 
 // ALL connections in the source AND destination channels receive this messge when a handover happpned.
