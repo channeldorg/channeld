@@ -6,7 +6,7 @@ require (
 	github.com/metaworking/channeld v0.0.0-00010101000000-000000000000
 	github.com/metaworking/channeld/examples/chat-rooms v0.0.0
 	github.com/metaworking/channeld/examples/unity-mirror-tanks v0.0.0
-	google.golang.org/protobuf v1.28.1
+	google.golang.org/protobuf v1.33.0
 )
 
 require (
