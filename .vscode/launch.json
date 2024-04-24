@@ -53,7 +53,16 @@
         "mode": "debug",
         "cwd": "${workspaceFolder}",
         "program": "examples/channeld-ue-tps",
-        "args": ["-dev", "-loglevel=-1", "-ct=0", "-mcb=13", "-cfsm=config/client_authoratative_fsm.json", "-chs=config/channel_settings_tps.json", "-scc=config/spatial_static_2x2.json"]
+        "args": [
+            "-dev", 
+            "-loglevel=-1", 
+            "-logfile=logs/{time}.log", 
+            "-ct=0", 
+            "-mcb=13", 
+            "-cfsm=config/client_authoratative_fsm.json", 
+            "-chs=config/channel_settings_ue.json", 
+            "-scc=config/spatial_static_2x2.json"
+        ]
     },
     {
         "name": "Launch Replay Session",

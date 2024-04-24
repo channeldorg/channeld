@@ -48,10 +48,10 @@
         "DataMsgFullName": "unrealpb.SpatialChannelData"
     },
     "5": {
-        "TickIntervalMs": 20,
-        "DefaultFanOutIntervalMs": 20,
+        "TickIntervalMs": 33,
+        "DefaultFanOutIntervalMs": 50,
         "DefaultFanOutDelayMs": 0,
-        "RemoveChannelAfterOwnerRemoved": false,
+        "RemoveChannelAfterOwnerRemoved": true,
         "ACLSettings": {
             "Sub": 3,
             "Unsub": 3,

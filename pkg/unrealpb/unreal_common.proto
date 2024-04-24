@@ -129,6 +129,7 @@ message SyncNetIdMessage {
     message NetIdPath {
         uint32 netId = 1;
         string path = 2;
+        optional uint32 outerNetId = 3;
     }
     repeated NetIdPath netIdPaths = 1;
 }
