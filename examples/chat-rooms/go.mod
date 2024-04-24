@@ -6,7 +6,7 @@ require (
 	github.com/metaworking/channeld v0.0.0-00010101000000-000000000000
 	github.com/prometheus/client_golang v1.11.1
 	github.com/stretchr/testify v1.8.1
-	google.golang.org/protobuf v1.28.1
+	google.golang.org/protobuf v1.33.0
 )
 
 require (
