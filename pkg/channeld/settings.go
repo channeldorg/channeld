@@ -27,11 +27,12 @@ type GlobalSettingsType struct {
 	ServerFSM             string
 	ServerBypassAuth      bool
 
-	ClientNetwork         string
-	ClientAddress         string
-	ClientReadBufferSize  int
-	ClientWriteBufferSize int
-	ClientFSM             string
+	ClientNetworkWaitMasterServer bool
+	ClientNetwork                 string
+	ClientAddress                 string
+	ClientReadBufferSize          int
+	ClientWriteBufferSize         int
+	ClientFSM                     string
 
 	CompressionType channeldpb.CompressionType
 
@@ -159,6 +160,7 @@ func (s *GlobalSettingsType) ParseFlag() error {
 	flag.StringVar(&s.ServerFSM, "sfsm", s.ServerFSM, "the path to the server FSM config")
 	flag.BoolVar(&s.ServerBypassAuth, "sba", true, "should server bypasses the authentication?")
 
+	flag.BoolVar(&s.ClientNetworkWaitMasterServer, "cwm", true, "should the client network starts listening after the Global channel being possessed by the Master Server?")
 	flag.StringVar(&s.ClientNetwork, "cn", "tcp", "the network type for the client connections")
 	flag.StringVar(&s.ClientAddress, "ca", ":12108", "the network address for the client connections")
 	flag.IntVar(&s.ClientReadBufferSize, "crb", s.ClientReadBufferSize, "the read buffer size for the client connections")

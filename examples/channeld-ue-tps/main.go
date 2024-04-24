@@ -32,7 +32,9 @@ func main() {
 
 	go channeld.StartListening(channeldpb.ConnectionType_SERVER, channeld.GlobalSettings.ServerNetwork, channeld.GlobalSettings.ServerAddress)
 
-	// After the Master server owned the GLOBAL channel, the client connection should be listened.*/
-	<-channeld.Event_GlobalChannelPossessed.Wait()
+	if channeld.GlobalSettings.ClientNetworkWaitMasterServer {
+		// After the Master server owned the GLOBAL channel, the client connection should be listened.
+		<-channeld.Event_GlobalChannelPossessed.Wait()
+	}
 	channeld.StartListening(channeldpb.ConnectionType_CLIENT, channeld.GlobalSettings.ClientNetwork, channeld.GlobalSettings.ClientAddress)
 }
