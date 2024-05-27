@@ -248,13 +248,9 @@ func handleCreateEntityChannel(ctx MessageContext) {
 									newChannel.Logger().Info("set the entity channel owner to the spatial channel's",
 										zap.Uint32("spatialChId", uint32(spatialChId)))
 
-									/* Sub-and-send happens at the end of this function
-									// Subscribe the owner to the entity channel
-									sub, shouldSend := ownerConn.SubscribeToChannel(newChannel, msg.SubOptions)
-									if shouldSend {
-										ownerConn.sendSubscribed(MessageContext{}, newChannel, ownerConn, 0, &sub.options)
-									}
-									*/
+									Event_EntityChannelSpatiallyOwned.Broadcast(EntityChannelSpatiallyOwnedEventData{newChannel, spatialCh})
+
+									// Sub-and-send happens at the end of this function
 
 									// Set the messge context so that the CreateChannelResultMessage will be sent to the owner
 									// instead of the message sender (the master server).
