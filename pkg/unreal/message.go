@@ -49,12 +49,7 @@ func handleUnrealSpawnObject(ctx channeld.MessageContext) {
 	// Update the message's spatial channelId based on the actor's location
 	oldChId := *spawnMsg.ChannelId
 	if spawnMsg.Location != nil {
-		// Swap the Y and Z as UE uses the Z-Up rule but channeld uses the Y-up rule.
-		spatialChId, err := channeld.GetSpatialController().GetChannelId(common.SpatialInfo{
-			X: float64(*spawnMsg.Location.X),
-			Y: float64(*spawnMsg.Location.Z),
-			Z: float64(*spawnMsg.Location.Y),
-		})
+		spatialChId, err := channeld.GetSpatialController().GetChannelId(*spawnMsg.Location.ToSpatialInfo())
 		if err != nil {
 			ctx.Connection.Logger().Warn("failed to GetChannelId", zap.Error(err),
 				zap.Float32("x", *spawnMsg.Location.X),

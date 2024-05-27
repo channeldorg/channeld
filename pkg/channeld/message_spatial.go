@@ -225,6 +225,50 @@ func handleCreateEntityChannel(ctx MessageContext) {
 			newChannel.Logger().Error("failed to unmarshal data message for the new channel", zap.Error(err))
 		} else {
 			newChannel.InitData(dataMsg, msg.MergeOptions)
+
+			// If the entity channel is created from GLOBAL channel(master server), but its data contains spatial info,
+			// we should set the owner of the entity channel to the spatial channel's.
+			if ctx.Channel == globalChannel {
+				dataMsgWithSpatialInfo, ok := dataMsg.(EntityChannelDataWithSpatialInfo)
+				if ok {
+					spatialInfo := dataMsgWithSpatialInfo.GetSpatialInfo()
+					if spatialInfo != nil {
+						spatialChId, err := spatialController.GetChannelId(*spatialInfo)
+						if err != nil {
+							ctx.Connection.Logger().Error("failed to set the entity channel owner to the spatial channel's", zap.Error(err))
+						} else {
+							spatialCh := GetChannel(spatialChId)
+							if spatialCh == nil {
+								newChannel.Logger().Error("failed to set the entity channel owner as the spatial channel does not exist",
+									zap.Uint32("spatialChId", uint32(spatialChId)))
+							} else {
+								ownerConn := spatialCh.GetOwner()
+								if ownerConn != nil && !ownerConn.IsClosing() {
+									newChannel.SetOwner(ownerConn)
+									newChannel.Logger().Info("set the entity channel owner to the spatial channel's",
+										zap.Uint32("spatialChId", uint32(spatialChId)))
+
+									/* Sub-and-send happens at the end of this function
+									// Subscribe the owner to the entity channel
+									sub, shouldSend := ownerConn.SubscribeToChannel(newChannel, msg.SubOptions)
+									if shouldSend {
+										ownerConn.sendSubscribed(MessageContext{}, newChannel, ownerConn, 0, &sub.options)
+									}
+									*/
+
+									// Set the messge context so that the CreateChannelResultMessage will be sent to the owner
+									// instead of the message sender (the master server).
+									ctx.Connection = ownerConn
+									ctx.ChannelId = uint32(spatialChId)
+								} else {
+									newChannel.Logger().Warn("the entity's owning spatial channel does not have an owner connection",
+										zap.Uint32("spatialChId", uint32(spatialChId)))
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 	} else {
 		// Channel data should always be initialized

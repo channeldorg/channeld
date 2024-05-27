@@ -110,7 +110,7 @@ message HandoverContext {
 }
 
 // Wrapped in ChannelDataHandoverMessage.data
-// Implements [channeld.HandoverDataPayload]
+// Implements [channeld.HandoverDataWithPayload]
 message HandoverData {
     repeated HandoverContext context = 1;
     // The channel data message that will be handed over to the destination channel.
