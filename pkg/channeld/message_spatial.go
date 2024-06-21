@@ -228,7 +228,7 @@ func handleCreateEntityChannel(ctx MessageContext) {
 
 			// If the entity channel is created from GLOBAL channel(master server), but its data contains spatial info,
 			// we should set the owner of the entity channel to the spatial channel's.
-			if ctx.Channel == globalChannel {
+			if ctx.Channel == globalChannel && spatialController != nil {
 				dataMsgWithSpatialInfo, ok := dataMsg.(EntityChannelDataWithSpatialInfo)
 				if ok {
 					spatialInfo := dataMsgWithSpatialInfo.GetSpatialInfo()
