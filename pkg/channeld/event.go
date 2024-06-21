@@ -23,6 +23,13 @@ var Event_AuthComplete = &Event[AuthEventData]{}
 
 var Event_FsmDisallowed = &Event[*Connection]{}
 
+type EntityChannelSpatiallyOwnedEventData struct {
+	EntityChannel *Channel
+	SpatialChanel *Channel
+}
+
+var Event_EntityChannelSpatiallyOwned = &Event[EntityChannelSpatiallyOwnedEventData]{}
+
 type EventData interface {
 }
 

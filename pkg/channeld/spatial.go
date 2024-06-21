@@ -380,6 +380,10 @@ func (ctl *StaticGrid2DSpatialController) GetAdjacentChannels(spatialChannelId c
 	return channelIds, nil
 }
 
+type EntityChannelDataWithSpatialInfo interface {
+	GetSpatialInfo() *common.SpatialInfo
+}
+
 func (ctl *StaticGrid2DSpatialController) CreateChannels(ctx MessageContext) ([]*Channel, error) {
 	ctl.initServerConnections()
 	serverIndex := ctl.nextServerIndex()
@@ -457,6 +461,14 @@ func (ctl *StaticGrid2DSpatialController) CreateChannels(ctx MessageContext) ([]
 		}
 		for _, serverConn := range ctl.serverConnections {
 			serverConn.Send(MessageContext{
+				MsgType: channeldpb.MessageType_SPATIAL_CHANNELS_READY,
+				Msg:     readyMsg,
+			})
+		}
+
+		// ...and the master server too.
+		if globalChannel.ownerConnection != nil {
+			globalChannel.ownerConnection.Send(MessageContext{
 				MsgType: channeldpb.MessageType_SPATIAL_CHANNELS_READY,
 				Msg:     readyMsg,
 			})

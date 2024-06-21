@@ -12,6 +12,8 @@ import (
 func InitMessageHandlers() {
 	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_SPAWN), &channeldpb.ServerForwardMessage{}, handleUnrealSpawnObject)
 	channeld.RegisterMessageHandler(uint32(unrealpb.MessageType_DESTROY), &channeldpb.ServerForwardMessage{}, handleUnrealDestroyObject)
+
+	channeld.Event_EntityChannelSpatiallyOwned.Listen(handleEntityChannelSpatiallyOwned)
 }
 
 // Executed in the spatial channels or the GLOBAL channel (no-spatial scenario)
@@ -49,12 +51,7 @@ func handleUnrealSpawnObject(ctx channeld.MessageContext) {
 	// Update the message's spatial channelId based on the actor's location
 	oldChId := *spawnMsg.ChannelId
 	if spawnMsg.Location != nil {
-		// Swap the Y and Z as UE uses the Z-Up rule but channeld uses the Y-up rule.
-		spatialChId, err := channeld.GetSpatialController().GetChannelId(common.SpatialInfo{
-			X: float64(*spawnMsg.Location.X),
-			Y: float64(*spawnMsg.Location.Z),
-			Z: float64(*spawnMsg.Location.Y),
-		})
+		spatialChId, err := channeld.GetSpatialController().GetChannelId(*spawnMsg.Location.ToSpatialInfo())
 		if err != nil {
 			ctx.Connection.Logger().Warn("failed to GetChannelId", zap.Error(err),
 				zap.Float32("x", *spawnMsg.Location.X),
@@ -121,6 +118,8 @@ type UnrealObjectEntityData interface {
 	SetObjRef(objRef *unrealpb.UnrealObjectRef)
 }
 
+// Add the SpatialEntityState to the spatial channel data. If an entity doesn't exist in the spatial channel data,
+// handover will not work properly.
 func addSpatialEntity(ch *channeld.Channel, objRef *unrealpb.UnrealObjectRef) {
 	if ch.Type() != channeldpb.ChannelType_SPATIAL {
 		return
@@ -187,4 +186,16 @@ func handleUnrealDestroyObject(ctx channeld.MessageContext) {
 		entityCh.Logger().Info("removing entity channel from unrealpb.DestroyObjectMessage")
 		channeld.RemoveChannel(entityCh)
 	}
+}
+
+func handleEntityChannelSpatiallyOwned(data channeld.EntityChannelSpatiallyOwnedEventData) {
+	dataMsgWithObjRef, ok := data.EntityChannel.GetDataMessage().(unrealpb.EntityChannelDataWithObjRef)
+	if !ok {
+		data.EntityChannel.Logger().Error("spatial-owned entity channel data doesn't implement EntityChannelDataWithObjRef")
+		return
+	}
+
+	data.SpatialChanel.Execute(func(ch *channeld.Channel) {
+		addSpatialEntity(ch, dataMsgWithObjRef.GetObjRef())
+	})
 }

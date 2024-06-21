@@ -8,6 +8,21 @@ import (
 	"github.com/metaworking/channeld/pkg/common"
 )
 
+func (vec *FVector) ToSpatialInfo() *common.SpatialInfo {
+	info := &common.SpatialInfo{}
+	if vec.X != nil {
+		info.X = float64(*vec.X)
+	}
+	// Swap the Y and Z as UE uses the Z-Up rule but channeld uses the Y-up rule.
+	if vec.Y != nil {
+		info.Z = float64(*vec.Y)
+	}
+	if vec.Z != nil {
+		info.Y = float64(*vec.Z)
+	}
+	return info
+}
+
 // Implement [channeld.HandoverDataWithPayload]
 func (data *HandoverData) ClearPayload() {
 	data.ChannelData = nil
