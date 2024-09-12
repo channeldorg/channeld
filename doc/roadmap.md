@@ -6,8 +6,9 @@
 - [x] Authentication
 - [x] Channel ACL
 - [x] DDoS Protection
-- [ ] Health check
 - [x] Spatial-based pub/sub
+- [ ] Health check
+- [ ] Disaster recovery
 - [ ] Spatial-based load-balancing
 - [ ] Distributed channels
 
@@ -25,11 +26,11 @@
 - [x] Read/write the packet using Protobuf
 - ~~[ ] Use [gogoprotobuf](https://github.com/gogo/protobuf) for faster marshalling/unmarshalling~~
 - [x] Enable custom merge of channel data messages
+- [ ] Non-reflection-based merge of channel data messages
 
 # Tests
 - [x] Unit tests
-- [ ] Benchmark tests
-- [ ] Scale tests
+- [x] Benchmark tests
 
 # SDKs
 - [ ] Javascript SDK
@@ -49,7 +50,7 @@
     - [ ] Complete the UI
 - [ ] Unity tank game
     - [x] Implement the C# client library
-    - [ ] Mirror Integration
+    - [x] Mirror Integration
         - [x] Transport
         - [x] SyncVar and NetworkTransform
         - [x] Observers and Interest Management

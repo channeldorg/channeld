@@ -385,13 +385,13 @@ func (c *Connection) receive() {
 				zap.Error(err),
 			)
 		case *websocket.CloseError:
-			c.Logger().Info("disconnected",
+			c.Logger().Info("disconnected (websocket)",
 				zap.String("remoteAddr", c.conn.RemoteAddr().String()),
 			)
 		}
 
 		if err == io.EOF {
-			c.Logger().Info("disconnected",
+			c.Logger().Info("disconnected (EOF)",
 				zap.String("remoteAddr", c.conn.RemoteAddr().String()),
 			)
 		}
