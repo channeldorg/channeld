@@ -26,7 +26,7 @@ func InitAntiDDoS() {
 			if GlobalSettings.MaxFailedAuthAttempts > 0 && failedAuthCounters[data.PlayerIdentifierToken] >= GlobalSettings.MaxFailedAuthAttempts {
 				pitBlacklist[data.PlayerIdentifierToken] = time.Now()
 				securityLogger.Info("blacklisted PIT due to too many failed auth attempts", zap.String("pit", data.PlayerIdentifierToken))
-				data.Connection.Close()
+				data.Connection.Close(nil)
 			}
 		} else if data.AuthResult == channeldpb.AuthResultMessage_INVALID_PIT {
 			// Invalid username token - record the IP
@@ -39,7 +39,7 @@ func InitAntiDDoS() {
 			if GlobalSettings.MaxFailedAuthAttempts > 0 && failedAuthCounters[ip] >= GlobalSettings.MaxFailedAuthAttempts {
 				ipBlacklist[ip] = time.Now()
 				securityLogger.Info("blacklisted IP due to too many failed auth attempts", zap.String("ip", ip))
-				data.Connection.Close()
+				data.Connection.Close(nil)
 			}
 		}
 	})
@@ -54,7 +54,7 @@ func InitAntiDDoS() {
 		if GlobalSettings.MaxFsmDisallowed > 0 && c.fsmDisallowedCounter >= GlobalSettings.MaxFsmDisallowed {
 			pitBlacklist[c.pit] = time.Now()
 			securityLogger.Info("blacklisted PIT due to too many FSM disallowed", zap.String("pit", c.pit))
-			c.Close()
+			c.Close(nil)
 		}
 	})
 
@@ -71,7 +71,7 @@ func checkUnauthConns() {
 			}
 			if conn.state == ConnectionState_UNAUTHENTICATED && time.Since(conn.connTime).Milliseconds() >= GlobalSettings.ConnectionAuthTimeoutMs {
 				ipBlacklist[GetIP(conn.RemoteAddr())] = time.Now()
-				conn.Close()
+				conn.Close(nil)
 				securityLogger.Info("closed and blacklisted unauthenticated connection due to timeout", zap.String("ip", conn.conn.RemoteAddr().String()))
 			}
 			return true

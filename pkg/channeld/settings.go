@@ -20,12 +20,14 @@ type GlobalSettingsType struct {
 	ProfileOption func(*profile.Profile)
 	ProfilePath   string
 
-	ServerNetwork         string
-	ServerAddress         string
-	ServerReadBufferSize  int
-	ServerWriteBufferSize int
-	ServerFSM             string
-	ServerBypassAuth      bool
+	ServerNetwork              string
+	ServerAddress              string
+	ServerReadBufferSize       int
+	ServerWriteBufferSize      int
+	ServerFSM                  string
+	ServerBypassAuth           bool
+	ServerConnRecoverable      bool
+	ServerConnRecoverTimeoutMs int64
 
 	ClientNetworkWaitMasterServer bool
 	ClientNetwork                 string
@@ -70,15 +72,18 @@ type ChannelSettingsType struct {
 }
 
 var GlobalSettings = GlobalSettingsType{
-	LogLevel:              &NullableInt{},
-	LogFile:               &NullableString{},
-	ServerReadBufferSize:  0x0001ffff,
-	ServerWriteBufferSize: 256,
-	ServerFSM:             "config/server_authoratative_fsm.json",
-	ClientReadBufferSize:  0x0001ffff,
-	ClientWriteBufferSize: 512,
-	ClientFSM:             "config/client_non_authoratative_fsm.json",
-	CompressionType:       channeldpb.CompressionType_NO_COMPRESSION,
+	LogLevel:                   &NullableInt{},
+	LogFile:                    &NullableString{},
+	ServerReadBufferSize:       0x0001ffff,
+	ServerWriteBufferSize:      256,
+	ServerFSM:                  "config/server_authoratative_fsm.json",
+	ServerBypassAuth:           true,
+	ServerConnRecoverable:      false,
+	ServerConnRecoverTimeoutMs: 0,
+	ClientReadBufferSize:       0x0001ffff,
+	ClientWriteBufferSize:      512,
+	ClientFSM:                  "config/client_non_authoratative_fsm.json",
+	CompressionType:            channeldpb.CompressionType_NO_COMPRESSION,
 	// Mirror uses int32 as the connId
 	MaxConnectionIdBits:     31,
 	ConnectionAuthTimeoutMs: 5000,
@@ -158,7 +163,9 @@ func (s *GlobalSettingsType) ParseFlag() error {
 	flag.IntVar(&s.ServerReadBufferSize, "srb", s.ServerReadBufferSize, "the read buffer size for the server connections")
 	flag.IntVar(&s.ServerWriteBufferSize, "swb", s.ServerWriteBufferSize, "the write buffer size for the server connections")
 	flag.StringVar(&s.ServerFSM, "sfsm", s.ServerFSM, "the path to the server FSM config")
-	flag.BoolVar(&s.ServerBypassAuth, "sba", true, "should server bypasses the authentication?")
+	flag.BoolVar(&s.ServerBypassAuth, "sba", s.ServerBypassAuth, "should server bypasses the authentication?")
+	flag.BoolVar(&s.ServerConnRecoverable, "scr", s.ServerConnRecoverable, "is the server connection recoverable?")
+	flag.Int64Var(&s.ServerConnRecoverTimeoutMs, "scrt", s.ServerConnRecoverTimeoutMs, "the duration to wait for the server connection to recover. Default is 0 (infinite)")
 
 	flag.BoolVar(&s.ClientNetworkWaitMasterServer, "cwm", true, "should the client network starts listening after the Global channel being possessed by the Master Server?")
 	flag.StringVar(&s.ClientNetwork, "cn", "tcp", "the network type for the client connections")

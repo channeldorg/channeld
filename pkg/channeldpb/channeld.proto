@@ -149,6 +149,12 @@ enum MessageType {
 
     // Used by @SpatialChannelsReadyMessage
     SPATIAL_CHANNELS_READY = 18;
+
+    // // Used by @StartRecoveryMesssage
+    // RECOVERY_START = 19;
+    RECOVERY_CHANNEL_DATA = 20;
+    // Used by @EndRecoveryMesssage
+    RECOVERY_END = 21;
     
     // Used by @DebugGetSpatialRegionsMessage
     DEBUG_GET_SPATIAL_REGIONS = 99;
@@ -193,6 +199,7 @@ message AuthResultMessage {
     // However, because the compression type is specified per packet, the client has its freedom to control which compression type to use.
     // It's useful when the client has too much CPU load for the compression, or the network debug is needed.
     CompressionType compressionType = 3;
+    bool shouldRecover = 4;
 }
 
 enum ChannelDataAccess {
@@ -333,6 +340,27 @@ message ChannelDataUpdateMessage {
 // Response: no.
 message DisconnectMessage {
     uint32 connId = 1;
+}
+
+// message StartRecoveryMesssage {
+
+// }
+
+// A combination of channel sub/create/update messages that are sent from channeld to the connection during the recovery process.
+message ChannelDataRecoveryMessage {
+    uint32 channelId = 1;
+    ChannelType channelType = 2;
+    string metadata = 3;
+    uint32 ownerConnId = 4;
+    // Used to restore the channel data in order. The connection that recovers should consume the recovery message in the order of subTime.
+    int64 subTime = 5;
+    ChannelSubscriptionOptions subOptions = 6;
+    // Full channel data. Objects should be able to re-created from the stats in it.
+    google.protobuf.Any data = 7;
+}
+
+message EndRecoveryMesssage {
+
 }
 
 // ----------------- SPATIAL messages start --------------------//
