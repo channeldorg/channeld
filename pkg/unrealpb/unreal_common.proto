@@ -146,6 +146,10 @@ message SpatialChannelData {
     map<uint32, SpatialEntityState> entities = 1;
 }
 
+message ChannelRecoveryData {
+    map<uint32, UnrealObjectRef> objRefs = 1;
+}
+
 
 
 extend google.protobuf.MessageOptions {

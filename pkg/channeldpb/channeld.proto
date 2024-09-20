@@ -355,8 +355,10 @@ message ChannelDataRecoveryMessage {
     // Used to restore the channel data in order. The connection that recovers should consume the recovery message in the order of subTime.
     int64 subTime = 5;
     ChannelSubscriptionOptions subOptions = 6;
-    // Full channel data. Objects should be able to re-created from the stats in it.
-    google.protobuf.Any data = 7;
+    // Full channel data. Objects should be able to re-created from the states in it.
+    google.protobuf.Any channelData = 7;
+    // Additional data that are required to recover the connection, e.g. the spawned objects.
+    optional google.protobuf.Any recoveryData = 8;
 }
 
 message EndRecoveryMesssage {

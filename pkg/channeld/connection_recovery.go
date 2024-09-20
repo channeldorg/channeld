@@ -121,23 +121,33 @@ func (ch *Channel) tickRecoverableSubscriptions() {
 			// 		subOptions: value.oldSubOptions,
 			// 	},
 			// )
-			anyData, err := anypb.New(ch.GetDataMessage())
+			channelData, err := anypb.New(ch.GetDataMessage())
 			if err != nil {
-				ch.Logger().Error("failed to marshal channel data message for recovery", zap.Error(err))
-				// No need to recover other subscriptions if the channel data is not corrputed.
+				ch.Logger().Error("failed to marshal channel full data message for recovery", zap.Error(err))
+				// No need to recover other subscriptions if the channel data is corrputed.
 				break
 			}
+			recoveryMsg := &channeldpb.ChannelDataRecoveryMessage{
+				ChannelId:   uint32(ch.id),
+				ChannelType: ch.channelType,
+				Metadata:    ch.metadata,
+				OwnerConnId: uint32(ch.GetOwner().Id()),
+				SubTime:     int64(value.oldSubTime),
+				SubOptions:  value.oldSubOptions,
+				ChannelData: channelData,
+			}
+			if ch.Data().Extension() != nil {
+				recoveryData, err := anypb.New(ch.Data().Extension().GetRecoveryDataMessage())
+				if err != nil {
+					ch.Logger().Error("failed to marshal channel recovery data message for recovery", zap.Error(err))
+					// No need to recover other subscriptions if the spawn data is corrputed.
+					break
+				}
+				recoveryMsg.RecoveryData = recoveryData
+			}
 			value.connHandle.newConn.Send(MessageContext{
-				MsgType: channeldpb.MessageType_RECOVERY_CHANNEL_DATA,
-				Msg: &channeldpb.ChannelDataRecoveryMessage{
-					ChannelId:   uint32(ch.id),
-					ChannelType: ch.channelType,
-					Metadata:    ch.metadata,
-					OwnerConnId: uint32(ch.GetOwner().Id()),
-					SubTime:     int64(value.oldSubTime),
-					SubOptions:  value.oldSubOptions,
-					Data:        anyData,
-				},
+				MsgType:   channeldpb.MessageType_RECOVERY_CHANNEL_DATA,
+				Msg:       recoveryMsg,
 				ChannelId: uint32(ch.id),
 			})
 			delete(ch.recoverableSubs, key)
