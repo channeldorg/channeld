@@ -366,7 +366,7 @@ func (c *Connection) Close(err error) {
 	}
 
 	if err != nil && c.connectionType == channeldpb.ConnectionType_SERVER && GlobalSettings.ServerConnRecoverable {
-		setConnectionRecoverable(c)
+		c.makeRecoverable()
 	}
 
 	atomic.StoreInt32(&c.state, ConnectionState_CLOSING)
@@ -743,9 +743,7 @@ func (c *Connection) OnAuthenticated(pit string) {
 	// Try to recover from the previous connection
 	handle, exists := connectionRecoverHandles.Load(pit)
 	if exists {
-		c.recoverHandle = handle
-		c.recoverHandle.newConn = c
-		c.recoverHandle.startRecoveryTime = time.Now()
+		c.RecoverFromHandle(handle)
 	}
 }
 
@@ -765,10 +763,6 @@ func (c *Connection) RemoteAddr() net.Addr {
 	}
 	*/
 	return c.conn.RemoteAddr()
-}
-
-func (c *Connection) ShouldRecover() bool {
-	return c.recoverHandle != nil
 }
 
 func (c *Connection) recordPacket(p *channeldpb.Packet) {

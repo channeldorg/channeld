@@ -70,6 +70,14 @@ func handleClientToServerUserMessage(ctx MessageContext) {
 
 	var channelOwnerConnId uint32 = 0
 	if ownerConn := ctx.Channel.GetOwner(); ownerConn != nil && !ownerConn.IsClosing() {
+		if ownerConn.ShouldRecover() {
+			ctx.Connection.Logger().Verbose("dropp the client message as the channel owner connection is in recovery",
+				zap.Uint32("msgType", uint32(ctx.MsgType)),
+				zap.String("channelType", ctx.Channel.channelType.String()),
+				zap.Uint32("channelId", uint32(ctx.Channel.id)),
+			)
+			return
+		}
 		ownerConn.Send(ctx)
 		channelOwnerConnId = uint32(ownerConn.Id())
 	} else if ctx.Broadcast > 0 {

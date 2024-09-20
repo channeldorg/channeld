@@ -11,19 +11,13 @@ import (
 )
 
 type connectionRecoverHandle struct {
+	prevConnId  ConnectionId
 	disconnTime time.Time
 	// Once set, the channels will start to send ChannelDataRecoveryMessage to the new connection.
 	// TODO: make it a chan?
 	newConn           *Connection
 	startRecoveryTime time.Time
-	// channelSubs       []recoverableChannelSub
 }
-
-// type recoverableChannelSub struct {
-// 	channelId  common.ChannelId
-// 	subTime    ChannelTime
-// 	subOptions *channeldpb.ChannelSubscriptionOptions
-// }
 
 // Key: PIT
 var connectionRecoverHandles *xsync.MapOf[string, *connectionRecoverHandle]
@@ -33,12 +27,35 @@ func (h *connectionRecoverHandle) IsTimeOut() bool {
 		time.Since(h.disconnTime) > time.Millisecond*time.Duration(GlobalSettings.ServerConnRecoverTimeoutMs)
 }
 
-func setConnectionRecoverable(conn *Connection) {
+func (conn *Connection) makeRecoverable() {
 	handle := &connectionRecoverHandle{
+		prevConnId:  conn.Id(),
 		disconnTime: time.Now(),
 	}
 	connectionRecoverHandles.Store(conn.pit, handle)
 	conn.recoverHandle = handle
+}
+
+func (c *Connection) ShouldRecover() bool {
+	return c.recoverHandle != nil
+}
+
+func (c *Connection) RecoverFromHandle(handle *connectionRecoverHandle) {
+
+	// Update the connection with the previous connection id if the previous connection id is not used.
+	_, prevIdExists := allConnections.LoadAndDelete(handle.prevConnId)
+	if !prevIdExists {
+		c.Logger().Info("recover the connection with the previous connection id", zap.Uint32("prevConnId", uint32(handle.prevConnId)))
+		c.id = handle.prevConnId
+		allConnections.Store(c.id, c)
+	} else {
+		c.Logger().Error("failed to recover the connection as the previous connection id is used")
+		return
+	}
+
+	c.recoverHandle = handle
+	c.recoverHandle.newConn = c
+	c.recoverHandle.startRecoveryTime = time.Now()
 }
 
 func tickConnectionRecovery() {
@@ -60,6 +77,7 @@ func tickConnectionRecovery() {
 					Msg:       &channeldpb.EndRecoveryMesssage{},
 					ChannelId: uint32(GlobalChannelId),
 				})
+				value.newConn.recoverHandle = nil
 				connectionRecoverHandles.Delete(key)
 				return true
 			}
