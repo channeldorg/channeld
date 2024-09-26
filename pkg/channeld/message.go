@@ -93,7 +93,7 @@ func handleClientToServerUserMessage(ctx MessageContext) {
 		}
 	} else {
 		if len(ctx.Channel.recoverableSubs) == 0 {
-			ctx.Channel.Logger().Error("channel has no owner to forward the user-space messaged",
+			ctx.Channel.Logger().Warn("channel has no owner to forward the user-space messaged",
 				zap.Uint32("msgType", uint32(ctx.MsgType)),
 				zap.Uint32("connId", uint32(ctx.Connection.Id())),
 			)

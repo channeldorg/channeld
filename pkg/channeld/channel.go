@@ -66,7 +66,7 @@ type ConnectionInChannel interface {
 type recoverableSubscription struct {
 	connHandle    *connectionRecoverHandle
 	isOwner       bool
-	oldSubTime    ChannelTime
+	oldSubTime    int64
 	oldSubOptions *channeldpb.ChannelSubscriptionOptions
 }
 
@@ -423,13 +423,17 @@ func (ch *Channel) tickConnections() {
 
 			// If the recover handle exists, store the subscription of the connection so that it can recover later.
 			if conn.recoverHandle != nil {
-				ch.Logger().Debug("recover handle found on closing connection", zap.Uint32("connId", uint32(conn.Id())))
 				sub, exists := ch.subscribedConnections[conn]
 				if exists {
+					absSubTime := ch.startTime.UnixNano() + int64(sub.subTime)
+					ch.Logger().Debug("recover handle found on closing connection",
+						zap.Uint32("connId", uint32(conn.Id())),
+						zap.Int64("subTime", absSubTime))
+
 					ch.recoverableSubs[conn.pit] = &recoverableSubscription{
 						connHandle:    conn.recoverHandle,
 						isOwner:       ch.GetOwner() == conn,
-						oldSubTime:    sub.subTime,
+						oldSubTime:    absSubTime,
 						oldSubOptions: &sub.options,
 					}
 				}

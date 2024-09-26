@@ -131,10 +131,12 @@ func (ch *Channel) tickRecoverableSubscriptions() {
 				ChannelId:   uint32(ch.id),
 				ChannelType: ch.channelType,
 				Metadata:    ch.metadata,
-				OwnerConnId: uint32(ch.GetOwner().Id()),
-				SubTime:     int64(value.oldSubTime),
+				SubTime:     value.oldSubTime,
 				SubOptions:  value.oldSubOptions,
 				ChannelData: channelData,
+			}
+			if ch.HasOwner() {
+				recoveryMsg.OwnerConnId = uint32(ch.GetOwner().Id())
 			}
 			if ch.Data().Extension() != nil {
 				recoveryData, err := anypb.New(ch.Data().Extension().GetRecoveryDataMessage())
