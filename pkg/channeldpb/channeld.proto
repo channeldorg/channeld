@@ -155,6 +155,11 @@ enum MessageType {
     RECOVERY_CHANNEL_DATA = 20;
     // Used by @EndRecoveryMesssage
     RECOVERY_END = 21;
+
+    // Used by @ChannelOwnerLostMessage
+    CHANNEL_OWNER_LOST = 22;
+    // Used by @ChannelOwnerRecoveredMessage
+    CHANNEL_OWNER_RECOVERED = 23;
     
     // Used by @DebugGetSpatialRegionsMessage
     DEBUG_GET_SPATIAL_REGIONS = 99;
@@ -363,6 +368,16 @@ message ChannelDataRecoveryMessage {
 
 message EndRecoveryMesssage {
 
+}
+
+// Sent from channeld to the subscribed connections of a channel when the owner of the channel is lost.
+// The client app should decide for itself which functionalities to disable until the owner is recovered.
+message ChannelOwnerLostMessage {
+}
+
+// Sent from channeld to the subscribed connections of a channel when the owner of the channel is recovered.
+// The client app should re-enable the functionalities that are disabled when the owner is lost.
+message ChannelOwnerRecoveredMessage {
 }
 
 // ----------------- SPATIAL messages start --------------------//

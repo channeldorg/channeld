@@ -66,7 +66,9 @@ type ChannelSettingsType struct {
 	DefaultFanOutIntervalMs        uint32
 	DefaultFanOutDelayMs           int32
 	RemoveChannelAfterOwnerRemoved bool
-	ACLSettings                    ACLSettingsType
+	// Should the channel send ChannelOwnerLost and ChannelOwnerRecovered message to its subscribers when the owner is lost and recovered?
+	SendOwnerLostAndRecovered bool
+	ACLSettings               ACLSettingsType
 	// Optinal. The full name of the Protobuf message type for the channel data (including the package name)
 	DataMsgFullName string
 }
@@ -97,6 +99,7 @@ var GlobalSettings = GlobalSettingsType{
 			DefaultFanOutIntervalMs:        20,
 			DefaultFanOutDelayMs:           0,
 			RemoveChannelAfterOwnerRemoved: false,
+			SendOwnerLostAndRecovered:      false,
 		},
 	},
 }

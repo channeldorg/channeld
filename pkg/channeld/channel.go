@@ -423,6 +423,7 @@ func (ch *Channel) tickConnections() {
 
 			// If the recover handle exists, store the subscription of the connection so that it can recover later.
 			if conn.recoverHandle != nil {
+				isOwner := ch.GetOwner() == conn
 				sub, exists := ch.subscribedConnections[conn]
 				if exists {
 					absSubTime := ch.startTime.UnixNano() + int64(sub.subTime)
@@ -432,10 +433,19 @@ func (ch *Channel) tickConnections() {
 
 					ch.recoverableSubs[conn.pit] = &recoverableSubscription{
 						connHandle:    conn.recoverHandle,
-						isOwner:       ch.GetOwner() == conn,
+						isOwner:       isOwner,
 						oldSubTime:    absSubTime,
 						oldSubOptions: &sub.options,
 					}
+				}
+
+				if isOwner && GlobalSettings.GetChannelSettings(ch.channelType).SendOwnerLostAndRecovered {
+					ch.Broadcast(MessageContext{
+						MsgType:   channeldpb.MessageType_CHANNEL_OWNER_LOST,
+						Msg:       &channeldpb.ChannelOwnerLostMessage{},
+						Broadcast: uint32(channeldpb.BroadcastType_ALL_BUT_OWNER),
+						ChannelId: uint32(ch.id),
+					})
 				}
 			}
 

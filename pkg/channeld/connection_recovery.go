@@ -153,6 +153,15 @@ func (ch *Channel) tickRecoverableSubscriptions() {
 				ChannelId: uint32(ch.id),
 			})
 			delete(ch.recoverableSubs, key)
+
+			if GlobalSettings.GetChannelSettings(ch.channelType).SendOwnerLostAndRecovered {
+				ch.Broadcast(MessageContext{
+					MsgType:   channeldpb.MessageType_CHANNEL_OWNER_RECOVERED,
+					Msg:       &channeldpb.ChannelOwnerRecoveredMessage{},
+					Broadcast: uint32(channeldpb.BroadcastType_ALL_BUT_OWNER),
+					ChannelId: uint32(ch.id),
+				})
+			}
 		}
 	}
 }
