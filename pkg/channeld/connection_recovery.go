@@ -10,6 +10,10 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
+// Time to wait for all channels to send ChannelDataRecoveryMessage to the new connection, before sending EndRecoveryMesssage.
+// This value should not be smaller than the tick interval of any recoverable channel.
+const ChannelDataRecoveryTimeout = time.Millisecond * 1000
+
 type connectionRecoverHandle struct {
 	prevConnId  ConnectionId
 	disconnTime time.Time
@@ -71,7 +75,7 @@ func tickConnectionRecovery() {
 			}
 
 			// Wait for all channels to send the ChannelDataRecoveryMessage
-			if time.Since(value.startRecoveryTime) > time.Millisecond*5000 {
+			if time.Since(value.startRecoveryTime) > ChannelDataRecoveryTimeout {
 				value.newConn.Send(MessageContext{
 					MsgType:   channeldpb.MessageType_RECOVERY_END,
 					Msg:       &channeldpb.EndRecoveryMesssage{},
@@ -155,12 +159,16 @@ func (ch *Channel) tickRecoverableSubscriptions() {
 			delete(ch.recoverableSubs, key)
 
 			if GlobalSettings.GetChannelSettings(ch.channelType).SendOwnerLostAndRecovered {
-				ch.Broadcast(MessageContext{
-					MsgType:   channeldpb.MessageType_CHANNEL_OWNER_RECOVERED,
-					Msg:       &channeldpb.ChannelOwnerRecoveredMessage{},
-					Broadcast: uint32(channeldpb.BroadcastType_ALL_BUT_OWNER),
-					ChannelId: uint32(ch.id),
-				})
+				// The mesage should be sent after EndRecoveryMesssage is sent.
+				go func() {
+					time.Sleep(ChannelDataRecoveryTimeout)
+					ch.Broadcast(MessageContext{
+						MsgType:   channeldpb.MessageType_CHANNEL_OWNER_RECOVERED,
+						Msg:       &channeldpb.ChannelOwnerRecoveredMessage{},
+						Broadcast: uint32(channeldpb.BroadcastType_ALL_BUT_OWNER),
+						ChannelId: uint32(ch.id),
+					})
+				}()
 			}
 		}
 	}
