@@ -16,7 +16,7 @@ func InitMessageHandlers() {
 	channeld.Event_EntityChannelSpatiallyOwned.Listen(handleEntityChannelSpatiallyOwned)
 }
 
-// Executed in the spatial channels or the GLOBAL channel (no-spatial scenario)
+// Executed in the spatial channels or the Global/Subworld channel (no-spatial scenario)
 func handleUnrealSpawnObject(ctx channeld.MessageContext) {
 	// server -> channeld -> client
 	msg, ok := ctx.Msg.(*channeldpb.ServerForwardMessage)
@@ -50,6 +50,7 @@ func handleUnrealSpawnObject(ctx channeld.MessageContext) {
 
 	// Update the message's spatial channelId based on the actor's location
 	oldChId := *spawnMsg.ChannelId
+	// Location is set only when the actor is in spatial channel
 	if spawnMsg.Location != nil {
 		spatialChId, err := channeld.GetSpatialController().GetChannelId(*spawnMsg.Location.ToSpatialInfo())
 		if err != nil {
@@ -83,7 +84,13 @@ func handleUnrealSpawnObject(ctx channeld.MessageContext) {
 			channeld.HandleServerToClientUserMessage(ctx)
 		}
 	} else {
-		addSpatialEntity(ctx.Channel, spawnMsg.Obj)
+		switch ctx.Channel.Type() {
+		case channeldpb.ChannelType_GLOBAL, channeldpb.ChannelType_SUBWORLD:
+			onSpawnObject(ctx.Channel, spawnMsg.Obj)
+		case channeldpb.ChannelType_SPATIAL:
+			addSpatialEntity(ctx.Channel, spawnMsg.Obj)
+		default:
+		}
 		channeld.HandleServerToClientUserMessage(ctx)
 	}
 
@@ -177,7 +184,14 @@ func handleUnrealDestroyObject(ctx channeld.MessageContext) {
 		return
 	}
 
-	removeSpatialEntity(ctx.Channel, destroyMsg.NetId)
+	switch ctx.Channel.Type() {
+	case channeldpb.ChannelType_GLOBAL, channeldpb.ChannelType_SUBWORLD:
+		onDestroyObject(ctx.Channel, destroyMsg.NetId)
+	case channeldpb.ChannelType_SPATIAL:
+		removeSpatialEntity(ctx.Channel, destroyMsg.NetId)
+	default:
+	}
+
 	// Send/broadcast the message
 	channeld.HandleServerToClientUserMessage(ctx)
 

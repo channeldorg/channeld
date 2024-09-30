@@ -29,7 +29,7 @@ func (c *aclTestConnection) HasAuthorityOver(ch *Channel) bool {
 	return false
 }
 
-func (c *aclTestConnection) Close() {
+func (c *aclTestConnection) Close(err error) {
 }
 
 func (c *aclTestConnection) IsClosing() bool {
@@ -68,6 +68,10 @@ func (c *aclTestConnection) Logger() *Logger {
 
 func (c *aclTestConnection) RemoteAddr() net.Addr {
 	return nil
+}
+
+func (c *aclTestConnection) ShouldRecover() bool {
+	return false
 }
 
 var idCounter = 0

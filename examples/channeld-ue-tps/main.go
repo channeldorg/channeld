@@ -19,6 +19,8 @@ func main() {
 	channeld.InitLogs()
 	channeld.InitMetrics()
 	channeld.InitConnections(channeld.GlobalSettings.ServerFSM, channeld.GlobalSettings.ClientFSM)
+	channeld.SetChannelDataExtension[unreal.RecoverableChannelDataExtension](channeldpb.ChannelType_GLOBAL)
+	channeld.SetChannelDataExtension[unreal.RecoverableChannelDataExtension](channeldpb.ChannelType_SUBWORLD)
 	channeld.InitChannels()
 
 	channeld.InitSpatialController()

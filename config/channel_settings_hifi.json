@@ -4,6 +4,7 @@
         "DefaultFanOutIntervalMs": 20,
         "DefaultFanOutDelayMs": 0,
         "RemoveChannelAfterOwnerRemoved": false,
+        "SendOwnerLostAndRecovered": true,
         "ACLSettings": {
             "Sub": 3,
             "Unsub": 3,
@@ -15,6 +16,7 @@
         "DefaultFanOutIntervalMs": 20,
         "DefaultFanOutDelayMs": 0,
         "RemoveChannelAfterOwnerRemoved": true,
+        "SendOwnerLostAndRecovered": true,
         "ACLSettings": {
             "Sub": 2,
             "Unsub": 2,
@@ -26,6 +28,7 @@
         "DefaultFanOutIntervalMs": 20,
         "DefaultFanOutDelayMs": 0,
         "RemoveChannelAfterOwnerRemoved": true,
+        "SendOwnerLostAndRecovered": true,
         "ACLSettings": {
             "Sub": 3,
             "Unsub": 3,
@@ -36,11 +39,25 @@
         "TickIntervalMs": 20,
         "DefaultFanOutIntervalMs": 20,
         "DefaultFanOutDelayMs": 0,
-        "RemoveChannelAfterOwnerRemoved": true,
+        "RemoveChannelAfterOwnerRemoved": false,
+        "SendOwnerLostAndRecovered": true,
         "ACLSettings": {
             "Sub": 3,
             "Unsub": 3,
             "Remove": 2
         }
+    },
+    "5": {
+        "TickIntervalMs": 20,
+        "DefaultFanOutIntervalMs": 20,
+        "DefaultFanOutDelayMs": 0,
+        "RemoveChannelAfterOwnerRemoved": true,
+        "SendOwnerLostAndRecovered": false,
+        "ACLSettings": {
+            "Sub": 3,
+            "Unsub": 3,
+            "Remove": 2
+        },
+        "DataMsgFullName": "tpspb.EntityChannelData"
     }
 }

@@ -104,6 +104,8 @@ type Connection struct {
 	closeHandlers        []func()
 	replaySession        *replaypb.ReplaySession
 	spatialSubscriptions *xsync.MapOf[common.ChannelId, *channeldpb.ChannelSubscriptionOptions]
+
+	recoverHandle *connectionRecoverHandle
 }
 
 var allConnections *xsync.MapOf[ConnectionId, *Connection]
@@ -144,6 +146,11 @@ func InitConnections(serverFsmPath string, clientFsmPath string) {
 			zap.String("path", clientFsmPath),
 			zap.String("currentState", clientFsm.CurrentState().Name),
 		)
+	}
+
+	connectionRecoverHandles = xsync.NewMapOf[*connectionRecoverHandle]()
+	if GlobalSettings.ServerConnRecoverable {
+		go tickConnectionRecovery()
 	}
 }
 
@@ -341,7 +348,7 @@ func (c *Connection) AddCloseHandler(handlerFunc func()) {
 	c.closeHandlers = append(c.closeHandlers, handlerFunc)
 }
 
-func (c *Connection) Close() {
+func (c *Connection) Close(err error) {
 	defer func() {
 		recover()
 	}()
@@ -358,6 +365,10 @@ func (c *Connection) Close() {
 		handlerFunc()
 	}
 
+	if err != nil && c.connectionType == channeldpb.ConnectionType_SERVER && GlobalSettings.ServerConnRecoverable {
+		c.makeRecoverable()
+	}
+
 	atomic.StoreInt32(&c.state, ConnectionState_CLOSING)
 	c.conn.Close()
 	close(c.sendQueue)
@@ -369,7 +380,7 @@ func (c *Connection) Close() {
 }
 
 func (c *Connection) IsClosing() bool {
-	return c.state > ConnectionState_AUTHENTICATED
+	return c.state >= ConnectionState_CLOSING
 }
 
 func (c *Connection) receive() {
@@ -395,7 +406,7 @@ func (c *Connection) receive() {
 				zap.String("remoteAddr", c.conn.RemoteAddr().String()),
 			)
 		}
-		c.Close()
+		c.Close(err)
 		return
 	}
 	c.readPos += bytesRead
@@ -410,7 +421,7 @@ func (c *Connection) receive() {
 		packet, err := c.readPacket(&bufPos)
 		// there's a wire format error, close the connection to give a quick feedback to the other end.
 		if err != nil {
-			c.Close()
+			c.Close(err)
 			return
 
 		}
@@ -727,6 +738,12 @@ func (c *Connection) OnAuthenticated(pit string) {
 
 	if !c.fsm.MoveToNextState() {
 		c.Logger().Error("no state found after the authenticated state")
+	}
+
+	// Try to recover from the previous connection
+	handle, exists := connectionRecoverHandles.Load(pit)
+	if exists {
+		c.RecoverFromHandle(handle)
 	}
 }
 

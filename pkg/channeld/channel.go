@@ -47,7 +47,9 @@ type ConnectionInChannel interface {
 	GetConnectionType() channeldpb.ConnectionType
 	OnAuthenticated(pit string)
 	HasAuthorityOver(ch *Channel) bool
-	Close()
+	// v0.8.0: if error is not nil, the close is considered as unexpected.
+	// In that case, if the connection should recover, its state will be saved until the recovery or timeout.
+	Close(err error)
 	IsClosing() bool
 	Send(ctx MessageContext)
 	// Returns the subscription instance if successfully subscribed, and true if subscription message should be sent.
@@ -58,6 +60,14 @@ type ConnectionInChannel interface {
 	HasInterestIn(spatialChId common.ChannelId) bool
 	Logger() *Logger
 	RemoteAddr() net.Addr
+	ShouldRecover() bool
+}
+
+type recoverableSubscription struct {
+	connHandle    *connectionRecoverHandle
+	isOwner       bool
+	oldSubTime    int64
+	oldSubOptions *channeldpb.ChannelSubscriptionOptions
 }
 
 type Channel struct {
@@ -86,6 +96,9 @@ type Channel struct {
 	enableClientBroadcast bool
 	logger                *Logger
 	removing              int32
+
+	// Key: PIT of the recoverable connection
+	recoverableSubs map[string]*recoverableSubscription
 }
 
 const (
@@ -169,7 +182,8 @@ func createChannelWithId(channelId common.ChannelId, t channeldpb.ChannelType, o
 			zap.String("channelType", t.String()),
 			zap.Uint32("channelId", uint32(channelId)),
 		)},
-		removing: 0,
+		removing:        0,
+		recoverableSubs: make(map[string]*recoverableSubscription),
 	}
 
 	if ch.channelType == channeldpb.ChannelType_ENTITY {
@@ -363,6 +377,8 @@ func (ch *Channel) Tick() {
 		ch.tickConnections()
 		ch.subLock.RUnlock()
 
+		ch.tickRecoverableSubscriptions()
+
 		tickDuration := time.Since(tickStart)
 		channelTickDuration.WithLabelValues(ch.channelType.String()).Set(float64(tickDuration) / float64(time.Millisecond))
 
@@ -401,8 +417,38 @@ func (ch *Channel) tickConnections() {
 	// }()
 	// ch.subLock.RLock()
 
-	for conn := range ch.subscribedConnections {
+	for key := range ch.subscribedConnections {
+		conn := key.(*Connection)
 		if conn.IsClosing() {
+
+			// If the recover handle exists, store the subscription of the connection so that it can recover later.
+			if conn.recoverHandle != nil {
+				isOwner := ch.GetOwner() == conn
+				sub, exists := ch.subscribedConnections[conn]
+				if exists {
+					absSubTime := ch.startTime.UnixNano() + int64(sub.subTime)
+					ch.Logger().Debug("recover handle found on closing connection",
+						zap.Uint32("connId", uint32(conn.Id())),
+						zap.Int64("subTime", absSubTime))
+
+					ch.recoverableSubs[conn.pit] = &recoverableSubscription{
+						connHandle:    conn.recoverHandle,
+						isOwner:       isOwner,
+						oldSubTime:    absSubTime,
+						oldSubOptions: &sub.options,
+					}
+				}
+
+				if isOwner && GlobalSettings.GetChannelSettings(ch.channelType).SendOwnerLostAndRecovered {
+					ch.Broadcast(MessageContext{
+						MsgType:   channeldpb.MessageType_CHANNEL_OWNER_LOST,
+						Msg:       &channeldpb.ChannelOwnerLostMessage{},
+						Broadcast: uint32(channeldpb.BroadcastType_ALL_BUT_OWNER),
+						ChannelId: uint32(ch.id),
+					})
+				}
+			}
+
 			// Unsub the connection from the channel
 			delete(ch.subscribedConnections, conn)
 			conn.Logger().Info("removed subscription of a disconnected endpoint", zap.Uint32("channelId", uint32(ch.id)))
@@ -413,31 +459,37 @@ func (ch *Channel) tickConnections() {
 					Event_GlobalChannelUnpossessed.Broadcast(struct{}{})
 				}
 				conn.Logger().Info("found removed ownner connection of channel", zap.Uint32("channelId", uint32(ch.id)))
-				if GlobalSettings.GetChannelSettings(ch.channelType).RemoveChannelAfterOwnerRemoved {
-					atomic.AddInt32(&ch.removing, 1)
 
-					// DO NOT remove the GLOBAL channel!
-					if ch != globalChannel {
-						// Only the GLOBAL channel can handle the channel removal
-						globalChannel.PutMessage(&channeldpb.RemoveChannelMessage{
-							ChannelId: uint32(ch.id),
-						}, handleRemoveChannel, nil, &channeldpb.MessagePack{
-							Broadcast: 0,
-							StubId:    0,
-							ChannelId: uint32(GlobalChannelId),
-						})
-					}
-
-					ch.Logger().Info("removing channel after the owner is removed")
+				// Don't remove the channel when the owner disconnects if the connection is recoverable.
+				if GlobalSettings.GetChannelSettings(ch.channelType).RemoveChannelAfterOwnerRemoved && conn.recoverHandle == nil {
+					removeChannelAfterOwnerRemoved(ch)
 					return
 				}
 			} else if conn != nil {
 				if ownerConn := ch.GetOwner(); ownerConn != nil {
-					ownerConn.sendUnsubscribed(MessageContext{}, ch, conn.(*Connection), 0)
+					ownerConn.sendUnsubscribed(MessageContext{}, ch, conn, 0)
 				}
 			}
 		}
 	}
+}
+
+func removeChannelAfterOwnerRemoved(ch *Channel) {
+	atomic.AddInt32(&ch.removing, 1)
+
+	// DO NOT remove the GLOBAL channel!
+	if ch != globalChannel {
+		// Only the GLOBAL channel can handle the channel removal
+		globalChannel.PutMessage(&channeldpb.RemoveChannelMessage{
+			ChannelId: uint32(ch.id),
+		}, handleRemoveChannel, nil, &channeldpb.MessagePack{
+			Broadcast: 0,
+			StubId:    0,
+			ChannelId: uint32(GlobalChannelId),
+		})
+	}
+
+	ch.Logger().Info("removing channel after the owner is removed")
 }
 
 func (ch *Channel) Broadcast(ctx MessageContext) {
