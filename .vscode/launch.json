@@ -61,8 +61,7 @@
             "-mcb=13", 
             "-cfsm=config/client_authoratative_fsm.json", 
             "-chs=config/channel_settings_ue.json", 
-            "-scc=config/spatial_static_2x2.json",
-            "-scr=true"
+            "-scc=config/spatial_static_2x2.json"
         ]
     },
     {
