@@ -4,7 +4,7 @@ package channeldpb;
 
 import "google/protobuf/any.proto";
 
-option go_package = "github.com/metaworking/channeld/pkg/channeldpb";
+option go_package = "github.com/channeldorg/channeld/pkg/channeldpb";
 
 // The data packet that is sent between the endpoints. A packet can have multiple messages in the payload in one trip to improve the efficiency.
 message Packet {
@@ -149,6 +149,17 @@ enum MessageType {
 
     // Used by @SpatialChannelsReadyMessage
     SPATIAL_CHANNELS_READY = 18;
+
+    // // Used by @StartRecoveryMesssage
+    // RECOVERY_START = 19;
+    RECOVERY_CHANNEL_DATA = 20;
+    // Used by @EndRecoveryMesssage
+    RECOVERY_END = 21;
+
+    // Used by @ChannelOwnerLostMessage
+    CHANNEL_OWNER_LOST = 22;
+    // Used by @ChannelOwnerRecoveredMessage
+    CHANNEL_OWNER_RECOVERED = 23;
     
     // Used by @DebugGetSpatialRegionsMessage
     DEBUG_GET_SPATIAL_REGIONS = 99;
@@ -193,6 +204,7 @@ message AuthResultMessage {
     // However, because the compression type is specified per packet, the client has its freedom to control which compression type to use.
     // It's useful when the client has too much CPU load for the compression, or the network debug is needed.
     CompressionType compressionType = 3;
+    bool shouldRecover = 4;
 }
 
 enum ChannelDataAccess {
@@ -333,6 +345,39 @@ message ChannelDataUpdateMessage {
 // Response: no.
 message DisconnectMessage {
     uint32 connId = 1;
+}
+
+// message StartRecoveryMesssage {
+
+// }
+
+// A combination of channel sub/create/update messages that are sent from channeld to the connection during the recovery process.
+message ChannelDataRecoveryMessage {
+    uint32 channelId = 1;
+    ChannelType channelType = 2;
+    string metadata = 3;
+    uint32 ownerConnId = 4;
+    // Used to restore the channel data in order. The connection that recovers should consume the recovery message in the order of subTime.
+    int64 subTime = 5;
+    ChannelSubscriptionOptions subOptions = 6;
+    // Full channel data. Objects should be able to re-created from the states in it.
+    google.protobuf.Any channelData = 7;
+    // Additional data that are required to recover the connection, e.g. the spawned objects.
+    optional google.protobuf.Any recoveryData = 8;
+}
+
+message EndRecoveryMesssage {
+
+}
+
+// Sent from channeld to the subscribed connections of a channel when the owner of the channel is lost.
+// The client app should decide for itself which functionalities to disable until the owner is recovered.
+message ChannelOwnerLostMessage {
+}
+
+// Sent from channeld to the subscribed connections of a channel when the owner of the channel is recovered.
+// The client app should re-enable the functionalities that are disabled when the owner is lost.
+message ChannelOwnerRecoveredMessage {
 }
 
 // ----------------- SPATIAL messages start --------------------//

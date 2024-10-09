@@ -5,8 +5,8 @@ import (
 	"net"
 	"testing"
 
-	"github.com/metaworking/channeld/pkg/channeldpb"
-	"github.com/metaworking/channeld/pkg/common"
+	"github.com/channeldorg/channeld/pkg/channeldpb"
+	"github.com/channeldorg/channeld/pkg/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -711,7 +711,7 @@ func (c *testConnection) HasAuthorityOver(ch *Channel) bool {
 	return false
 }
 
-func (c *testConnection) Close() {
+func (c *testConnection) Close(err error) {
 	c.closing = true
 }
 
@@ -753,6 +753,10 @@ func (c *testConnection) Logger() *Logger {
 
 func (c *testConnection) RemoteAddr() net.Addr {
 	return nil
+}
+
+func (c *testConnection) ShouldRecover() bool {
+	return false
 }
 
 func TestGetChannelId2(t *testing.T) {

@@ -4,8 +4,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/metaworking/channeld/pkg/channeldpb"
-	"github.com/metaworking/channeld/pkg/common"
+	"github.com/channeldorg/channeld/pkg/channeldpb"
+	"github.com/channeldorg/channeld/pkg/common"
 )
 
 // Filter the merged list when the length of the merged list exceeds mergeOptions.ListSizeLimit

@@ -1,10 +1,10 @@
 package main
 
 import (
-	"github.com/metaworking/channeld/examples/channeld-ue-tps/tpspb"
-	"github.com/metaworking/channeld/pkg/channeld"
-	"github.com/metaworking/channeld/pkg/channeldpb"
-	"github.com/metaworking/channeld/pkg/unrealpb"
+	"github.com/channeldorg/channeld/examples/channeld-ue-tps/tpspb"
+	"github.com/channeldorg/channeld/pkg/channeld"
+	"github.com/channeldorg/channeld/pkg/channeldpb"
+	"github.com/channeldorg/channeld/pkg/unrealpb"
 )
 
 func InitTpsChannelDataTypes() {

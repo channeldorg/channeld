@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/metaworking/channeld/examples/unity-mirror-tanks/tankspb"
-	"github.com/metaworking/channeld/pkg/channeld"
-	"github.com/metaworking/channeld/pkg/channeldpb"
+	"github.com/channeldorg/channeld/examples/unity-mirror-tanks/tankspb"
+	"github.com/channeldorg/channeld/pkg/channeld"
+	"github.com/channeldorg/channeld/pkg/channeldpb"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 

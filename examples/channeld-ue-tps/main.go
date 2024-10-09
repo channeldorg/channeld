@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/metaworking/channeld/pkg/channeld"
-	"github.com/metaworking/channeld/pkg/channeldpb"
-	"github.com/metaworking/channeld/pkg/unreal"
-	"github.com/metaworking/channeld/pkg/unrealpb"
+	"github.com/channeldorg/channeld/pkg/channeld"
+	"github.com/channeldorg/channeld/pkg/channeldpb"
+	"github.com/channeldorg/channeld/pkg/unreal"
+	"github.com/channeldorg/channeld/pkg/unrealpb"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -19,6 +19,8 @@ func main() {
 	channeld.InitLogs()
 	channeld.InitMetrics()
 	channeld.InitConnections(channeld.GlobalSettings.ServerFSM, channeld.GlobalSettings.ClientFSM)
+	channeld.SetChannelDataExtension[unreal.RecoverableChannelDataExtension](channeldpb.ChannelType_GLOBAL)
+	channeld.SetChannelDataExtension[unreal.RecoverableChannelDataExtension](channeldpb.ChannelType_SUBWORLD)
 	channeld.InitChannels()
 
 	channeld.InitSpatialController()

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/metaworking/channeld/pkg/common"
+	"github.com/channeldorg/channeld/pkg/common"
 )
 
 type LocalhostAddr struct {

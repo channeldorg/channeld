@@ -1,8 +1,8 @@
 package unreal
 
 import (
-	"github.com/metaworking/channeld/pkg/common"
-	"github.com/metaworking/channeld/pkg/unrealpb"
+	"github.com/channeldorg/channeld/pkg/common"
+	"github.com/channeldorg/channeld/pkg/unrealpb"
 )
 
 func CheckEntityHandover(netId uint32, newLoc, oldLoc *unrealpb.FVector) (bool, *common.SpatialInfo, *common.SpatialInfo) { //, spatialNotifier common.SpatialInfoChangedNotifier) {

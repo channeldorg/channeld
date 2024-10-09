@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/channeldorg/channeld/internal/testpb"
+	"github.com/channeldorg/channeld/pkg/channeldpb"
 	"github.com/gorilla/websocket"
-	"github.com/metaworking/channeld/internal/testpb"
-	"github.com/metaworking/channeld/pkg/channeldpb"
 	"github.com/stretchr/testify/assert"
 	"github.com/xtaci/kcp-go"
 	"google.golang.org/protobuf/proto"

@@ -3,8 +3,9 @@ syntax = "proto3";
 package unrealpb;
 
 import "google/protobuf/any.proto";
+import "google/protobuf/descriptor.proto";
 
-option go_package = "github.com/metaworking/channeld/pkg/unrealpb";
+option go_package = "github.com/channeldorg/channeld/pkg/unrealpb";
 
 enum MessageType {
     INVALID = 0;
@@ -145,7 +146,33 @@ message SpatialChannelData {
     map<uint32, SpatialEntityState> entities = 1;
 }
 
+message ChannelRecoveryData {
+    map<uint32, UnrealObjectRef> objRefs = 1;
+}
 
+
+
+extend google.protobuf.MessageOptions {
+    // Used for tagging the state message with the Unreal class path, so that
+    // UChannelDataView::CheckUnspawnedObject can create the object.
+    optional string unreal_class_path = 50001;
+}
+
+message ActorState {
+    option (unreal_class_path) = "/Script/Engine.Actor";
+    bool removed = 1;
+    optional uint32 owningConnId = 2;
+    optional bool bReplicateMovement = 3;
+    optional uint32 localRole = 4;
+    optional uint32 remoteRole = 5;
+    optional UnrealObjectRef owner = 6;
+    optional bool bHidden = 7;
+    optional bool bTearOff = 8;
+    optional bool bCanBeDamaged = 9;
+    optional UnrealObjectRef instigator = 10;
+    optional FRepMovement replicatedMovement = 11;
+    optional FRepAttachment attachmentReplication = 12;
+}
 
 message FRepMovement {
     optional FVector linearVelocity = 1;
@@ -165,22 +192,8 @@ message FRepAttachment {
     optional ActorComponentRef attachComponent = 6;
 }
 
-message ActorState {
-    bool removed = 1;
-    optional uint32 owningConnId = 2;
-    optional bool bReplicateMovement = 3;
-    optional uint32 localRole = 4;
-    optional uint32 remoteRole = 5;
-    optional UnrealObjectRef owner = 6;
-    optional bool bHidden = 7;
-    optional bool bTearOff = 8;
-    optional bool bCanBeDamaged = 9;
-    optional UnrealObjectRef instigator = 10;
-    optional FRepMovement replicatedMovement = 11;
-    optional FRepAttachment attachmentReplication = 12;
-}
-
 message ActorComponentState {
+    option (unrealpb.unreal_class_path) = "/Script/Engine.ActorComponent";
     // Marks that the state should be removed from the containing map
     bool removed = 1;
     optional bool bIsActive = 2;
@@ -193,6 +206,7 @@ message ActorComponentStates {
 }
 
 message SceneComponentState {
+    option (unrealpb.unreal_class_path) = "/Script/Engine.SceneComponent";
     bool removed = 1;
     optional bool bAbsoluteLocation = 2;
     optional bool bAbsoluteRotation = 3;
@@ -270,6 +284,7 @@ message FRepRootMotionMontage {
 }
 
 message CharacterState {
+    option (unrealpb.unreal_class_path) = "/Script/Engine.Character";
     optional FRepRootMotionMontage rootMotion = 2;
     optional FBasedMovementInfo basedMovement = 3;
     optional float serverLastTransformUpdateTimeStamp = 4;
@@ -290,6 +305,7 @@ message Character_ClientMoveResponsePacked_Params {
     bytes packedBits = 2;
 }
 
+// DO NOT modify. Since v0.7.4, this message is only used in tests and benchmarks. 
 message PlayerState {
     optional float score = 2;
     optional int32 playerId = 3;
@@ -298,6 +314,7 @@ message PlayerState {
 }
 
 message ControllerState {
+    option (unrealpb.unreal_class_path) = "/Script/Engine.Controller";
     // APlayerState is an actor.
     UnrealObjectRef playerState = 2;
     UnrealObjectRef pawn = 3;
@@ -313,7 +330,9 @@ message Controller_ClientSetRotation_Params {
     bool bResetCamera = 2;
 }
 
+// DO NOT modify. Since v0.7.2, this message is only used in tests and benchmarks. 
 message PlayerControllerState {
+    option (unrealpb.unreal_class_path) = "/Script/Engine.PlayerController";
     optional FVector targetViewRotation = 2;
     optional FVector spawnLocation = 3;
 }
@@ -377,6 +396,7 @@ message PlayerController_ClientReceiveLocalizedMessage_Params {
 }
 
 message GameStateBase {
+    option (unrealpb.unreal_class_path) = "/Script/Engine.GameStateBase";
     optional string spectatorClassName = 2;
     optional string gameModeClassName = 3;
     // Compatible with UE 5.2+
@@ -385,6 +405,7 @@ message GameStateBase {
 }
 
 message PawnState {
+    option (unrealpb.unreal_class_path) = "/Script/Engine.Pawn";
     UnrealObjectRef playerState = 1;
     UnrealObjectRef controller = 2;
     optional uint32 remoteViewPitch = 3;
@@ -406,6 +427,7 @@ message FClientAdjustment {
 }
 
 message StaticMeshComponentState {
+    option (unrealpb.unreal_class_path) = "/Script/Engine.StaticMeshComponent";
     bool removed = 1;
     AssetRef staticMesh = 2;
 }

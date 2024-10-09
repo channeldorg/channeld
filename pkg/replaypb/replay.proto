@@ -4,7 +4,7 @@ package replaypb;
 
 import "pkg/channeldpb/channeld.proto";
 
-option go_package = "github.com/metaworking/channeld/pkg/replaypb";
+option go_package = "github.com/channeldorg/channeld/pkg/replaypb";
 
 message ReplayPacket {
     int64 offsetTime = 1;

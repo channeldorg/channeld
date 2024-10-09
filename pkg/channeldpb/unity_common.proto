@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package channeldpb;
 
-option go_package = "github.com/metaworking/channeld/pkg/channeldpb";
+option go_package = "github.com/channeldorg/channeld/pkg/channeldpb";
 option csharp_namespace = "Channeld";
 
 message Vector3f {

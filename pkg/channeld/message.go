@@ -3,8 +3,8 @@ package channeld
 import (
 	"strings"
 
-	"github.com/metaworking/channeld/pkg/channeldpb"
-	"github.com/metaworking/channeld/pkg/common"
+	"github.com/channeldorg/channeld/pkg/channeldpb"
+	"github.com/channeldorg/channeld/pkg/common"
 	"go.uber.org/zap"
 )
 
@@ -70,6 +70,14 @@ func handleClientToServerUserMessage(ctx MessageContext) {
 
 	var channelOwnerConnId uint32 = 0
 	if ownerConn := ctx.Channel.GetOwner(); ownerConn != nil && !ownerConn.IsClosing() {
+		if ownerConn.ShouldRecover() {
+			ctx.Connection.Logger().Verbose("dropp the client message as the channel owner connection is in recovery",
+				zap.Uint32("msgType", uint32(ctx.MsgType)),
+				zap.String("channelType", ctx.Channel.channelType.String()),
+				zap.Uint32("channelId", uint32(ctx.Channel.id)),
+			)
+			return
+		}
 		ownerConn.Send(ctx)
 		channelOwnerConnId = uint32(ownerConn.Id())
 	} else if ctx.Broadcast > 0 {
@@ -84,10 +92,12 @@ func handleClientToServerUserMessage(ctx MessageContext) {
 			return
 		}
 	} else {
-		ctx.Channel.Logger().Error("channel has no owner to forward the user-space messaged",
-			zap.Uint32("msgType", uint32(ctx.MsgType)),
-			zap.Uint32("connId", uint32(ctx.Connection.Id())),
-		)
+		if len(ctx.Channel.recoverableSubs) == 0 {
+			ctx.Channel.Logger().Warn("channel has no owner to forward the user-space messaged",
+				zap.Uint32("msgType", uint32(ctx.MsgType)),
+				zap.Uint32("connId", uint32(ctx.Connection.Id())),
+			)
+		}
 		return
 	}
 
@@ -233,13 +243,13 @@ func HandleServerToClientUserMessage(ctx MessageContext) {
 func handleAuth(ctx MessageContext) {
 	if ctx.Channel != globalChannel {
 		ctx.Connection.Logger().Error("illegal attemp to authenticate outside the GLOBAL channel")
-		ctx.Connection.Close()
+		ctx.Connection.Close(nil)
 		return
 	}
 	msg, ok := ctx.Msg.(*channeldpb.AuthMessage)
 	if !ok {
 		ctx.Connection.Logger().Error("mssage is not an AuthMessage, will not be handled.")
-		ctx.Connection.Close()
+		ctx.Connection.Close(nil)
 		return
 	}
 	//log.Printf("Auth PIT: %s, LT: %s\n", msg.PlayerIdentifierToken, msg.LoginToken)
@@ -247,7 +257,7 @@ func handleAuth(ctx MessageContext) {
 	_, banned := pitBlacklist[msg.PlayerIdentifierToken]
 	if banned {
 		securityLogger.Info("refused authentication of banned PIT", zap.String("pit", msg.PlayerIdentifierToken))
-		ctx.Connection.Close()
+		ctx.Connection.Close(nil)
 		return
 	}
 
@@ -264,7 +274,7 @@ func handleAuth(ctx MessageContext) {
 			authResult, err := authProvider.DoAuth(ctx.Connection.Id(), msg.PlayerIdentifierToken, msg.LoginToken)
 			if err != nil {
 				ctx.Connection.Logger().Error("failed to do auth", zap.Error(err))
-				ctx.Connection.Close()
+				ctx.Connection.Close(nil)
 			} else {
 				onAuthComplete(ctx, authResult, msg.PlayerIdentifierToken)
 			}
@@ -287,6 +297,7 @@ func onAuthComplete(ctx MessageContext, authResult channeldpb.AuthResultMessage_
 		Result:          authResult,
 		ConnId:          uint32(ctx.Connection.Id()),
 		CompressionType: GlobalSettings.CompressionType,
+		ShouldRecover:   ctx.Connection.ShouldRecover(),
 	}
 	ctx.Connection.Send(ctx)
 
@@ -671,5 +682,5 @@ func handleDisconnect(ctx MessageContext) {
 			zap.String("targetConnType", connToDisconnect.connectionType.String()),
 		)
 	}
-	connToDisconnect.Close()
+	connToDisconnect.Close(nil)
 }

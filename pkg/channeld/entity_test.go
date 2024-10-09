@@ -3,8 +3,8 @@ package channeld
 import (
 	"testing"
 
-	"github.com/metaworking/channeld/pkg/channeldpb"
-	"github.com/metaworking/channeld/pkg/common"
+	"github.com/channeldorg/channeld/pkg/channeldpb"
+	"github.com/channeldorg/channeld/pkg/common"
 	"github.com/stretchr/testify/assert"
 )
 

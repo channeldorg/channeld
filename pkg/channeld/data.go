@@ -3,10 +3,11 @@ package channeld
 import (
 	"container/list"
 	"fmt"
+	"reflect"
 
+	"github.com/channeldorg/channeld/pkg/channeldpb"
+	"github.com/channeldorg/channeld/pkg/common"
 	"github.com/indiest/fmutils"
-	"github.com/metaworking/channeld/pkg/channeldpb"
-	"github.com/metaworking/channeld/pkg/common"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
@@ -22,6 +23,7 @@ type ChannelData struct {
 	updateMsgBuffer      *list.List
 	maxFanOutIntervalMs  uint32
 	msgIndex             uint64
+	extension            ChannelDataExtension
 }
 
 // Indicate that the channel data message should be initialized with default values.
@@ -111,6 +113,7 @@ func (ch *Channel) InitData(dataMsg common.ChannelDataMessage, mergeOptions *cha
 		ch.data.msg, err = ReflectChannelDataMessage(ch.channelType)
 		if err != nil {
 			ch.logger.Info("unable to create default channel data message; will use the first received message to set", zap.String("chType", ch.channelType.String()), zap.Error(err))
+			initChannelDataExtension(ch)
 			return
 		}
 		ch.data.accumulatedUpdateMsg = proto.Clone(ch.data.msg)
@@ -123,6 +126,8 @@ func (ch *Channel) InitData(dataMsg common.ChannelDataMessage, mergeOptions *cha
 			return
 		}
 	}
+
+	initChannelDataExtension(ch)
 }
 
 func (ch *Channel) Data() *ChannelData {
@@ -380,4 +385,32 @@ func ReflectMerge(dst common.ChannelDataMessage, src common.ChannelDataMessage, 
 			return true
 		})
 	}
+}
+
+type ChannelDataExtension interface {
+	Init(ch *Channel)
+	GetRecoveryDataMessage() common.Message
+}
+
+func initChannelDataExtension(ch *Channel) {
+	extType, exists := channelDataExtensionRegistery[ch.channelType]
+	if exists {
+		ch.data.extension = reflect.New(extType).Interface().(ChannelDataExtension)
+		ch.data.extension.Init(ch)
+	}
+}
+
+func (d *ChannelData) Extension() ChannelDataExtension {
+	return d.extension
+}
+
+var channelDataExtensionRegistery = make(map[channeldpb.ChannelType]reflect.Type)
+
+func SetChannelDataExtension[T any, PT interface {
+	*T
+	ChannelDataExtension
+}](chType channeldpb.ChannelType) {
+	var zero [0]T
+	extType := reflect.TypeOf(zero).Elem()
+	channelDataExtensionRegistery[chType] = extType
 }
