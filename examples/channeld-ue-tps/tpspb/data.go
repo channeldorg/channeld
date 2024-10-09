@@ -3,11 +3,11 @@ package tpspb
 import (
 	"errors"
 
-	"github.com/metaworking/channeld/pkg/channeld"
-	"github.com/metaworking/channeld/pkg/channeldpb"
-	"github.com/metaworking/channeld/pkg/common"
-	"github.com/metaworking/channeld/pkg/unreal"
-	"github.com/metaworking/channeld/pkg/unrealpb"
+	"github.com/channeldorg/channeld/pkg/channeld"
+	"github.com/channeldorg/channeld/pkg/channeldpb"
+	"github.com/channeldorg/channeld/pkg/common"
+	"github.com/channeldorg/channeld/pkg/unreal"
+	"github.com/channeldorg/channeld/pkg/unrealpb"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"

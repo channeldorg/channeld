@@ -4,7 +4,7 @@ package tankspb;
 
 import "pkg/channeldpb/unity_common.proto";
 
-option go_package = "github.com/metaworking/channeld/examples/unity-mirror-tanks/tankspb";
+option go_package = "github.com/channeldorg/channeld/examples/unity-mirror-tanks/tankspb";
 option csharp_namespace = "Channeld.Examples.Tanks";
 
 message TankState {

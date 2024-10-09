@@ -3,9 +3,9 @@ package tps
 import (
 	"log"
 
-	"github.com/metaworking/channeld/pkg/channeldpb"
-	"github.com/metaworking/channeld/pkg/client"
-	"github.com/metaworking/channeld/pkg/replay"
+	"github.com/channeldorg/channeld/pkg/channeldpb"
+	"github.com/channeldorg/channeld/pkg/client"
+	"github.com/channeldorg/channeld/pkg/replay"
 )
 
 func Run() {

@@ -4,7 +4,7 @@ package testpb;
 
 import "google/protobuf/any.proto";
 
-option go_package = "github.com/metaworking/channeld/pkg/testpb";
+option go_package = "github.com/channeldorg/channeld/pkg/testpb";
 
 message TestChannelDataMessage {
     string text = 1;

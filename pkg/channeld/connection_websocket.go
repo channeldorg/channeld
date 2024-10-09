@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/channeldorg/channeld/pkg/channeldpb"
 	"github.com/gorilla/websocket"
-	"github.com/metaworking/channeld/pkg/channeldpb"
 	"go.uber.org/zap"
 )
 

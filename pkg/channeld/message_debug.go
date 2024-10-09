@@ -1,7 +1,7 @@
 package channeld
 
 import (
-	"github.com/metaworking/channeld/pkg/channeldpb"
+	"github.com/channeldorg/channeld/pkg/channeldpb"
 	"go.uber.org/zap"
 )
 

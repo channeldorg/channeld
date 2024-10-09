@@ -3,7 +3,7 @@ package tpspb
 import (
 	"testing"
 
-	"github.com/metaworking/channeld/pkg/channeld"
+	"github.com/channeldorg/channeld/pkg/channeld"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/encoding/protojson"
 )

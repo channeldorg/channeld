@@ -4,7 +4,7 @@ package tpspb;
 
 import "unreal_common.proto";
 
-option go_package = "github.com/metaworking/channeld/examples/channeld-ue-tps/tpspb";
+option go_package = "github.com/channeldorg/channeld/examples/channeld-ue-tps/tpspb";
 
 message TestRepGameState {
     optional int32 jumps = 1;

@@ -1,9 +1,9 @@
 package unreal
 
 import (
-	"github.com/metaworking/channeld/pkg/channeld"
-	"github.com/metaworking/channeld/pkg/common"
-	"github.com/metaworking/channeld/pkg/unrealpb"
+	"github.com/channeldorg/channeld/pkg/channeld"
+	"github.com/channeldorg/channeld/pkg/common"
+	"github.com/channeldorg/channeld/pkg/unrealpb"
 )
 
 // Global and Subworld channels maintain the spawned objects and send them to the recovering connection

@@ -11,9 +11,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/metaworking/channeld/pkg/channeldpb"
-	"github.com/metaworking/channeld/pkg/client"
-	"github.com/metaworking/channeld/pkg/replaypb"
+	"github.com/channeldorg/channeld/pkg/channeldpb"
+	"github.com/channeldorg/channeld/pkg/client"
+	"github.com/channeldorg/channeld/pkg/replaypb"
 	"google.golang.org/protobuf/proto"
 )
 

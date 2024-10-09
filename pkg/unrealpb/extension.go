@@ -3,9 +3,9 @@ package unrealpb
 import (
 	"errors"
 
-	"github.com/metaworking/channeld/pkg/channeld"
-	"github.com/metaworking/channeld/pkg/channeldpb"
-	"github.com/metaworking/channeld/pkg/common"
+	"github.com/channeldorg/channeld/pkg/channeld"
+	"github.com/channeldorg/channeld/pkg/channeldpb"
+	"github.com/channeldorg/channeld/pkg/common"
 )
 
 func (vec *FVector) ToSpatialInfo() *common.SpatialInfo {

@@ -40,7 +40,7 @@ channeld的最终目标是实现专用服务器的分布式组合，从而形成
 * FSM-based message filtering
 * Fanout-based data pub/sub of any type defined with Protobuf
 * Interest management based on channel and data pub/sub
-* Integration with the mainstream game engines ([Unity](https://github.com/metaworking/channeld-unity-mirror), [Unreal Engine](https://github.com/metaworking/channeld-ue-plugin))
+* Integration with the mainstream game engines ([Unity](https://github.com/channeldorg/channeld-unity-mirror), [Unreal Engine](https://github.com/channeldorg/channeld-ue-plugin))
 * [WIP] Backend servers load-balancing with auto-scaling
 
 关键特性：
@@ -48,7 +48,7 @@ channeld的最终目标是实现专用服务器的分布式组合，从而形成
 * 基于有限状态机的消息过滤
 * 基于扇出的数据发布/订阅，支持任意Protobuf定义的数据类型
 * 基于频道和数据发布/订阅的兴趣管理
-* 接入主流游戏引擎（[Unity](https://github.com/metaworking/channeld-unity-mirror), [Unreal Engine](https://github.com/metaworking/channeld-ue-plugin))
+* 接入主流游戏引擎（[Unity](https://github.com/channeldorg/channeld-unity-mirror), [Unreal Engine](https://github.com/channeldorg/channeld-ue-plugin))
 
 ## Performance 性能
 channeld is aimed to support 10K connections and 100K mps(messages per second) on a single node (uplink + downlink), and 10M+ mps in a distributed system.
@@ -86,8 +86,8 @@ Use the input box at the bottom to send messages, to the GLOBAL channel by defau
 
 ## 4. The Unity tank demo
 Follow these steps if the docker image has not been built for the tanks service yet:
-1. Check out the [unity-mirror-channeld](https://github.com/metaworking/channeld-unity-mirror) repo
-2. Create the Unity project following the [instruction](https://github.com/metaworking/channeld-unity-mirror#how-to-run-the-tank-demo)
+1. Check out the [unity-mirror-channeld](https://github.com/channeldorg/channeld-unity-mirror) repo
+2. Create the Unity project following the [instruction](https://github.com/channeldorg/channeld-unity-mirror#how-to-run-the-tank-demo)
 3. Either build the Linux player from Unity Editor (Build -> Linux Server), or via the command: `Unity -batchmode -nographics -projectPath <PATH_TO_YOUR_UNITY_PROJECT> -executeMethod BuildScript.BuildLinuxServer -logFile build.log -quit`. The path to the Unity Editor needs to added to the PATH environment argument in order to run the command.
 4. Build the docker image: `docker build -t channeld/tanks .`
 
@@ -95,4 +95,4 @@ Running the Unity tanks demo with Docker is similar to running the chat rooms de
 
 `docker-compose up tanks`
 
-Then you can the play the game in Unity Editor. See the [full instruction here](https://github.com/metaworking/channeld-unity-mirror#how-to-run-the-tank-demo).
+Then you can the play the game in Unity Editor. See the [full instruction here](https://github.com/channeldorg/channeld-unity-mirror#how-to-run-the-tank-demo).

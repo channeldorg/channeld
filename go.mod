@@ -1,4 +1,4 @@
-module github.com/metaworking/channeld
+module github.com/channeldorg/channeld
 
 go 1.18
 

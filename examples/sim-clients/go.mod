@@ -1,11 +1,11 @@
-module github.com/metaworking/channeld/examples/sim-clients
+module github.com/channeldorg/channeld/examples/sim-clients
 
 go 1.18
 
 require (
-	github.com/metaworking/channeld v0.0.0-00010101000000-000000000000
-	github.com/metaworking/channeld/examples/chat-rooms v0.0.0
-	github.com/metaworking/channeld/examples/unity-mirror-tanks v0.0.0
+	github.com/channeldorg/channeld v0.0.0-00010101000000-000000000000
+	github.com/channeldorg/channeld/examples/chat-rooms v0.0.0
+	github.com/channeldorg/channeld/examples/unity-mirror-tanks v0.0.0
 	google.golang.org/protobuf v1.28.1
 )
 
@@ -38,8 +38,8 @@ require (
 	golang.org/x/sys v0.18.0 // indirect
 )
 
-replace github.com/metaworking/channeld => ../..
+replace github.com/channeldorg/channeld => ../..
 
-replace github.com/metaworking/channeld/examples/chat-rooms => ../../examples/chat-rooms
+replace github.com/channeldorg/channeld/examples/chat-rooms => ../../examples/chat-rooms
 
-replace github.com/metaworking/channeld/examples/unity-mirror-tanks => ../../examples/unity-mirror-tanks
+replace github.com/channeldorg/channeld/examples/unity-mirror-tanks => ../../examples/unity-mirror-tanks

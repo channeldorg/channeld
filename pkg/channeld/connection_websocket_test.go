@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/channeldorg/channeld/internal/testpb"
 	"github.com/gorilla/websocket"
-	"github.com/metaworking/channeld/internal/testpb"
 	"google.golang.org/protobuf/proto"
 )
 

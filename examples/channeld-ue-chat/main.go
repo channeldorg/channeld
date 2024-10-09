@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/metaworking/channeld/examples/channeld-ue-chat/chatpb"
-	"github.com/metaworking/channeld/pkg/channeld"
-	"github.com/metaworking/channeld/pkg/channeldpb"
-	"github.com/metaworking/channeld/pkg/client"
+	"github.com/channeldorg/channeld/examples/channeld-ue-chat/chatpb"
+	"github.com/channeldorg/channeld/pkg/channeld"
+	"github.com/channeldorg/channeld/pkg/channeldpb"
+	"github.com/channeldorg/channeld/pkg/client"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/protobuf/types/known/anypb"
 )

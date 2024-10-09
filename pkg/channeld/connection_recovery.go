@@ -3,7 +3,7 @@ package channeld
 import (
 	"time"
 
-	"github.com/metaworking/channeld/pkg/channeldpb"
+	"github.com/channeldorg/channeld/pkg/channeldpb"
 	"github.com/puzpuzpuz/xsync/v2"
 	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
