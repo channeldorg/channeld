@@ -1,6 +1,6 @@
 module github.com/channeldorg/channeld/examples/channeld-ue-tps
 
-go 1.18
+go 1.24.0
 
 require (
 	github.com/channeldorg/channeld v0.0.0-00010101000000-000000000000
@@ -34,9 +34,10 @@ require (
 	github.com/xtaci/kcp-go v5.4.20+incompatible // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.7.0 // indirect
-	golang.org/x/crypto v0.21.0 // indirect
-	golang.org/x/net v0.23.0 // indirect
-	golang.org/x/sys v0.18.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
+	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0 // indirect
+	golang.org/x/net v0.47.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
