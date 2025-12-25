@@ -1,4 +1,4 @@
-FROM golang:1.18
+FROM golang:1.25.5
 
 COPY . /channeld/
 #RUN ls -la /channeld
