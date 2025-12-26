@@ -1,4 +1,4 @@
-FROM golang:1.18.8-alpine3.16 as builder
+FROM golang:1.25.5-alpine as builder
 
 COPY . /channeld
 
