@@ -6,6 +6,7 @@ import (
 
 	"github.com/channeldorg/channeld/pkg/channeld"
 	"github.com/channeldorg/channeld/pkg/channeldpb"
+	"github.com/channeldorg/channeld/pkg/inspector"
 	"github.com/channeldorg/channeld/pkg/unreal"
 	"github.com/channeldorg/channeld/pkg/unrealpb"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -33,6 +34,13 @@ func main() {
 	go http.ListenAndServe(":8080", nil)
 
 	go channeld.StartListening(channeldpb.ConnectionType_SERVER, channeld.GlobalSettings.ServerNetwork, channeld.GlobalSettings.ServerAddress)
+
+	// Initialize Inspector
+	inspector.RegisterInspectorHandlers()
+	// Start Inspector listener
+	if channeld.GlobalSettings.InspectorNetwork != "" {
+		go channeld.StartListening(channeldpb.ConnectionType_INSPECTOR, channeld.GlobalSettings.InspectorNetwork, channeld.GlobalSettings.InspectorAddress)
+	}
 
 	if channeld.GlobalSettings.ClientNetworkWaitMasterServer {
 		// After the Master server owned the GLOBAL channel, the client connection should be listened.

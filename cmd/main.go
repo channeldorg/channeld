@@ -6,6 +6,7 @@ import (
 
 	"github.com/channeldorg/channeld/pkg/channeld"
 	"github.com/channeldorg/channeld/pkg/channeldpb"
+	"github.com/channeldorg/channeld/pkg/inspector"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -45,6 +46,9 @@ func main() {
 	channeld.InitConnections(channeld.GlobalSettings.ServerFSM, channeld.GlobalSettings.ClientFSM)
 	channeld.InitChannels()
 
+	// Initialize Inspector
+	inspector.RegisterInspectorHandlers()
+
 	// Setup Prometheus
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(":8080", nil)
@@ -52,5 +56,8 @@ func main() {
 	go channeld.StartListening(channeldpb.ConnectionType_SERVER, channeld.GlobalSettings.ServerNetwork, channeld.GlobalSettings.ServerAddress)
 	// FIXME: After all the server connections are established, the client connection should be listened.*/
 	channeld.StartListening(channeldpb.ConnectionType_CLIENT, channeld.GlobalSettings.ClientNetwork, channeld.GlobalSettings.ClientAddress)
+
+	// Start Inspector listener on port 80
+	go channeld.StartListening(channeldpb.ConnectionType_INSPECTOR, channeld.GlobalSettings.InspectorNetwork, channeld.GlobalSettings.InspectorAddress)
 
 }

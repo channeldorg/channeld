@@ -112,6 +112,7 @@ var allConnections *xsync.MapOf[ConnectionId, *Connection]
 var nextConnectionId uint32 = 0
 var serverFsm *fsm.FiniteStateMachine
 var clientFsm *fsm.FiniteStateMachine
+var inspectorFsm *fsm.FiniteStateMachine
 
 func InitConnections(serverFsmPath string, clientFsmPath string) {
 	if allConnections != nil {
@@ -145,6 +146,28 @@ func InitConnections(serverFsmPath string, clientFsmPath string) {
 		rootLogger.Info("loaded client FSM",
 			zap.String("path", clientFsmPath),
 			zap.String("currentState", clientFsm.CurrentState().Name),
+		)
+	}
+
+	// Load Inspector FSM (reuse client FSM path for now, can be configured separately later)
+	inspectorFsmPath := GlobalSettings.InspectorFSM
+	if inspectorFsmPath == "" {
+		inspectorFsmPath = clientFsmPath // Fallback to client FSM
+	}
+	bytes, err = os.ReadFile(inspectorFsmPath)
+	if err == nil {
+		inspectorFsm, err = fsm.Load(bytes)
+	}
+	if err != nil {
+		rootLogger.Warn("failed to read inspector FSM, will use client FSM",
+			zap.Error(err),
+			zap.String("path", inspectorFsmPath),
+		)
+		inspectorFsm = clientFsm // Fallback to client FSM
+	} else {
+		rootLogger.Info("loaded inspector FSM",
+			zap.String("path", inspectorFsmPath),
+			zap.String("currentState", inspectorFsm.CurrentState().Name),
 		)
 	}
 
@@ -266,6 +289,9 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 	} else if t == channeldpb.ConnectionType_CLIENT {
 		readerSize = GlobalSettings.ClientReadBufferSize
 		// writerSize = GlobalSettings.ClientWriteBufferSize
+	} else if t == channeldpb.ConnectionType_INSPECTOR {
+		readerSize = GlobalSettings.InspectorReadBufferSize
+		// writerSize = GlobalSettings.InspectorWriteBufferSize
 	} else {
 		rootLogger.Panic("invalid connection type", zap.Int32("connType", int32(t)))
 	}
@@ -324,6 +350,16 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 	case channeldpb.ConnectionType_CLIENT:
 		if clientFsm != nil {
 			// IMPORTANT: always make a value copy
+			fsm := *clientFsm
+			connection.fsm = &fsm
+		}
+	case channeldpb.ConnectionType_INSPECTOR:
+		if inspectorFsm != nil {
+			// IMPORTANT: always make a value copy
+			fsm := *inspectorFsm
+			connection.fsm = &fsm
+		} else if clientFsm != nil {
+			// Fallback to client FSM if inspector FSM not loaded
 			fsm := *clientFsm
 			connection.fsm = &fsm
 		}

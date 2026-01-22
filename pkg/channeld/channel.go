@@ -610,3 +610,31 @@ func (c *Channel) SetOwner(conn ConnectionInChannel) {
 	// 2. set to dst server conn when the entity of the channel is handed over to the dst server.
 	c.ownerConnection = conn
 }
+
+// State returns the channel state (thread-safe read)
+func (ch *Channel) State() ChannelState {
+	return ch.state
+}
+
+// Metadata returns the channel metadata (thread-safe read)
+func (ch *Channel) Metadata() string {
+	return ch.metadata
+}
+
+// StartTime returns the channel creation time (thread-safe read)
+func (ch *Channel) StartTime() time.Time {
+	return ch.startTime
+}
+
+// GetAllChannelsSnapshot returns a snapshot of all channels for Inspector
+// This function is thread-safe as it creates a snapshot
+func GetAllChannelsSnapshot() []*Channel {
+	var channels []*Channel
+	allChannels.Range(func(id common.ChannelId, ch *Channel) bool {
+		if !ch.IsRemoving() {
+			channels = append(channels, ch)
+		}
+		return true
+	})
+	return channels
+}

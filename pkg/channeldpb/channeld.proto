@@ -72,6 +72,7 @@ enum ConnectionType {
     NO_CONNECTION = 0;
     SERVER = 1;
     CLIENT = 2;
+    INSPECTOR = 3;  // Inspector connections for debugging and monitoring
 }
 
 enum ChannelType {
@@ -160,6 +161,34 @@ enum MessageType {
     CHANNEL_OWNER_LOST = 22;
     // Used by @ChannelOwnerRecoveredMessage
     CHANNEL_OWNER_RECOVERED = 23;
+    
+    // ------------------ DEBUG messages (Inspector) start ---------------------//
+    // Debug/Inspector messages use range 81-99 (below USER_SPACE_START)
+    // These messages are for debugging and monitoring channeld
+    
+    // Debug event messages (81-86)
+    DEBUG_CHANNEL_LIST_SNAPSHOT = 81;   // Full channel list snapshot (full sync)
+    DEBUG_CONNECTION_UPDATED = 82;      // Connection updated
+    DEBUG_CHANNEL_DATA_UPDATED = 83;    // Channel data updated
+    DEBUG_CHANNEL_REMOVED = 84;         // Channel removed
+    DEBUG_CHANNEL_ADDED = 85;           // New channel added
+    DEBUG_CHANNEL_UPDATED = 86;         // Single channel updated (incremental)
+    
+    // Debug response messages (87-91)
+    DEBUG_ERROR = 87;
+    DEBUG_UPDATE_CHANNEL_DATA_RESULT = 88;
+    DEBUG_GET_CHANNEL_DATA_RESULT = 89;
+    DEBUG_GET_CHANNEL_RESULT = 90;
+    DEBUG_GET_CHANNELS_RESULT = 91;
+    
+    // Debug request messages (92-98)
+    DEBUG_UNSUBSCRIBE_CHANNEL_LIST = 92; // Unsubscribe from channel list updates
+    DEBUG_SUBSCRIBE_CHANNEL_LIST = 93;  // Subscribe to channel list updates
+    DEBUG_SEARCH_CHANNELS = 94;
+    DEBUG_UPDATE_CHANNEL_DATA = 95;
+    DEBUG_GET_CHANNEL_DATA = 96;
+    DEBUG_GET_CHANNEL = 97;
+    DEBUG_GET_CHANNELS = 98;
     
     // Used by @DebugGetSpatialRegionsMessage
     DEBUG_GET_SPATIAL_REGIONS = 99;
@@ -509,3 +538,122 @@ message DebugGetSpatialRegionsMessage {
 }
 
 // ----------------- INTERNAL messages start --------------------//
+
+// ------------------ DEBUG messages (Inspector) start ---------------------//
+
+// Request: Get channels list with pagination and filtering
+// Response: @DebugGetChannelsResponse
+message DebugGetChannelsRequest {
+    uint32 page = 1;              // Page number, starting from 1
+    uint32 page_size = 2;          // Number of items per page
+    ChannelType filter_type = 3;   // Filter by channel type, 0 means no filter
+    string search_keyword = 4;      // Search keyword (optional)
+}
+
+// Response: Channels list
+message DebugGetChannelsResponse {
+    repeated DebugChannelInfo channels = 1;
+    uint32 total = 2;              // Total number of channels
+    uint32 page = 3;               // Current page number
+    uint32 page_size = 4;          // Page size
+}
+
+// Request: Get single channel details
+// Response: @DebugGetChannelResponse
+message DebugGetChannelRequest {
+    uint32 channel_id = 1;
+}
+
+// Response: Channel details
+message DebugGetChannelResponse {
+    DebugChannelInfo channel = 1;
+    repeated uint32 subscriber_conn_ids = 2;  // List of subscriber connection IDs
+}
+
+// Request: Get channel data
+// Response: @DebugGetChannelDataResponse
+message DebugGetChannelDataRequest {
+    uint32 channel_id = 1;
+}
+
+// Response: Channel data as JSON
+message DebugGetChannelDataResponse {
+    uint32 channel_id = 1;
+    string json_data = 2;          // Channel data as JSON string
+    bool has_data = 3;             // Whether the channel has data
+}
+
+// Request: Update channel data (update leaf property by JSON path)
+// Response: @DebugUpdateChannelDataResponse
+message DebugUpdateChannelDataRequest {
+    uint32 channel_id = 1;
+    string json_path = 2;          // JSON path, e.g., "field.subfield" or "array[0]"
+    string value = 3;              // New value as JSON string
+    string value_type = 4;          // Value type: string, number, boolean, null, object, array
+}
+
+// Request: Subscribe to channel list updates
+// Response: No response, updates will be sent as events
+message DebugSubscribeChannelListRequest {
+    bool enable_full_sync = 1;     // If true, send full snapshot periodically (default: false)
+    uint32 full_sync_interval_sec = 2; // Full sync interval in seconds (default: 300, 5 minutes)
+}
+
+// Request: Unsubscribe from channel list updates
+// Response: No response
+message DebugUnsubscribeChannelListRequest {
+}
+
+// Response: Update result
+message DebugUpdateChannelDataResponse {
+    uint32 channel_id = 1;
+    bool success = 2;
+    string error_message = 3;     // Error message if failed
+}
+
+// Error response
+message DebugErrorResponse {
+    uint32 code = 1;               // Error code
+    string message = 2;            // Error message
+    string details = 3;             // Detailed information
+}
+
+// Channel information
+message DebugChannelInfo {
+    uint32 channel_id = 1;
+    ChannelType channel_type = 2;
+    uint32 owner_conn_id = 3;      // Owner connection ID, 0 means no owner
+    uint32 subscriber_count = 4;    // Number of subscribers
+    string metadata = 5;            // Metadata
+    int64 created_time = 6;         // Creation time (Unix timestamp in milliseconds)
+}
+
+// Event: Channel updated
+message DebugChannelUpdatedEvent {
+    uint32 channel_id = 1;
+    ChannelType channel_type = 2;
+    uint32 owner_conn_id = 3;
+    uint32 subscriber_count = 4;
+}
+
+// Event: Channel data updated
+message DebugChannelDataUpdatedEvent {
+    uint32 channel_id = 1;
+    string json_data = 2;          // Full data (optional, can send only changed paths if too large)
+    repeated string changed_paths = 3;  // List of changed JSON paths
+}
+
+// Event: Full channel list snapshot (for full sync)
+message DebugChannelListSnapshotEvent {
+    repeated DebugChannelInfo channels = 1;
+    uint32 total = 2;              // Total number of channels
+    int64 snapshot_time = 3;        // Snapshot timestamp (Unix timestamp in milliseconds)
+}
+
+// Event: Connection updated
+message DebugConnectionUpdatedEvent {
+    uint32 connection_id = 1;
+    ConnectionType connection_type = 2;
+    int32 state = 3;               // ConnectionState: 0=UNAUTHENTICATED, 1=AUTHENTICATED, 2=CLOSING
+    string remote_addr = 4;        // Remote address
+}

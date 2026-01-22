@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>WebSocket Connection Test</h1>
+    <div id="status">Not connected</div>
+    <div id="log"></div>
+    
+    <script type="module">
+        const statusDiv = document.getElementById('status');
+        const logDiv = document.getElementById('log');
+        
+        function log(message) {
+            console.log(message);
+            const p = document.createElement('p');
+            p.textContent = new Date().toISOString() + ': ' + message;
+            logDiv.appendChild(p);
+        }
+        
+        // Test WebSocket connection
+        const ws = new WebSocket('ws://localhost:12108');
+        ws.binaryType = 'arraybuffer';
+        
+        ws.onopen = () => {
+            statusDiv.textContent = 'Connected';
+            statusDiv.style.color = 'green';
+            log('WebSocket connected');
+            
+            // Wait a bit before sending data
+            setTimeout(() => {
+                log('Sending test packet...');
+                // Create a simple test packet with CHNL header
+                const testData = new Uint8Array([1, 2, 3, 4, 5]);
+                const packet = new Uint8Array(testData.length + 5);
+                
+                // CHNL header
+                packet[0] = 67;  // 'C'
+                packet[1] = 72;   // 'H'
+                packet[2] = (testData.length >> 8) & 0xff;  // High byte
+                packet[3] = testData.length & 0xff;         // Low byte
+                packet[4] = 0;   // Compression type
+                packet.set(testData, 5);
+                
+                log('Sending packet: ' + Array.from(packet).map(b => b.toString(16).padStart(2, '0')).join(' '));
+                ws.send(packet.buffer);
+            }, 1000);
+        };
+        
+        ws.onerror = (error) => {
+            statusDiv.textContent = 'Error';
+            statusDiv.style.color = 'red';
+            log('WebSocket error: ' + error);
+        };
+        
+        ws.onclose = (event) => {
+            statusDiv.textContent = 'Disconnected (code: ' + event.code + ')';
+            statusDiv.style.color = 'red';
+            log('WebSocket closed: code=' + event.code + ', reason=' + event.reason);
+        };
+        
+        ws.onmessage = (event) => {
+            log('Received message: ' + event.data.byteLength + ' bytes');
+            const view = new Uint8Array(event.data);
+            log('Data: ' + Array.from(view.slice(0, 20)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+        };
+    </script>
+</body>
+</html>

@@ -36,6 +36,12 @@ type GlobalSettingsType struct {
 	ClientWriteBufferSize         int
 	ClientFSM                     string
 
+	InspectorNetwork         string
+	InspectorAddress         string
+	InspectorReadBufferSize  int
+	InspectorWriteBufferSize int
+	InspectorFSM             string
+
 	CompressionType channeldpb.CompressionType
 
 	MaxConnectionIdBits uint8
@@ -85,7 +91,14 @@ var GlobalSettings = GlobalSettingsType{
 	ClientReadBufferSize:       0x0001ffff,
 	ClientWriteBufferSize:      512,
 	ClientFSM:                  "config/client_non_authoratative_fsm.json",
-	CompressionType:            channeldpb.CompressionType_NO_COMPRESSION,
+
+	InspectorNetwork:         "ws",
+	InspectorAddress:         ":80",
+	InspectorReadBufferSize:  0x0001ffff,
+	InspectorWriteBufferSize: 512,
+	InspectorFSM:             "config/client_authoratative_fsm.json", // Reuse client FSM for now
+
+	CompressionType: channeldpb.CompressionType_NO_COMPRESSION,
 	// Mirror uses int32 as the connId
 	MaxConnectionIdBits:     31,
 	ConnectionAuthTimeoutMs: 5000,
@@ -176,6 +189,12 @@ func (s *GlobalSettingsType) ParseFlag() error {
 	flag.IntVar(&s.ClientReadBufferSize, "crb", s.ClientReadBufferSize, "the read buffer size for the client connections")
 	flag.IntVar(&s.ClientWriteBufferSize, "cwb", s.ClientWriteBufferSize, "the write buffer size for the client connections")
 	flag.StringVar(&s.ClientFSM, "cfsm", s.ClientFSM, "the path to the client FSM config")
+
+	flag.StringVar(&s.InspectorNetwork, "in", "ws", "the network type for the inspector connections")
+	flag.StringVar(&s.InspectorAddress, "ia", ":80", "the network address for the inspector connections")
+	flag.IntVar(&s.InspectorReadBufferSize, "irb", s.InspectorReadBufferSize, "the read buffer size for the inspector connections")
+	flag.IntVar(&s.InspectorWriteBufferSize, "iwb", s.InspectorWriteBufferSize, "the write buffer size for the inspector connections")
+	flag.StringVar(&s.InspectorFSM, "ifsm", s.InspectorFSM, "the path to the inspector FSM config")
 
 	flag.BoolVar(&s.EnableRecordPacket, "erp", false, "enable record message packets send from clients")
 	flag.StringVar(&s.ReplaySessionPersistenceDir, "rspd", "", "the path to write packet recording")

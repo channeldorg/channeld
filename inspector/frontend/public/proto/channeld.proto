@@ -1,0 +1,659 @@
+syntax = "proto3";
+
+package channeldpb;
+
+import "google/protobuf/any.proto";
+
+option go_package = "github.com/channeldorg/channeld/pkg/channeldpb";
+
+// The data packet that is sent between the endpoints. A packet can have multiple messages in the payload in one trip to improve the efficiency.
+message Packet {
+    repeated MessagePack messages = 1;
+}
+
+// The serialized message and the context of it.
+message MessagePack {
+    // The ID of the channel that the message is sent to, or received from channeld.
+    // 0 is the GLOBAL channel; 1-65535 are for non-spatial channels;
+    // beyond (0xffff-0xffffffff) are reserved for spatial channels.
+    uint32 channelId = 1;
+
+    // How the message will be broadcasted to all connections in the channel? 
+    // See @BroadcastType. ONLY works for the user-space messages. 
+    uint32 broadcast = 2;
+
+    // The stub for RPC callbacks.
+    // 0 means the message is not a RPC message.
+    uint32 stubId = 3;
+
+    // The MessageType either defined in @MessageType enum, or defined in user space.
+    uint32 msgType = 4;
+
+    // The serialized message. It's Protobuf-marshalled byte array if the message is defined in @MessageType.
+    bytes msgBody = 5;
+}
+
+/*
+Connection Type | Broadcast_NO     | Broadacst_ALL                                       | Broadcast_SINGLE_CONNECTION
+------------------------------------------------------------------------------------------------------------------------
+Client          | forward to owner | broadcast if no owner && enableClientBroadcast      | same as Broadacst_ALL
+Server          | forward to owner | broadcast (same for ALL_BUT_XXXX) | forward to client connection
+*/
+// Can be used as the Flags-style enum in C#. See https://groups.google.com/g/protobuf/c/L105Q4NIk0U?pli=1.
+enum BroadcastType {
+    // No broadcast. All internal messages should use this type, and other types are ignored.
+    NO_BROADCAST = 0;
+
+    // Forward the message to the connection. Can only be used by the backend server.
+    // This has the same behavior as sending the message to the PRIVATE channel owned by the target connection with BroadcastType = NO.
+    SINGLE_CONNECTION = 1; 
+
+    // Broadcast the message to all the connections in the channel, the sender included.
+    ALL = 2;
+
+    // Broadcast the message to all the connections in the channel, the sender excluded.
+    ALL_BUT_SENDER = 4;
+
+    // Broadcast the message to all the connections in the channel, the owner excluded.
+    ALL_BUT_OWNER = 8;
+
+    // Broadcast the message to all client connections in the channel.
+    ALL_BUT_CLIENT = 16;
+
+    // Broadcast the message to all server connections in the channel, the owner excluded.
+    ALL_BUT_SERVER = 32;
+
+    // Broadcast the message to all the connections in all the adjacent(3x3) spatial channels. Ignored if the target channel is not a spatial channel.
+    // To ignore the center spatial channel, use ADJACENT_CHANNELS | ALL_BUT_OWNER; to ignore the sender(spatial server), use ADJACENT_CHANNELS | ALL_BUT_SENDER.
+    ADJACENT_CHANNELS = 64;
+}
+
+enum ConnectionType {
+    NO_CONNECTION = 0;
+    SERVER = 1;
+    CLIENT = 2;
+    INSPECTOR = 3;  // Inspector connections for debugging and monitoring
+}
+
+enum ChannelType {
+    UNKNOWN = 0;
+    // Default channel. Any message without ChannelId specified (equals 0) will be sent to this channel.
+    GLOBAL = 1;
+    // Per-connection channel. Useful to store the user data and subscribe the client to the data update.
+    PRIVATE = 2;
+    // A game "room" in a session-based game, or a "dungeon" in an MMORPG. Subworlds are spatially divided thus the interests are isolated.
+    SUBWORLD = 3;
+    // Spatial channels are spatailly connected. Using this type of channel to implement a seamless open world which consists of servers, and each server simulates a part of the world. 
+    // Only server connections can create the spatial channel.
+    SPATIAL = 4;
+
+    ENTITY = 5;
+
+    // The following are for tests.
+    TEST = 100;
+    TEST1 = 101;
+    TEST2 = 102;
+    TEST3 = 103;
+    TEST4 = 104;
+}
+
+enum MessageType {
+    INVALID = 0;
+
+    // Used by both @AuthMessage and @AuthResultMessage
+    AUTH = 1;
+    
+    // Used by both @CreateChannelMessage and @CreateChannelResultMessage
+    CREATE_CHANNEL = 3;
+    
+    // Used by @RemoveChannelMessage
+    REMOVE_CHANNEL = 4;
+    
+    // Used by both @ListChannelMessage and @ListChannelResultMessage
+    LIST_CHANNEL = 5;
+    
+    // Used by both @SubscribedToChannelMessage and @SubscribedToChannelResultMessage
+    SUB_TO_CHANNEL = 6;
+    
+    // Used by both @UnsubscribedFromChannelMessage and @UnsubscribedFromChannelResultMessage
+    UNSUB_FROM_CHANNEL = 7;
+    
+    // Used by @ChannelDataUpdateMessage
+    CHANNEL_DATA_UPDATE = 8;
+    
+    // Used by @DisconnectMessage
+    DISCONNECT = 9;
+    
+    // Used by both @CreateChannelMessage and @CreateSpatialChannelsResultMessage
+    CREATE_SPATIAL_CHANNEL = 10;
+    
+    // Used by both @QuerySpatialChannelMessage and @QuerySpatialChannelResultMessage
+    QUERY_SPATIAL_CHANNEL = 11;
+    
+    // Used by @ChannelDataHandoverMessage
+    CHANNEL_DATA_HANDOVER = 12;
+
+    // Used by @SpatialRegionsUpdateMessage
+    SPATIAL_REGIONS_UPDATE = 13;
+
+    // Used by @UpdateSpatialInterestMessage
+    UPDATE_SPATIAL_INTEREST = 14;
+
+    // Used by @CreateEntityChannelMessage
+    CREATE_ENTITY_CHANNEL = 15;
+
+    // Used by @AddEntityGroupMessage
+    ENTITY_GROUP_ADD = 16;
+
+    // Used by @RemoveEntityGroupMessage
+    ENTITY_GROUP_REMOVE = 17;
+
+    // Used by @SpatialChannelsReadyMessage
+    SPATIAL_CHANNELS_READY = 18;
+
+    // // Used by @StartRecoveryMesssage
+    // RECOVERY_START = 19;
+    RECOVERY_CHANNEL_DATA = 20;
+    // Used by @EndRecoveryMesssage
+    RECOVERY_END = 21;
+
+    // Used by @ChannelOwnerLostMessage
+    CHANNEL_OWNER_LOST = 22;
+    // Used by @ChannelOwnerRecoveredMessage
+    CHANNEL_OWNER_RECOVERED = 23;
+    
+    // ------------------ DEBUG messages (Inspector) start ---------------------//
+    // Debug/Inspector messages use range 81-99 (below USER_SPACE_START)
+    // These messages are for debugging and monitoring channeld
+    
+    // Debug event messages (81-86)
+    DEBUG_CHANNEL_LIST_SNAPSHOT = 81;   // Full channel list snapshot (full sync)
+    DEBUG_CONNECTION_UPDATED = 82;      // Connection updated
+    DEBUG_CHANNEL_DATA_UPDATED = 83;    // Channel data updated
+    DEBUG_CHANNEL_REMOVED = 84;         // Channel removed
+    DEBUG_CHANNEL_ADDED = 85;           // New channel added
+    DEBUG_CHANNEL_UPDATED = 86;         // Single channel updated (incremental)
+    
+    // Debug response messages (87-91)
+    DEBUG_ERROR = 87;
+    DEBUG_UPDATE_CHANNEL_DATA_RESULT = 88;
+    DEBUG_GET_CHANNEL_DATA_RESULT = 89;
+    DEBUG_GET_CHANNEL_RESULT = 90;
+    DEBUG_GET_CHANNELS_RESULT = 91;
+    
+    // Debug request messages (92-98)
+    DEBUG_UNSUBSCRIBE_CHANNEL_LIST = 92; // Unsubscribe from channel list updates
+    DEBUG_SUBSCRIBE_CHANNEL_LIST = 93;  // Subscribe to channel list updates
+    DEBUG_SEARCH_CHANNELS = 94;
+    DEBUG_UPDATE_CHANNEL_DATA = 95;
+    DEBUG_GET_CHANNEL_DATA = 96;
+    DEBUG_GET_CHANNEL = 97;
+    DEBUG_GET_CHANNELS = 98;
+    
+    // Used by @DebugGetSpatialRegionsMessage
+    DEBUG_GET_SPATIAL_REGIONS = 99;
+
+    // Start of any user-space defined message
+    USER_SPACE_START = 100;
+}
+
+// The message that is used to carries user-space message and communicate between channeld and backend servers.
+// Users don't need to use this message directly if they are using a client library.
+message ServerForwardMessage {
+    // The client that sends the user-space message to server or server sends the user-space message to.
+    // If a server sends to channeld with clientConnId = 0, the message will be forwarded to the channel owner.
+    uint32 clientConnId = 1;
+    // The user-space message. channeld leaves it as the original binary format.
+    bytes payload = 2;
+}
+
+// The message should have channelId = 0 in order to be handled.
+// Response: @AuthResultMessage. The GLOBAL channel owner will also receive this message (to handle the client's subscription if it doesn't have the authority to).
+message AuthMessage {
+    string playerIdentifierToken = 1;
+    string loginToken = 2;
+}
+
+enum CompressionType {
+    NO_COMPRESSION = 0;
+    // https://github.com/google/snappy
+    SNAPPY = 1;
+}
+
+message AuthResultMessage {
+    enum AuthResult {
+        SUCCESSFUL = 0;
+        INVALID_PIT = 1;
+        INVALID_LT = 2;
+    }
+    AuthResult result = 1;
+    uint32 connId = 2;
+    
+    // The compression type should be used for future communication.
+    // However, because the compression type is specified per packet, the client has its freedom to control which compression type to use.
+    // It's useful when the client has too much CPU load for the compression, or the network debug is needed.
+    CompressionType compressionType = 3;
+    bool shouldRecover = 4;
+}
+
+enum ChannelDataAccess {
+    NO_ACCESS = 0;
+    READ_ACCESS = 1;
+    WRITE_ACCESS = 2;
+}
+
+message ChannelSubscriptionOptions {
+	// Should the subscriber be able to update the channel data?
+    // Use enum over bool as in Protobuf, after setting a bool field to true, merging it with false won't work!
+    optional ChannelDataAccess dataAccess = 1;
+    
+    // How the fields are filtered before sending to the subscriber.
+    // For detailed usage, see https://developers.google.com/protocol-buffers/docs/reference/csharp/class/google/protobuf/well-known-types/field-mask.
+	repeated string dataFieldMasks = 2;
+    
+    // How frequent the updated channel data will be fanned-out to the subscriber, in millisecond. 
+    // For an MMORPG-style server/client, the value should be between 50-100, while an FPS-style game, the value should be between 10-30.
+	optional uint32 fanOutIntervalMs = 3;
+
+    // How long between the subscription and the first (and full-state) ChannelDataUpdateMessage being send to the subscriber, in millisecond.
+    // To be accurate, the first fan-out time will be (sub time + fan-out delay). It's possible to set the delay to a negative value to makee the first fan-out happen earlier.
+    // Fan-out delay is useful when the clients need spawn message (sent from the backend server) to be handled, before handling the ChannelDataUpdateMessage properly.
+    // In Mirror, it can take up to 100ms to wait.
+    optional int32 fanOutDelayMs = 4;
+
+    // Whether the subscriber should skip the fan-out of its own ChannelDataUpdate. Default is true.
+    optional bool skipSelfUpdateFanOut = 5;
+
+    // Whether the subscriber should skip the first fan-out that contains the full states. Default is false.
+    optional bool skipFirstFanOut = 6;
+}
+
+// Defines how two @ChannelDataUpdateMessage.data are merged.
+// The custom merge function should always be implemented for the sake of performance. Otherwise, 
+// the default merge that based on Protobuf's reflection will be used, and it's >10 times slower.
+message ChannelDataMergeOptions {
+    // By default, Protobuf appends the src list to the dst list. Setting this option to true will replace the dst list with the src list.
+	bool shouldReplaceList = 1;
+	
+    // If the value is greater than 0, truncate the the list when oversized.
+	uint32 listSizeLimit = 2;
+    
+    // If true, the top elements of the list will be truncated instead of the end. It's useful for scenarios like chat message list.
+    bool truncateTop = 3;
+	
+    // If true, the merge method will remove any map entry that has removed=true in its value.
+	bool shouldCheckRemovableMapField = 4;
+}
+
+// The message should have channelId = 0 in order to be handled.
+// Response: @CreateChannelResultMessage, if the MessageType is CREATE_CHANNEL and the channelType is not SPATIAL. The GLOBAL channel owner will also receive this message.
+// Response: @CreateSpatialChannelsResultMessage, if the MessageType is CREATE_SPATIAL_CHANNEL and the channelType is SPATIAL. The GLOBAL channel owner will also receive this message.
+// Response: @SubscribedToChannelResultMessage. The channel creator will also be subscribed to the channel immediately after the creation.
+message CreateChannelMessage {
+    ChannelType channelType = 1;
+    string metadata = 2;
+    ChannelSubscriptionOptions subOptions = 3;
+    google.protobuf.Any data = 4;
+    ChannelDataMergeOptions mergeOptions = 5;
+}
+
+message CreateChannelResultMessage {
+    ChannelType channelType = 1;
+    string metadata = 2;
+    uint32 ownerConnId = 3;
+    // The ID of the newly-created channel. Add this field to differentiate it from MessagePack.channelId.
+    uint32 channelId = 4;
+}
+
+// The message should have channelId = 0 in order to be handled.
+// Response: all connections in the channel will receive @RemoveChannelMessage. The GLOBAL channel owner will also receive this message.
+message RemoveChannelMessage {
+    uint32 channelId = 1;
+}
+
+// The message should have channelId = 0 in order to be handled.
+// Response: @ListChannelResultMessage
+message ListChannelMessage {
+    ChannelType typeFilter = 1;
+    repeated string metadataFilters = 2;
+}
+
+message ListChannelResultMessage {
+    message ChannelInfo {
+        uint32 channelId = 1;
+        ChannelType channelType = 2;
+        string metadata = 3;
+    }
+    repeated ChannelInfo channels = 1;
+}
+
+// Response: @SubscribedToChannelResultMessage. The message sender, the subscribed connection (if not the sender), and the channel owner will receive the message respectively.
+// If the connection has already been subscripbed to the channel, the subOptions will be merged, but no response message will be sent.
+message SubscribedToChannelMessage {
+    // The connection to be added to the channel is not necessarily the one sends the message.
+    // Remarks: only the channel owner or the GLOBAL channel owner can sub another connection to the channel.
+    uint32 connId = 1;
+    ChannelSubscriptionOptions subOptions = 2;
+}
+
+message SubscribedToChannelResultMessage {
+    // The connection that subscribed.
+    uint32 connId = 1;
+    ChannelSubscriptionOptions subOptions = 2;
+    ConnectionType connType = 3;
+    ChannelType channelType = 4;
+}
+
+// Response: @UnsubscribedFromChannelResultMessage. The message sender, the connection that unsubscribed, and the channel owner will receive the message respectively.
+message UnsubscribedFromChannelMessage {
+    // The connection to be removed from the channel is not necessarily the one sends the message.
+    // Remarks: only the channel owner or the GLOBAL channel can unsub another connection from the channel.
+    uint32 connId = 1;
+}
+
+message UnsubscribedFromChannelResultMessage {
+    // The connection that unsubsribed.
+    uint32 connId = 1;
+    ConnectionType connType = 2;
+    ChannelType channelType = 3;
+}
+
+// Response: no. Each connection in the channel receives the @ChannelDataUpdateMessage in every @ChannelSubscriptionOptions.FanOutIntervalMs
+message ChannelDataUpdateMessage {
+    google.protobuf.Any data = 1;
+
+    // The ID of the connection that causes the update of the channel data.
+    // In a server-authoratative system (which means the @ChannelDataUpdateMessage will only be sent by server), the servers need to send this field to channeld.
+    // If the sender is a client, this field will be ignored.
+    uint32 contextConnId = 2;
+}
+
+// Disconnect another connection from channeld. 
+// This message should only be sent by the server connection in a server-authoratative environment.
+// The message should have channelId = 0 in order to be handled.
+// Response: no.
+message DisconnectMessage {
+    uint32 connId = 1;
+}
+
+// message StartRecoveryMesssage {
+
+// }
+
+// A combination of channel sub/create/update messages that are sent from channeld to the connection during the recovery process.
+message ChannelDataRecoveryMessage {
+    uint32 channelId = 1;
+    ChannelType channelType = 2;
+    string metadata = 3;
+    uint32 ownerConnId = 4;
+    // Used to restore the channel data in order. The connection that recovers should consume the recovery message in the order of subTime.
+    int64 subTime = 5;
+    ChannelSubscriptionOptions subOptions = 6;
+    // Full channel data. Objects should be able to re-created from the states in it.
+    google.protobuf.Any channelData = 7;
+    // Additional data that are required to recover the connection, e.g. the spawned objects.
+    optional google.protobuf.Any recoveryData = 8;
+}
+
+message EndRecoveryMesssage {
+
+}
+
+// Sent from channeld to the subscribed connections of a channel when the owner of the channel is lost.
+// The client app should decide for itself which functionalities to disable until the owner is recovered.
+message ChannelOwnerLostMessage {
+}
+
+// Sent from channeld to the subscribed connections of a channel when the owner of the channel is recovered.
+// The client app should re-enable the functionalities that are disabled when the owner is lost.
+message ChannelOwnerRecoveredMessage {
+}
+
+// ----------------- SPATIAL messages start --------------------//
+
+// Left-handed coordinate system with Y-up rule.
+message SpatialInfo {
+    double x = 1;
+    double y = 2;
+    double z = 3;
+}
+
+message CreateSpatialChannelsResultMessage {
+    repeated uint32 spatialChannelId = 1;
+    string metadata = 2;
+    uint32 ownerConnId = 3;
+}
+
+// The message should have channelId = 0 in order to be handled.
+// Response: @QuerySpatialChannelResultMessage
+message QuerySpatialChannelMessage {
+    repeated SpatialInfo spatialInfo = 1;
+}
+
+message QuerySpatialChannelResultMessage {
+    repeated uint32 channelId = 1;
+}
+
+// Indicates that all the spatial channels are created by the spatial servers, so the servers can continue further initialization.
+message SpatialChannelsReadyMessage {
+    uint32 serverIndex = 1;
+    uint32 serverCount = 2;
+}
+
+// ALL connections in the source AND destination channels receive this messge when a handover happpned.
+// Handover means an object moves from a spatial channel to another. It doesn't necessarily mean the objece moves from a spatial server to another.
+message ChannelDataHandoverMessage {
+    uint32 srcChannelId = 1;
+    uint32 dstChannelId = 2;
+    
+    // The ID of the client connection that triggered the handover. If the handover is triggered by server (e.g. NPC movement), the value will be 0.
+    uint32 contextConnId = 3;
+
+    // The data that migrate from the source channel to the destination channel. It can be the spatial channel data or anything, as long as the spatial servers can use it to process the handover.
+    google.protobuf.Any data = 4;
+}
+
+message SpatialRegion {
+    SpatialInfo min = 1;
+    SpatialInfo max = 2;
+    uint32 channelId = 3;
+    uint32 serverIndex = 4;
+}
+
+// channeld updates the information of spatial channels and regions to the spatial servers.
+// Spatial servers use this information mainly for mapping the position of a spawned object to a correct channelId at realtime (rather than querying it before sending the spawn message to the client).
+// Sent upon the creation of spatial channels (after @CreateSpatialChannelsResultMessage being sent), or any regional change (basiclally caused by the loadbalancer).
+message SpatialRegionsUpdateMessage {
+    repeated SpatialRegion regions = 1;
+}
+
+message SpatialInterestQuery {
+
+    message SpotsAOI {
+        repeated SpatialInfo spots = 1;
+        // The fixed distance between each spot and the player. If not specified, 0 = nearest will be used.
+        repeated uint32 dists = 2;
+    }
+    optional SpotsAOI spotsAOI = 1;
+
+    message BoxAOI {
+        SpatialInfo center = 1;
+        SpatialInfo extent = 2;
+    }
+    optional BoxAOI boxAOI = 2;
+
+    message SphereAOI {
+        SpatialInfo center = 1;
+        double radius = 2;
+    }
+    optional SphereAOI sphereAOI = 3;
+
+    message ConeAOI {
+        SpatialInfo center = 1;
+        SpatialInfo direction = 2;
+        // In radians.
+        double angle = 3;
+        double radius = 4;
+    }
+    optional ConeAOI coneAOI = 4;
+
+}
+
+message UpdateSpatialInterestMessage {
+    uint32 connId = 1;
+    SpatialInterestQuery query = 2;
+}
+
+message CreateEntityChannelMessage {
+    uint32 entityId = 1;
+    string metadata = 2;
+    ChannelSubscriptionOptions subOptions = 3;
+    google.protobuf.Any data = 4;
+    ChannelDataMergeOptions mergeOptions = 5;
+    bool isWellKnown = 6;
+}
+
+enum EntityGroupType {
+    HANDOVER = 0;
+    LOCK = 1;
+}
+
+// Add specified entities to the handover/lock group of the entity channel. Should sent by the entity channel owner.
+message AddEntityGroupMessage {
+    EntityGroupType type = 1;
+    repeated uint32 EntitiesToAdd = 2;
+}
+
+// Remove specified entities from the handover/lock group of the entity channel. Should sent by the entity channel owner.
+message RemoveEntityGroupMessage {
+    EntityGroupType type = 1;
+    repeated uint32 EntitiesToRemove = 2;
+}
+
+// ------------------ DEBUG messages start ---------------------//
+
+// Client requests the spatail regions information. Only valid in Development mode (with "-dev" launch argument).
+// Response: @SpatialRegionsUpdateMessage
+message DebugGetSpatialRegionsMessage {
+}
+
+// ----------------- INTERNAL messages start --------------------//
+
+// ------------------ DEBUG messages (Inspector) start ---------------------//
+
+// Request: Get channels list with pagination and filtering
+// Response: @DebugGetChannelsResponse
+message DebugGetChannelsRequest {
+    uint32 page = 1;              // Page number, starting from 1
+    uint32 page_size = 2;          // Number of items per page
+    ChannelType filter_type = 3;   // Filter by channel type, 0 means no filter
+    string search_keyword = 4;      // Search keyword (optional)
+}
+
+// Response: Channels list
+message DebugGetChannelsResponse {
+    repeated DebugChannelInfo channels = 1;
+    uint32 total = 2;              // Total number of channels
+    uint32 page = 3;               // Current page number
+    uint32 page_size = 4;          // Page size
+}
+
+// Request: Get single channel details
+// Response: @DebugGetChannelResponse
+message DebugGetChannelRequest {
+    uint32 channel_id = 1;
+}
+
+// Response: Channel details
+message DebugGetChannelResponse {
+    DebugChannelInfo channel = 1;
+    repeated uint32 subscriber_conn_ids = 2;  // List of subscriber connection IDs
+}
+
+// Request: Get channel data
+// Response: @DebugGetChannelDataResponse
+message DebugGetChannelDataRequest {
+    uint32 channel_id = 1;
+}
+
+// Response: Channel data as JSON
+message DebugGetChannelDataResponse {
+    uint32 channel_id = 1;
+    string json_data = 2;          // Channel data as JSON string
+    bool has_data = 3;             // Whether the channel has data
+}
+
+// Request: Update channel data (update leaf property by JSON path)
+// Response: @DebugUpdateChannelDataResponse
+message DebugUpdateChannelDataRequest {
+    uint32 channel_id = 1;
+    string json_path = 2;          // JSON path, e.g., "field.subfield" or "array[0]"
+    string value = 3;              // New value as JSON string
+    string value_type = 4;          // Value type: string, number, boolean, null, object, array
+}
+
+// Request: Subscribe to channel list updates
+// Response: No response, updates will be sent as events
+message DebugSubscribeChannelListRequest {
+    bool enable_full_sync = 1;     // If true, send full snapshot periodically (default: false)
+    uint32 full_sync_interval_sec = 2; // Full sync interval in seconds (default: 300, 5 minutes)
+}
+
+// Request: Unsubscribe from channel list updates
+// Response: No response
+message DebugUnsubscribeChannelListRequest {
+}
+
+// Response: Update result
+message DebugUpdateChannelDataResponse {
+    uint32 channel_id = 1;
+    bool success = 2;
+    string error_message = 3;     // Error message if failed
+}
+
+// Error response
+message DebugErrorResponse {
+    uint32 code = 1;               // Error code
+    string message = 2;            // Error message
+    string details = 3;             // Detailed information
+}
+
+// Channel information
+message DebugChannelInfo {
+    uint32 channel_id = 1;
+    ChannelType channel_type = 2;
+    uint32 owner_conn_id = 3;      // Owner connection ID, 0 means no owner
+    uint32 subscriber_count = 4;    // Number of subscribers
+    string metadata = 5;            // Metadata
+    int64 created_time = 6;         // Creation time (Unix timestamp in milliseconds)
+}
+
+// Event: Channel updated
+message DebugChannelUpdatedEvent {
+    uint32 channel_id = 1;
+    ChannelType channel_type = 2;
+    uint32 owner_conn_id = 3;
+    uint32 subscriber_count = 4;
+}
+
+// Event: Channel data updated
+message DebugChannelDataUpdatedEvent {
+    uint32 channel_id = 1;
+    string json_data = 2;          // Full data (optional, can send only changed paths if too large)
+    repeated string changed_paths = 3;  // List of changed JSON paths
+}
+
+// Event: Full channel list snapshot (for full sync)
+message DebugChannelListSnapshotEvent {
+    repeated DebugChannelInfo channels = 1;
+    uint32 total = 2;              // Total number of channels
+    int64 snapshot_time = 3;        // Snapshot timestamp (Unix timestamp in milliseconds)
+}
+
+// Event: Connection updated
+message DebugConnectionUpdatedEvent {
+    uint32 connection_id = 1;
+    ConnectionType connection_type = 2;
+    int32 state = 3;               // ConnectionState: 0=UNAUTHENTICATED, 1=AUTHENTICATED, 2=CLOSING
+    string remote_addr = 4;        // Remote address
+}

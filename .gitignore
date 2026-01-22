@@ -7,3 +7,5 @@ _data
 .devcontainer/devcontainer.json
 *.gen.go
 channeldgenpb
+pkg/inspector/channeldpb.pb.go
+.cursor
